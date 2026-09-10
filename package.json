@@ -1,0 +1,22 @@
+{
+  "name": "am-couture",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev -w backend",
+    "dev:frontend": "npm run dev -w frontend",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:seed": "node --experimental-strip-types --env-file=.env prisma/seed.js",
+    "build": "npm run build -w frontend"
+  },
+  "devDependencies": {
+    "prisma": "^7.10.0",
+    "dotenv": "^17.2.3"
+  }
+}

@@ -1,0 +1,78 @@
+@import "tailwindcss";
+
+/* Active dark: sur la presence de la classe .dark (posee sur <html> par
+   lib/theme.js), plutot que sur la seule preference systeme par defaut de
+   Tailwind v4 - condition necessaire pour un choix clair/sombre pilotable
+   par l'utilisateur (voir Parametres > Apparence), tout en reutilisant a
+   l'identique les centaines de classes dark: deja ecrites dans toute
+   l'application (aucune ne change de nom, seul le declencheur change). Voir
+   lib/theme.js pour le choix du theme, et le script inline de index.html
+   pour l'application avant le premier rendu (evite le flash). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Design system AM Couture.
+   Palette de marque bleu marine/petrole, sobre et professionnelle - genere
+   automatiquement bg-brand-*, text-brand-*, border-brand-* via le systeme de
+   theme CSS-first de Tailwind v4. Le reste de l'interface continue
+   d'utiliser l'echelle neutral-* par defaut de Tailwind. Changer ces onze
+   valeurs suffit a changer la couleur de marque dans toute l'application -
+   aucun autre fichier ne code une couleur "brand" en dur.
+
+   Convention de rayons : rounded-lg pour les controles (inputs, boutons,
+   badges rectangulaires), rounded-2xl pour les cartes/conteneurs/tableaux,
+   rounded-full pour les pastilles de statut.
+
+   Convention de surfaces (dark mode) : fond de page neutral-50/dark:neutral-950,
+   carte white/dark:neutral-900, survol neutral-50/dark:neutral-800, bordure
+   standard neutral-200/dark:neutral-800, bordure discrete neutral-100/dark:neutral-900. */
+@theme {
+  --color-brand-50: #f5f8fa;
+  --color-brand-100: #e6eff4;
+  --color-brand-200: #c5dbe7;
+  --color-brand-300: #9bbfd4;
+  --color-brand-400: #6b9fbd;
+  --color-brand-500: #3e7ea3;
+  --color-brand-600: #276386;
+  --color-brand-700: #1f4f6b;
+  --color-brand-800: #194057;
+  --color-brand-900: #163141;
+  --color-brand-950: #0d1d26;
+
+  /* Petite entree en fondu, pour les bannieres de succes/erreur qui sinon
+     apparaissent/disparaissent instantanement (montage conditionnel, donc
+     pas de transition possible) - voir GlobalFormError, ParametresPage. */
+  --animate-fade-in: fade-in 0.18s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+:root {
+  /* Par defaut (avant que lib/theme.js ne tranche), les deux sont acceptes -
+     une fois la classe .dark posee ou non sur <html>, la regle plus precise
+     ci-dessous prend le dessus pour que les controles natifs (scrollbar,
+     champs de date...) suivent le theme REELLEMENT actif, pas "les deux". */
+  color-scheme: light dark;
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+:root:not(.dark) {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+  font-feature-settings: "tnum" 1;
+}

@@ -1,0 +1,285 @@
+// AM COUTURE — Schéma de données
+// Prisma ORM v7 — generator "prisma-client" + adapter obligatoire (voir backend/src/lib/prisma.js)
+
+generator client {
+  provider = "prisma-client"
+  output   = "../backend/src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Pas d'url ici : la connexion runtime passe par l'adapter (@prisma/adapter-pg),
+  // et la connexion CLI/migrations est définie dans prisma.config.ts (DIRECT_URL).
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────────────────────
+
+enum Sexe {
+  FEMME
+  HOMME
+  AUTRE
+}
+
+enum StatutCommande {
+  NOUVELLE
+  EN_CONFECTION
+  ESSAYAGE
+  RETOUCHES
+  TERMINEE
+  LIVREE
+  ANNULEE
+}
+
+enum Priorite {
+  NORMALE
+  URGENTE
+}
+
+enum ModePaiement {
+  ESPECES
+  MOBILE_MONEY
+  VIREMENT
+  AUTRE
+}
+
+enum CategorieVetement {
+  ROBE
+  BOUBOU
+  ENSEMBLE
+  PANTALON
+  CHEMISE
+  JUPE
+  KAFTAN
+  COSTUME
+  TENUE_TRADITIONNELLE
+  AUTRE
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Utilisateur (propriétaire) et paramètres de l'atelier
+// ─────────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  identifiant  String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+/// Ligne unique (singleton) — sert de source pour la route /api/parametres.
+model Atelier {
+  id         String   @id @default(cuid())
+  nom        String
+  logoUrl    String?
+  telephone  String?
+  adresse    String?
+  slogan     String?
+  devise     String   @default("FCFA")
+  recuConfig Json?
+  updatedAt  DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Clientes / Mesures / Modèles
+// ─────────────────────────────────────────────────────────────────────────
+
+model Cliente {
+  id         String     @id @default(cuid())
+  nom        String
+  prenom     String
+  telephone  String
+  telephone2 String?
+  adresse    String?
+  sexe       Sexe?
+  notes      String?
+  archivedAt DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  mesures   Mesure[]
+  commandes Commande[]
+
+  @@index([nom, prenom])
+  @@index([telephone])
+}
+
+model Mesure {
+  id        String  @id @default(cuid())
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  epaule           Decimal? @db.Decimal(6, 2)
+  poitrine         Decimal? @db.Decimal(6, 2)
+  taille           Decimal? @db.Decimal(6, 2)
+  hanches          Decimal? @db.Decimal(6, 2)
+  longueur         Decimal? @db.Decimal(6, 2)
+  longueurRobe     Decimal? @db.Decimal(6, 2)
+  longueurJupe     Decimal? @db.Decimal(6, 2)
+  longueurPantalon Decimal? @db.Decimal(6, 2)
+  longueurManche   Decimal? @db.Decimal(6, 2)
+  tourBras         Decimal? @db.Decimal(6, 2)
+  tourCou          Decimal? @db.Decimal(6, 2)
+  tourPoignet      Decimal? @db.Decimal(6, 2)
+  tourCuisse       Decimal? @db.Decimal(6, 2)
+  tourGenou        Decimal? @db.Decimal(6, 2)
+  autres           Json? // mesures libres additionnelles : { "label": valeur }
+
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([clienteId])
+}
+
+model Modele {
+  id            String            @id @default(cuid())
+  nom           String
+  categorie     CategorieVetement
+  description   String?
+  prixIndicatif Decimal?          @db.Decimal(10, 2)
+  photoUrl      String?
+  archivedAt    DateTime?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  commandes Commande[]
+
+  @@index([nom])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Commandes / Paiements / Livraisons / Reçus
+// ─────────────────────────────────────────────────────────────────────────
+
+model Commande {
+  id        String  @id @default(cuid())
+  numero    String  @unique // CMD-2026-0001, généré atomiquement — voir Counter
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  modeleId  String?
+  modele    Modele? @relation(fields: [modeleId], references: [id], onDelete: SetNull)
+
+  typeVetement CategorieVetement
+  description  String?
+  couleur      String?
+  tissu        String?
+  quantite     Int      @default(1)
+  prixTotal    Decimal  @db.Decimal(10, 2)
+  // Pas de champ "acompte" ici : le premier versement est enregistré comme un
+  // Paiement normal (créé en transaction à la création de la commande). Le
+  // solde est TOUJOURS dérivé de prixTotal - SUM(paiements.montant), jamais stocké.
+
+  statut   StatutCommande @default(NOUVELLE)
+  priorite Priorite       @default(NORMALE)
+
+  dateCommande        DateTime @default(now())
+  dateLivraisonPrevue DateTime
+  observations         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  paiements  Paiement[]
+  // Livraison[] (et non Livraison? comme avant) : une livraison peut être
+  // annulée (annuleAt) pour cause d'erreur de saisie, auquel cas une
+  // nouvelle doit pouvoir être enregistrée pour la même commande — un
+  // Livraison? unique en base l'aurait interdit à vie. "La" livraison
+  // active (au plus une à la fois, contrainte partielle en base, voir
+  // migration) se retrouve par livraisons.find(l => !l.annuleAt).
+  livraisons Livraison[]
+  recus      Recu[]
+
+  @@index([clienteId])
+  @@index([statut])
+  @@index([dateLivraisonPrevue])
+}
+
+model Paiement {
+  id          String       @id @default(cuid())
+  commandeId  String
+  commande    Commande     @relation(fields: [commandeId], references: [id], onDelete: Restrict)
+  montant     Decimal      @db.Decimal(10, 2)
+  date        DateTime     @default(now())
+  mode        ModePaiement
+  reference   String?
+  commentaire String?
+  createdAt   DateTime     @default(now())
+
+  // Annulation logique d'une erreur de saisie — jamais de modification ni de
+  // suppression de la ligne d'origine (voir POST .../paiements/:id/annuler).
+  // Un paiement annulé reste visible dans l'historique mais est exclu de
+  // tous les totaux (solde, statistiques, rapports).
+  annuleAt    DateTime?
+  annuleMotif String?
+
+  recu Recu?
+
+  @@index([commandeId])
+  @@index([date])
+}
+
+model Livraison {
+  id             String   @id @default(cuid())
+  commandeId     String
+  commande       Commande @relation(fields: [commandeId], references: [id], onDelete: Restrict)
+  dateLivraison  DateTime @default(now())
+  montantRestant Decimal  @db.Decimal(10, 2) // snapshot calculé côté serveur, jamais accepté depuis le client
+  commentaire    String?
+  createdAt      DateTime @default(now())
+
+  // Annulation logique — mêmes principes que Paiement.annuleAt ci-dessus.
+  // Pas de @@unique([commandeId]) : une commande peut avoir plusieurs lignes
+  // Livraison dans le temps (une annulée + une nouvelle correcte), mais au
+  // plus UNE active (annuleAt IS NULL) — contrainte partielle ajoutée à la
+  // main dans la migration SQL (Prisma ne supporte pas les index uniques
+  // partiels dans son DSL de schéma), backstop en base en plus de la
+  // vérification applicative (voir routes/livraisons.routes.js).
+  annuleAt    DateTime?
+  annuleMotif String?
+
+  @@index([commandeId])
+}
+
+model Recu {
+  id          String    @id @default(cuid())
+  numero      String    @unique // REC-2026-0001, généré atomiquement — voir Counter
+  commandeId  String
+  commande    Commande  @relation(fields: [commandeId], references: [id], onDelete: Restrict)
+  paiementId  String?   @unique
+  paiement    Paiement? @relation(fields: [paiementId], references: [id], onDelete: Restrict)
+  montantPaye Decimal   @db.Decimal(10, 2)
+  createdAt   DateTime  @default(now())
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Dépenses
+// ─────────────────────────────────────────────────────────────────────────
+
+model Depense {
+  id              String   @id @default(cuid())
+  categorie       String
+  montant         Decimal  @db.Decimal(10, 2)
+  date            DateTime @default(now())
+  description     String?
+  justificatifUrl String?
+  createdAt       DateTime @default(now())
+
+  // Annulation logique — mêmes principes que Paiement.annuleAt ci-dessus.
+  annuleAt    DateTime?
+  annuleMotif String?
+
+  @@index([date])
+  @@index([categorie])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Compteurs atomiques (numérotation CMD-AAAA-XXXX / REC-AAAA-XXXX)
+// id = "CMD-2026", "REC-2026", etc. — un compteur par préfixe ET par année,
+// donc la numérotation repart proprement à 0001 chaque nouvelle année.
+// ─────────────────────────────────────────────────────────────────────────
+
+model Counter {
+  id     String @id
+  valeur Int    @default(0)
+}
