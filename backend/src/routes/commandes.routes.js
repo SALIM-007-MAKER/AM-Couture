@@ -5,7 +5,8 @@ import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { nextNumero } from "../lib/numero.js";
-import { computeSolde } from "../lib/money.js";
+import { computeSolde, statutPaiement } from "../lib/money.js";
+import { streamFicheCommandePdf } from "../lib/recuPdf.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import {
   createCommandeSchema,
@@ -95,6 +96,7 @@ router.post("/", async (req, res) => {
     paiementInitial: result.paiement,
     totalPaye,
     solde,
+    statutPaiement: statutPaiement(result.commande.prixTotal, totalPaye),
   });
 });
 
@@ -161,7 +163,7 @@ router.get("/", async (req, res) => {
 
   const data = rows.map(({ paiements, ...commande }) => {
     const { totalPaye, solde } = computeSolde(commande.prixTotal, paiements);
-    return { ...commande, totalPaye, solde };
+    return { ...commande, totalPaye, solde, statutPaiement: statutPaiement(commande.prixTotal, totalPaye) };
   });
 
   res.json({
@@ -190,7 +192,32 @@ router.get("/:id", async (req, res) => {
     commande.prixTotal,
     commande.paiements.filter((p) => !p.annuleAt),
   );
-  res.json({ ...commande, totalPaye, solde });
+  res.json({ ...commande, totalPaye, solde, statutPaiement: statutPaiement(commande.prixTotal, totalPaye) });
+});
+
+// GET /api/commandes/:id/fiche-pdf — fiche commande à jour (PDF), à partager
+// avec la cliente (voir Phase 3, WhatsApp) — DISTINCT du Reçu de paiement
+// (recus.routes.js) : ce document n'est jamais persisté et recalcule le
+// solde/statut en direct à chaque appel, contrairement au Reçu qui est un
+// instantané figé (voir commentaire dans recus.routes.js).
+router.get("/:id/fiche-pdf", async (req, res) => {
+  const commande = await prisma.commande.findUnique({
+    where: { id: req.params.id },
+    include: {
+      cliente: { select: CLIENTE_SUMMARY_SELECT },
+      modele: { select: MODELE_SUMMARY_SELECT },
+      paiements: { where: { annuleAt: null }, select: { montant: true } },
+    },
+  });
+  if (!commande) throw new HttpError(404, "Commande introuvable.");
+
+  const { totalPaye, solde } = computeSolde(commande.prixTotal, commande.paiements);
+
+  // Singleton facultatif, comme pour le Reçu (voir recus.routes.js) : dégrade
+  // proprement (pas de logo/coordonnées) si Paramètres n'a jamais été rempli.
+  const atelier = await prisma.atelier.findFirst();
+
+  streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde });
 });
 
 // PATCH /api/commandes/:id — modification partielle des champs non financiers/non système

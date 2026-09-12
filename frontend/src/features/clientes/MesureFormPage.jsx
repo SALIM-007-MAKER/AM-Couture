@@ -2,15 +2,17 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Ruler, Plus, Trash2, Save, X } from "lucide-react";
 import { useClienteQuery, useCreateMesureMutation } from "./hooks.js";
-import { MESURE_FIELDS } from "./constants.js";
+import { MESURE_FIELDS, MESURE_GROUPS } from "./constants.js";
 import { LoadingState, ErrorState, FieldError, GlobalFormError } from "../../components/QueryState.jsx";
 import { inputClass } from "../../components/FormField.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
+import Disclosure from "../../components/Disclosure.jsx";
 import { ApiError } from "../../lib/apiClient.js";
 
 const EMPTY_VALUES = Object.fromEntries(MESURE_FIELDS.map((f) => [f.name, ""]));
+const FIELD_BY_NAME = Object.fromEntries(MESURE_FIELDS.map((f) => [f.name, f]));
 
 export default function MesureFormPage() {
   const { id } = useParams();
@@ -83,20 +85,29 @@ export default function MesureFormPage() {
       <Card as="form" onSubmit={handleSubmit} className="space-y-4">
         <GlobalFormError error={createMesure.error} />
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          {MESURE_FIELDS.map((field) => (
-            <label key={field.name} className="block space-y-1">
-              <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{field.label}</span>
-              <input
-                type="text"
-                inputMode="decimal"
-                placeholder="cm"
-                value={values[field.name]}
-                onChange={(e) => updateValue(field.name, e.target.value)}
-                className={inputClass}
-              />
-              <FieldError messages={details?.[field.name]} />
-            </label>
+        <div className="space-y-3">
+          {MESURE_GROUPS.map((group) => (
+            <Disclosure key={group.label} label={group.label} defaultOpen>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {group.fields.map((name) => {
+                  const field = FIELD_BY_NAME[name];
+                  return (
+                    <label key={name} className="block space-y-1">
+                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{field.label}</span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="cm"
+                        value={values[name]}
+                        onChange={(e) => updateValue(name, e.target.value)}
+                        className={inputClass}
+                      />
+                      <FieldError messages={details?.[name]} />
+                    </label>
+                  );
+                })}
+              </div>
+            </Disclosure>
           ))}
         </div>
 

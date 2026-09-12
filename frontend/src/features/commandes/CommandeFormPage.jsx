@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ClipboardList, Wallet, Save, X } from "lucide-react";
 import { useCommandeQuery, useCreateCommandeMutation, useUpdateCommandeMutation } from "./hooks.js";
-import { PRIORITES, MODES_PAIEMENT } from "./constants.js";
+import { PRIORITES, MODES_PAIEMENT, TISSUS_SUGGERES } from "./constants.js";
 import { CATEGORIES_VETEMENT } from "../modeles/constants.js";
 import ClientePicker from "./components/ClientePicker.jsx";
 import ModelePicker from "./components/ModelePicker.jsx";
@@ -11,6 +11,7 @@ import { Field, inputClass } from "../../components/FormField.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
+import ImageUploadField from "../../components/ImageUploadField.jsx";
 import { ApiError } from "../../lib/apiClient.js";
 
 function toDateInputValue(iso) {
@@ -18,9 +19,9 @@ function toDateInputValue(iso) {
   return new Date(iso).toISOString().slice(0, 10);
 }
 
-function createFormStateFrom() {
+function createFormStateFrom(clienteId = "", dateLivraisonPrevue = "") {
   return {
-    clienteId: "",
+    clienteId,
     modeleId: "",
     typeVetement: "",
     description: "",
@@ -29,8 +30,10 @@ function createFormStateFrom() {
     quantite: "1",
     prixTotal: "",
     priorite: "NORMALE",
-    dateLivraisonPrevue: "",
+    dateLivraisonPrevue,
     observations: "",
+    photoTissuUrl: "",
+    photoModeleUrl: "",
     avecPaiementInitial: false,
     paiementMontant: "",
     paiementMode: "ESPECES",
@@ -49,6 +52,8 @@ function editFormStateFrom(commande) {
     priorite: commande?.priorite ?? "NORMALE",
     dateLivraisonPrevue: toDateInputValue(commande?.dateLivraisonPrevue),
     observations: commande?.observations ?? "",
+    photoTissuUrl: commande?.photoTissuUrl ?? "",
+    photoModeleUrl: commande?.photoModeleUrl ?? "",
   };
 }
 
@@ -66,12 +71,29 @@ export default function CommandeFormPage({ mode }) {
 function CommandeForm({ mode, initial }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isEdit = mode === "edit";
   const createMutation = useCreateCommandeMutation();
   const updateMutation = useUpdateCommandeMutation(id);
   const mutation = isEdit ? updateMutation : createMutation;
 
-  const [form, setForm] = useState(() => (isEdit ? editFormStateFrom(initial) : createFormStateFrom()));
+  // Préremplissage depuis la fiche client (?clienteId=..., voir
+  // ClienteDetailPage.jsx) ou depuis le calendrier (?dateLivraisonPrevue=...,
+  // voir CalendrierPage.jsx, bouton "Nouvelle commande ce jour"). Simple
+  // confort — les deux champs restent modifiables, aucune validation
+  // supplémentaire ici (le backend revalide tout de toute façon).
+  const [form, setForm] = useState(() =>
+    isEdit
+      ? editFormStateFrom(initial)
+      : createFormStateFrom(searchParams.get("clienteId") ?? "", searchParams.get("dateLivraisonPrevue") ?? ""),
+  );
+  // "Tissu" reste un texte libre côté backend (voir constants.js,
+  // TISSUS_SUGGERES) — cet état local ne pilote que l'affichage du champ
+  // texte de secours quand la valeur ne correspond à aucune suggestion.
+  const [tissuLibre, setTissuLibre] = useState(() => {
+    const t = isEdit ? (initial?.tissu ?? "") : "";
+    return Boolean(t) && !TISSUS_SUGGERES.includes(t);
+  });
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -90,6 +112,8 @@ function CommandeForm({ mode, initial }) {
         priorite: form.priorite,
         dateLivraisonPrevue: form.dateLivraisonPrevue,
         observations: form.observations || undefined,
+        photoTissuUrl: form.photoTissuUrl || undefined,
+        photoModeleUrl: form.photoModeleUrl || undefined,
       };
       mutation.mutate(payload, { onSuccess: (commande) => navigate(`/commandes/${commande.id}`) });
       return;
@@ -107,6 +131,8 @@ function CommandeForm({ mode, initial }) {
       priorite: form.priorite,
       dateLivraisonPrevue: form.dateLivraisonPrevue,
       observations: form.observations || undefined,
+      photoTissuUrl: form.photoTissuUrl || undefined,
+      photoModeleUrl: form.photoModeleUrl || undefined,
       paiementInitial: form.avecPaiementInitial
         ? {
             montant: form.paiementMontant,
@@ -162,7 +188,36 @@ function CommandeForm({ mode, initial }) {
             <FieldError messages={details?.couleur} />
           </Field>
           <Field label="Tissu">
-            <input value={form.tissu} onChange={(e) => update("tissu", e.target.value)} className={inputClass} />
+            <select
+              value={tissuLibre ? "AUTRE" : form.tissu}
+              onChange={(e) => {
+                if (e.target.value === "AUTRE") {
+                  setTissuLibre(true);
+                  update("tissu", "");
+                } else {
+                  setTissuLibre(false);
+                  update("tissu", e.target.value);
+                }
+              }}
+              className={inputClass}
+            >
+              <option value="">Non précisé</option>
+              {TISSUS_SUGGERES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+              <option value="AUTRE">Autre…</option>
+            </select>
+            {tissuLibre && (
+              <input
+                type="text"
+                placeholder="Précisez le tissu"
+                value={form.tissu}
+                onChange={(e) => update("tissu", e.target.value)}
+                className={`${inputClass} mt-2`}
+              />
+            )}
             <FieldError messages={details?.tissu} />
           </Field>
           <Field label="Quantité">
@@ -230,6 +285,25 @@ function CommandeForm({ mode, initial }) {
           />
           <FieldError messages={details?.observations} />
         </Field>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Photo du tissu">
+            <ImageUploadField
+              value={form.photoTissuUrl}
+              onChange={(v) => update("photoTissuUrl", v)}
+              previewClassName="h-24 w-20 object-cover"
+            />
+            <FieldError messages={details?.photoTissuUrl} />
+          </Field>
+          <Field label="Photo du modèle">
+            <ImageUploadField
+              value={form.photoModeleUrl}
+              onChange={(v) => update("photoModeleUrl", v)}
+              previewClassName="h-24 w-20 object-cover"
+            />
+            <FieldError messages={details?.photoModeleUrl} />
+          </Field>
+        </div>
 
         {!isEdit && (
           <Card variant="outlined" className="space-y-3">

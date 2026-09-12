@@ -24,6 +24,10 @@ import PaiementsListPage from "./features/paiements/PaiementsListPage.jsx";
 import RecusListPage from "./features/recus/RecusListPage.jsx";
 import RapportsPage from "./features/rapports/RapportsPage.jsx";
 import ParametresPage from "./features/parametres/ParametresPage.jsx";
+import NotificationsPage from "./features/notifications/NotificationsPage.jsx";
+import CalendrierPage from "./features/calendrier/CalendrierPage.jsx";
+import ComptePage from "./features/compte/ComptePage.jsx";
+import AbonnementPage from "./features/abonnement/AbonnementPage.jsx";
 
 export default function App() {
   return (
@@ -56,7 +60,11 @@ export default function App() {
           <Route path="/depenses/:id" element={<DepenseDetailPage />} />
           <Route path="/recus" element={<RecusListPage />} />
           <Route path="/rapports" element={<RapportsPage />} />
+          <Route path="/calendrier" element={<CalendrierPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/parametres" element={<ParametresPage />} />
+          <Route path="/compte" element={<ComptePage />} />
+          <Route path="/abonnement" element={<AbonnementPage />} />
         </Route>
       </Route>
 

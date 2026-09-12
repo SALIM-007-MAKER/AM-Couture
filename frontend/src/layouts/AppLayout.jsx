@@ -10,7 +10,11 @@ import {
   Receipt,
   FileText,
   BarChart3,
+  Calendar,
+  Bell,
   Settings,
+  UserCircle,
+  CreditCard,
   Menu,
   LogOut,
   ChevronsLeft,
@@ -18,6 +22,7 @@ import {
 } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { useParametresQuery } from "../features/parametres/hooks.js";
+import { useNombreNonLuesQuery } from "../features/notifications/hooks.js";
 import { useUiStore } from "../stores/uiStore.js";
 
 // Sidebar groupée par domaine métier — reflète l'organisation réelle de
@@ -47,11 +52,18 @@ const NAV_GROUPS = [
   },
   {
     label: "Analyse",
-    items: [{ label: "Rapports", to: "/rapports", icon: BarChart3 }],
+    items: [
+      { label: "Rapports", to: "/rapports", icon: BarChart3 },
+      { label: "Calendrier", to: "/calendrier", icon: Calendar },
+    ],
   },
   {
     label: "Configuration",
-    items: [{ label: "Paramètres", to: "/parametres", icon: Settings }],
+    items: [
+      { label: "Paramètres", to: "/parametres", icon: Settings },
+      { label: "Mon compte", to: "/compte", icon: UserCircle },
+      { label: "Abonnement", to: "/abonnement", icon: CreditCard },
+    ],
   },
 ];
 // "Finances" n'existe pas dans la sidebar desktop (voir NAV_GROUPS
@@ -60,7 +72,11 @@ const NAV_GROUPS = [
 // clic (voir BottomNav plus bas et pages/FinancesPage.jsx). Ajoutée ici,
 // séparément, uniquement pour que l'en-tête affiche le bon titre de page.
 const FINANCES_HUB_ITEM = { label: "Finances", to: "/finances", icon: Wallet };
-const ALL_NAV_ITEMS = [...NAV_GROUPS.flatMap((g) => g.items), FINANCES_HUB_ITEM];
+// Notifications : pas dans la sidebar desktop (accès direct via la cloche de
+// l'en-tête, voir plus bas) mais garde un titre de page cohérent — même
+// logique que FINANCES_HUB_ITEM ci-dessus.
+const NOTIFICATIONS_HUB_ITEM = { label: "Notifications", to: "/notifications", icon: Bell };
+const ALL_NAV_ITEMS = [...NAV_GROUPS.flatMap((g) => g.items), FINANCES_HUB_ITEM, NOTIFICATIONS_HUB_ITEM];
 
 function useCurrentNavItem(pathname) {
   return ALL_NAV_ITEMS.find((item) => (item.end ? pathname === item.to : pathname.startsWith(item.to)));
@@ -80,7 +96,11 @@ const MOBILE_DRAWER_GROUPS = [
       { label: "Livraisons", to: "/livraisons", icon: Truck },
       { label: "Reçus", to: "/recus", icon: FileText },
       { label: "Rapports", to: "/rapports", icon: BarChart3 },
+      { label: "Calendrier", to: "/calendrier", icon: Calendar },
+      { label: "Notifications", to: "/notifications", icon: Bell },
       { label: "Paramètres", to: "/parametres", icon: Settings },
+      { label: "Mon compte", to: "/compte", icon: UserCircle },
+      { label: "Abonnement", to: "/abonnement", icon: CreditCard },
     ],
   },
 ];
@@ -103,12 +123,12 @@ function NavContent({ collapsed, onNavigate, groups = NAV_GROUPS }) {
               onClick={onNavigate}
               title={collapsed ? item.label : undefined}
               className={({ isActive }) =>
-                `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  collapsed ? "justify-center" : ""
+                `flex items-center gap-2.5 rounded-lg border-l-2 pl-2.5 pr-3 py-2 text-sm font-medium transition-colors ${
+                  collapsed ? "justify-center border-l-0 pl-3" : ""
                 } ${
                   isActive
-                    ? "bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300 font-semibold hover:bg-brand-100 dark:hover:bg-brand-900"
-                    : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 hover:text-neutral-900 dark:hover:text-neutral-100"
+                    ? "border-brand-600 dark:border-brand-400 bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300 font-semibold hover:bg-brand-100 dark:hover:bg-brand-900"
+                    : "border-transparent text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 hover:text-neutral-900 dark:hover:text-neutral-100"
                 }`
               }
             >
@@ -183,10 +203,10 @@ function Logo({ collapsed, logoUrl }) {
         <img
           src={logoUrl}
           alt="Logo de l'atelier"
-          className="size-8 shrink-0 rounded-lg object-contain bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-800"
+          className="size-8 shrink-0 rounded-lg object-contain bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 shadow-glow-brand"
         />
       ) : (
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-white">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow-brand">
           <Scissors className="size-4" aria-hidden="true" />
         </span>
       )}
@@ -196,6 +216,29 @@ function Logo({ collapsed, logoUrl }) {
         </span>
       )}
     </div>
+  );
+}
+
+// Cloche de l'en-tête (Phase 4) — pastille = nombre de notifications non
+// lues, rafraîchie toutes les 60s (voir useNombreNonLuesQuery). isPending/
+// isError ignorés volontairement : un compteur absent/en erreur reste un
+// détail décoratif, jamais bloquant (même logique que le logo ci-dessus).
+function NotificationBell() {
+  const { data } = useNombreNonLuesQuery();
+  const count = data?.count ?? 0;
+  return (
+    <NavLink
+      to="/notifications"
+      className="relative rounded-lg p-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+      aria-label={count > 0 ? `${count} notification(s) non lue(s)` : "Notifications"}
+    >
+      <Bell className="size-4" aria-hidden="true" />
+      {count > 0 && (
+        <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-4 h-4 px-0.5 rounded-full bg-red-600 text-white text-[10px] font-semibold leading-none">
+          {count > 9 ? "9+" : count}
+        </span>
+      )}
+    </NavLink>
   );
 }
 
@@ -214,10 +257,14 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-svh flex bg-neutral-50 dark:bg-neutral-950">
-      {/* Sidebar desktop — réductible en mode rail (icônes seules) */}
+      {/* Sidebar desktop — réductible en mode rail (icônes seules). Largeur
+          par palier (pas une seule valeur fixe) : compacte sur tablette
+          (md, ≥768px), grandit progressivement jusqu'à ~320px sur les très
+          grands écrans (2xl, ≥1536px) — un iPad et un écran 27" n'ont pas la
+          même largeur disponible pour le contenu principal. */}
       <aside
         className={`hidden md:flex flex-col shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 transition-[width] duration-150 ${
-          sidebarCollapsed ? "w-16" : "w-60"
+          sidebarCollapsed ? "w-16" : "w-56 lg:w-64 xl:w-72 2xl:w-80"
         }`}
       >
         <Logo collapsed={sidebarCollapsed} logoUrl={logoUrl} />
@@ -255,7 +302,7 @@ export default function AppLayout() {
       />
       <div
         inert={!sidebarOpen}
-        className={`md:hidden fixed inset-y-0 left-0 z-40 w-64 flex flex-col bg-white dark:bg-neutral-900 shadow-xl transition-transform duration-200 ${
+        className={`md:hidden fixed inset-y-0 left-0 z-40 w-[min(68vw,280px)] flex flex-col bg-white dark:bg-neutral-900 shadow-xl transition-transform duration-200 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -287,6 +334,7 @@ export default function AppLayout() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            <NotificationBell />
             {user && (
               <div className="hidden sm:flex items-center gap-2">
                 <span className="flex size-7 items-center justify-center rounded-full bg-brand-100 dark:bg-brand-950 text-xs font-semibold text-brand-700 dark:text-brand-300">

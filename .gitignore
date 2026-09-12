@@ -7,3 +7,6 @@ backend/src/generated/
 *.log
 .DS_Store
 .neon
+
+.vercel
+.env*

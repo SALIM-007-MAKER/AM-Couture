@@ -1,17 +1,21 @@
 import { Link, useParams } from "react-router-dom";
-import { ClipboardList, Pencil, User, Shirt, Ruler, Banknote, Wallet, Truck, FileText } from "lucide-react";
+import { ClipboardList, Pencil, User, Shirt, Ruler, Banknote, Wallet, Truck, FileText, Download } from "lucide-react";
 import { useCommandeQuery } from "./hooks.js";
 import { prioriteLabel } from "./constants.js";
+import { fichePdfUrl } from "./api.js";
 import { CATEGORIES_VETEMENT } from "../modeles/constants.js";
 import { MESURE_FIELDS } from "../clientes/constants.js";
 import { useDerniereMesureQuery } from "../clientes/hooks.js";
+import { useParametresQuery } from "../parametres/hooks.js";
 import { LoadingState, ErrorState } from "../../components/QueryState.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
 import CommandeStatutBadge from "./components/CommandeStatutBadge.jsx";
+import PaiementStatutBadge from "./components/PaiementStatutBadge.jsx";
 import StatutTransitions from "./components/StatutTransitions.jsx";
+import WhatsAppActions from "./components/WhatsAppActions.jsx";
 import PaiementsSection from "./components/PaiementsSection.jsx";
 import LivraisonSection from "./components/LivraisonSection.jsx";
 import RecusSection from "../recus/components/RecusSection.jsx";
@@ -54,25 +58,38 @@ function CommandeDetailContent({ id, commande }) {
   const mesure = mesureQuery.data;
   const populatedMesures = mesure ? MESURE_FIELDS.filter((f) => mesure[f.name] != null) : [];
 
+  // Nom/coordonnées atelier pour les messages WhatsApp (voir
+  // WhatsAppActions.jsx) — dégradé proprement si Paramètres pas encore
+  // chargé/configuré (même logique que le logo dans AppLayout.jsx).
+  const atelierQuery = useParametresQuery();
+  const atelier = atelierQuery.data;
+
   return (
     <div className="max-w-3xl space-y-6">
       <PageHeader
         icon={ClipboardList}
         title={commande.numero}
         subtitle={
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-2 flex-wrap">
             <CommandeStatutBadge statut={commande.statut} />
+            <PaiementStatutBadge statut={commande.statutPaiement} />
             {prioriteLabel(commande.priorite)}
           </span>
         }
         actions={
-          <Button as={Link} to={`/commandes/${id}/modifier`} variant="secondary" icon={Pencil}>
-            Modifier
-          </Button>
+          <>
+            <Button as="a" href={fichePdfUrl(id)} target="_blank" rel="noreferrer" variant="secondary" icon={Download}>
+              Fiche PDF
+            </Button>
+            <Button as={Link} to={`/commandes/${id}/modifier`} variant="secondary" icon={Pencil}>
+              Modifier
+            </Button>
+          </>
         }
       />
 
       <StatutTransitions commandeId={id} statutActuel={commande.statut} />
+      <WhatsAppActions commande={commande} atelier={atelier} />
 
       <div className="space-y-2">
         <SectionTitle icon={User}>Client</SectionTitle>
@@ -118,6 +135,30 @@ function CommandeDetailContent({ id, commande }) {
             <div>
               <p className="text-neutral-500 text-xs mb-0.5">Observations</p>
               <p className="text-neutral-900 dark:text-neutral-100 whitespace-pre-wrap">{commande.observations}</p>
+            </div>
+          )}
+          {(commande.photoTissuUrl || commande.photoModeleUrl) && (
+            <div className="flex gap-4 pt-3 border-t border-neutral-200 dark:border-neutral-800">
+              {commande.photoTissuUrl && (
+                <div>
+                  <p className="text-neutral-500 text-xs mb-1">Photo du tissu</p>
+                  <img
+                    src={commande.photoTissuUrl}
+                    alt="Tissu"
+                    className="h-24 w-20 object-cover rounded-lg border border-neutral-200 dark:border-neutral-800"
+                  />
+                </div>
+              )}
+              {commande.photoModeleUrl && (
+                <div>
+                  <p className="text-neutral-500 text-xs mb-1">Photo du modèle</p>
+                  <img
+                    src={commande.photoModeleUrl}
+                    alt="Modèle souhaité"
+                    className="h-24 w-20 object-cover rounded-lg border border-neutral-200 dark:border-neutral-800"
+                  />
+                </div>
+              )}
             </div>
           )}
         </Card>

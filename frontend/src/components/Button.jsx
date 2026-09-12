@@ -12,11 +12,16 @@ import { Loader2 } from "lucide-react";
  *  - secondary : action secondaire (bordure neutre)
  *  - ghost     : action tertiaire discrète (texte souligné, ex: "Voir")
  *  - danger    : action destructive/annulation (rouge)
+ *  - whatsapp  : action d'envoi WhatsApp (vert, voir lib/whatsapp.js)
+ *  - accent    : moment vraiment particulier (ex: payer un abonnement) —
+ *                touche dorée reprise de la page de connexion, jamais pour
+ *                une action courante (une seule à la fois par écran, comme
+ *                "primary")
  * size : sm | md
  */
 const VARIANTS = {
   primary:
-    "bg-brand-600 text-white hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-400 disabled:hover:bg-brand-600",
+    "bg-gradient-to-b from-brand-500 to-brand-700 text-white hover:from-brand-400 hover:to-brand-600 hover:shadow-glow-brand dark:from-brand-400 dark:to-brand-600 disabled:hover:shadow-none",
   secondary:
     "border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800",
   ghost:
@@ -25,6 +30,10 @@ const VARIANTS = {
     "bg-red-600 text-white hover:bg-red-700 disabled:hover:bg-red-600",
   "danger-ghost":
     "text-red-600 dark:text-red-400 underline hover:text-red-700 dark:hover:text-red-300",
+  whatsapp:
+    "bg-green-600 text-white hover:bg-green-700 disabled:hover:bg-green-600",
+  accent:
+    "bg-gradient-to-r from-amber-500 to-amber-600 text-neutral-950 font-semibold hover:from-amber-400 hover:to-amber-500 hover:shadow-glow-accent disabled:hover:shadow-none",
 };
 
 const SIZES = {

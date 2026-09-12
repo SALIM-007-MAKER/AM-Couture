@@ -61,7 +61,7 @@ router.get("/me", requireAuth, async (req, res) => {
     clearAuthCookie(res);
     throw new HttpError(401, "Session invalide.");
   }
-  res.json({ id: user.id, identifiant: user.identifiant, createdAt: user.createdAt });
+  res.json({ id: user.id, identifiant: user.identifiant, langue: user.langue, createdAt: user.createdAt });
 });
 
 export default router;

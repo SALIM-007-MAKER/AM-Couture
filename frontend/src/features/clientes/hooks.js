@@ -62,6 +62,16 @@ export function useRestoreClienteMutation(id) {
   });
 }
 
+// Totaux agrégés (toutes les commandes du client, pas seulement la page
+// affichée) — voir ClienteDetailPage.jsx, bloc "Total commandes/payé/restant".
+export function useClienteTotauxQuery(clienteId) {
+  return useQuery({
+    queryKey: ["clientes", clienteId, "totaux"],
+    queryFn: () => clientesApi.totaux(clienteId),
+    enabled: Boolean(clienteId),
+  });
+}
+
 export function useMesuresQuery(clienteId, params) {
   return useQuery({
     queryKey: ["clientes", clienteId, "mesures", "list", params],

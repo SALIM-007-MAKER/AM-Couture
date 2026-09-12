@@ -25,3 +25,18 @@ export function computeSolde(prixTotal, paiements) {
   const solde = new Prisma.Decimal(prixTotal).minus(totalPaye);
   return { totalPaye: totalPaye.toString(), solde: solde.toString() };
 }
+
+/**
+ * Statut de paiement dérivé — jamais stocké, recalculé à chaque lecture à
+ * partir de prixTotal/totalPaye (mêmes valeurs déjà produites par
+ * computeSolde ci-dessus), exactement dans le même esprit que le solde
+ * lui-même. Accepte des chaînes ou des Decimal indifféremment (les deux
+ * circulent selon l'appelant : chaîne côté API déjà sérialisée, Decimal côté
+ * calcul interne).
+ */
+export function statutPaiement(prixTotal, totalPaye) {
+  const paye = new Prisma.Decimal(totalPaye);
+  if (paye.lessThanOrEqualTo(0)) return "NON_PAYE";
+  if (paye.lessThan(new Prisma.Decimal(prixTotal))) return "PARTIELLEMENT_PAYE";
+  return "PAYE";
+}

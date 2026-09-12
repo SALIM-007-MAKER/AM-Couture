@@ -23,3 +23,10 @@ export const commandesApi = {
       api.post(`/commandes/${commandeId}/livraisons/${livraisonId}/annuler`, { motif }),
   },
 };
+
+// Chemin direct (flux PDF, pas du JSON) — même origine, le cookie de session
+// part automatiquement. Voir recuPdfUrl (features/recus/api.js) pour le même
+// pattern.
+export function fichePdfUrl(commandeId) {
+  return `/api/commandes/${commandeId}/fiche-pdf`;
+}

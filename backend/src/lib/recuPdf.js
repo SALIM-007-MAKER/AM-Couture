@@ -81,6 +81,47 @@ function isNonEmptyRecuConfig(recuConfig) {
   return recuConfig && typeof recuConfig === "object" && Object.keys(recuConfig).length > 0;
 }
 
+// pdfkit n'embarque nativement que PNG/JPEG (voir doc pdfkit — pas de
+// support GIF/WEBP), alors qu'optionalImageField() (zodHelpers.js) accepte
+// aussi ces deux formats pour l'upload. On ne tente donc le décodage que
+// pour png/jpeg ; tout le reste (webp, gif, ou une ancienne valeur
+// http(s):// conservée pour compatibilité — voir optionalImageField) est
+// ignoré silencieusement : le PDF reste utilisable sans logo plutôt que de
+// planter sur un format que pdfkit ne sait pas lire.
+const EMBEDDABLE_LOGO_RE = /^data:image\/(png|jpe?g);base64,([A-Za-z0-9+/]+=*)$/i;
+
+function decodeEmbeddableLogo(dataUrl) {
+  if (typeof dataUrl !== "string") return null;
+  const match = dataUrl.match(EMBEDDABLE_LOGO_RE);
+  if (!match) return null;
+  try {
+    return Buffer.from(match[2], "base64");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Logo atelier, centré, en haut du document — partagé entre le Reçu et la
+ * Fiche commande. `doc.image(buf, x, y, ...)` avec x/y explicites ne fait
+ * PAS avancer le curseur `doc.y` comme le ferait du texte : on le repositionne
+ * nous-mêmes après coup pour que le contenu suivant ne chevauche pas le logo.
+ */
+function drawLogo(doc, atelier) {
+  const buffer = decodeEmbeddableLogo(atelier?.logoUrl);
+  if (!buffer) return;
+  try {
+    const size = 50;
+    const x = (doc.page.width - size) / 2;
+    const y = doc.y;
+    doc.image(buffer, x, y, { fit: [size, size], align: "center" });
+    doc.y = y + size + 8;
+  } catch {
+    // Data URL valide mais contenu image corrompu/non décodable par pdfkit
+    // malgré le sniff mime ci-dessus — on continue sans logo.
+  }
+}
+
 /**
  * Écrit le PDF du reçu directement dans la réponse HTTP (stream).
  * Doit être appelé APRÈS toute validation (404 etc.) : une fois cette
@@ -98,6 +139,7 @@ export function streamRecuPdf(res, { recu, atelier }) {
   doc.pipe(res);
 
   // En-tête atelier
+  drawLogo(doc, atelier);
   doc.fontSize(18).font("Helvetica-Bold").text(nomAtelier, { align: "center" });
   doc.moveDown(0.2);
   doc.fontSize(9).font("Helvetica");
@@ -161,6 +203,113 @@ export function streamRecuPdf(res, { recu, atelier }) {
 
   doc.moveDown(1.5);
   doc.fontSize(8).font("Helvetica-Oblique").text("Document généré automatiquement — conserver comme preuve de paiement.", {
+    align: "center",
+  });
+
+  doc.end();
+}
+
+// Copie de présentation de frontend/src/features/commandes/constants.js
+// (STATUTS_COMMANDE) — à garder synchronisée si l'enum change. Le backend ne
+// peut pas importer un module frontend, d'où cette duplication volontaire et
+// minimale (7 libellés fixes), plutôt qu'un partage de code cross-bundle.
+const STATUT_LABELS = {
+  NOUVELLE: "Nouvelle",
+  EN_CONFECTION: "En confection",
+  ESSAYAGE: "Essayage",
+  RETOUCHES: "Retouches",
+  TERMINEE: "Terminée",
+  LIVREE: "Livrée",
+  ANNULEE: "Annulée",
+};
+
+// Copie de présentation de frontend/src/features/modeles/constants.js
+// (CATEGORIES_VETEMENT) — utilisée uniquement en repli quand la commande
+// n'a pas de modèle de catalogue associé (commande sur mesure directe).
+const TYPE_VETEMENT_LABELS = {
+  ROBE: "Robe",
+  BOUBOU: "Boubou",
+  ENSEMBLE: "Ensemble",
+  PANTALON: "Pantalon",
+  CHEMISE: "Chemise",
+  JUPE: "Jupe",
+  KAFTAN: "Kaftan",
+  COSTUME: "Costume",
+  TENUE_TRADITIONNELLE: "Tenue traditionnelle",
+  AUTRE: "Autre",
+};
+
+function formatDateHeure(date) {
+  const d = new Date(date);
+  const jour = d.toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+  const heure = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return `${jour} à ${heure}`;
+}
+
+/**
+ * Fiche commande — document DISTINCT du Reçu ci-dessus (voir décision Phase
+ * 3) : pas un justificatif de paiement figé, mais un instantané de l'état
+ * ACTUEL de la commande (statut, solde) à partager avec la cliente. Régénéré
+ * à chaque appel à partir de données calculées en direct (totalPaye/solde
+ * passés en paramètres, jamais stockés — voir computeSolde/statutPaiement,
+ * commandes.routes.js) : jamais persisté, comme le Reçu.
+ */
+export function streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde }) {
+  const nomAtelier = sanitizeForPdf(atelier?.nom || "AM Couture");
+  const devise = sanitizeForPdf(atelier?.devise || "FCFA");
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${commande.numero}.pdf"`);
+
+  const doc = new PDFDocument({ size: "A5", margin: 40 });
+  doc.pipe(res);
+
+  // En-tête atelier — identique au Reçu (logo, nom, slogan, coordonnées).
+  drawLogo(doc, atelier);
+  doc.fontSize(18).font("Helvetica-Bold").text(nomAtelier, { align: "center" });
+  doc.moveDown(0.2);
+  doc.fontSize(9).font("Helvetica");
+  if (atelier?.slogan) doc.text(sanitizeForPdf(atelier.slogan), { align: "center" });
+  const coordonnees = [atelier?.adresse, atelier?.telephone].filter(Boolean).map(sanitizeForPdf).join(" — ");
+  if (coordonnees) doc.text(coordonnees, { align: "center" });
+
+  doc.moveDown(1);
+  doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
+  doc.moveDown(1);
+
+  doc.fontSize(14).font("Helvetica-Bold").text(`COMMANDE N° ${sanitizeForPdf(commande.numero)}`, { align: "center" });
+  doc.moveDown(0.3);
+  doc.fontSize(10).font("Helvetica").text(`Émise le ${formatDateHeure(commande.createdAt)}`, { align: "center" });
+  doc.moveDown(1.5);
+
+  const cliente = commande.cliente;
+  doc.fontSize(11).font("Helvetica-Bold").text("Client");
+  doc.font("Helvetica").fontSize(10);
+  doc.text(cliente ? sanitizeForPdf(`${cliente.prenom} ${cliente.nom}`) : "—");
+  if (cliente?.telephone) doc.text(sanitizeForPdf(cliente.telephone));
+  doc.moveDown(0.8);
+
+  doc.font("Helvetica-Bold").fontSize(11).text("Détails");
+  doc.font("Helvetica").fontSize(10);
+  const modeleLabel = commande.modele?.nom || TYPE_VETEMENT_LABELS[commande.typeVetement] || commande.typeVetement;
+  doc.text(`Modèle : ${sanitizeForPdf(modeleLabel)}`);
+  doc.text(`Statut : ${sanitizeForPdf(STATUT_LABELS[commande.statut] || commande.statut)}`);
+  doc.text(`Livraison prévue : ${formatDate(commande.dateLivraisonPrevue)}`);
+  doc.moveDown(1.2);
+
+  doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
+  doc.moveDown(0.6);
+
+  doc.fontSize(10).font("Helvetica-Bold").text("Montant total", { continued: true });
+  doc.font("Helvetica").text(`   ${formatMontant(commande.prixTotal, devise)}`);
+  doc.font("Helvetica-Bold").text("Montant payé", { continued: true });
+  doc.font("Helvetica").text(`   ${formatMontant(totalPaye, devise)}`);
+  doc.moveDown(0.4);
+  doc.fontSize(11).font("Helvetica-Bold").text("Solde restant", { continued: false });
+  doc.fontSize(16).text(formatMontant(solde, devise));
+
+  doc.moveDown(1.5);
+  doc.fontSize(8).font("Helvetica-Oblique").text("Document généré automatiquement — montants à jour au moment de l'émission.", {
     align: "center",
   });
 

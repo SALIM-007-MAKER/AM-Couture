@@ -1,4 +1,4 @@
-import { Sparkles, Scissors, UserCheck, Wrench, CheckCircle2, PackageCheck, Ban } from "lucide-react";
+import { Sparkles, Scissors, UserCheck, Wrench, CheckCircle2, PackageCheck, Ban, CircleOff, Clock } from "lucide-react";
 
 // Libellés de PRÉSENTATION uniquement — les valeurs et transitions reflètent
 // exactement l'enum Prisma StatutCommande et STATUT_TRANSITIONS réels (voir
@@ -28,6 +28,29 @@ export const MODES_PAIEMENT = [
   { value: "AUTRE", label: "Autre" },
 ];
 
+// Contrairement aux listes ci-dessus, `tissu` (Commande.tissu, voir
+// schema.prisma) n'est PAS un enum côté backend — un simple texte libre
+// (optionalTrimmed(100)) qui accepte déjà n'importe quelle valeur. Cette
+// liste n'est qu'une aide de saisie (suggestions les plus courantes dans un
+// atelier de couture ouest-africain) ; l'option "Autre" du formulaire
+// retombe sur un champ texte libre pour tout le reste.
+export const TISSUS_SUGGERES = [
+  "Bazin riche",
+  "Bazin getzner",
+  "Super bazin",
+  "Bazin brodé",
+  "Wax",
+  "Pagne tissé",
+  "Coton",
+  "Soie",
+  "Lin",
+  "Dentelle",
+  "Mousseline",
+  "Satin",
+  "Velours",
+  "Jersey",
+];
+
 // Copie de présentation de backend/src/schemas/commande.schema.js —
 // STATUT_TRANSITIONS. Sert uniquement à savoir quels boutons de transition
 // proposer ; le backend revalide indépendamment (409 sinon).
@@ -51,6 +74,26 @@ export const STATUT_ICONS = {
   LIVREE: PackageCheck,
   ANNULEE: Ban,
 };
+
+// Statut de PAIEMENT — distinct du statut de commande ci-dessus (jamais
+// mélangés). Purement dérivé côté backend (voir statutPaiement(),
+// backend/src/lib/money.js) à partir de prixTotal/totalPaye, jamais stocké :
+// cette liste ne reflète qu'un affichage, pas une valeur saisissable.
+export const STATUTS_PAIEMENT = [
+  { value: "NON_PAYE", label: "Non payé" },
+  { value: "PARTIELLEMENT_PAYE", label: "Partiellement payé" },
+  { value: "PAYE", label: "Payé" },
+];
+
+export const STATUT_PAIEMENT_ICONS = {
+  NON_PAYE: CircleOff,
+  PARTIELLEMENT_PAYE: Clock,
+  PAYE: CheckCircle2,
+};
+
+export function statutPaiementLabel(value) {
+  return STATUTS_PAIEMENT.find((s) => s.value === value)?.label ?? value;
+}
 
 export function statutLabel(value) {
   return STATUTS_COMMANDE.find((s) => s.value === value)?.label ?? value;

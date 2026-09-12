@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
@@ -127,6 +128,40 @@ router.get("/:id", async (req, res) => {
   const cliente = await prisma.cliente.findUnique({ where: { id: req.params.id } });
   if (!cliente) throw new HttpError(404, "Client introuvable.");
   res.json(cliente);
+});
+
+const D0 = new Prisma.Decimal(0);
+const dec = (v) => (v == null ? D0 : new Prisma.Decimal(v));
+
+// GET /api/clientes/:id/totaux — totaux agrégés sur TOUTES les commandes du
+// client (calculés en base, jamais en paginant une liste côté client — un
+// client avec plus d'une page de commandes donnerait sinon un total faux).
+// Même convention que Dashboard/Rapports (voir dashboard.routes.js) : la
+// valeur des commandes n'exclut pas les commandes ANNULEE, exactement comme
+// le solde d'une commande individuelle (computeSolde) ne le fait pas non
+// plus — un statut de commande et un total financier restent deux
+// informations distinctes ici, jamais mélangées.
+router.get("/:id/totaux", async (req, res) => {
+  const { id } = req.params;
+  const cliente = await prisma.cliente.findUnique({ where: { id }, select: { id: true } });
+  if (!cliente) throw new HttpError(404, "Client introuvable.");
+
+  const [commandesAgg, paiementsAgg] = await Promise.all([
+    prisma.commande.aggregate({ where: { clienteId: id }, _sum: { prixTotal: true } }),
+    prisma.paiement.aggregate({
+      where: { annuleAt: null, commande: { clienteId: id } },
+      _sum: { montant: true },
+    }),
+  ]);
+
+  const totalCommandes = dec(commandesAgg._sum.prixTotal);
+  const totalPaye = dec(paiementsAgg._sum.montant);
+
+  res.json({
+    totalCommandes: totalCommandes.toString(),
+    totalPaye: totalPaye.toString(),
+    totalRestant: totalCommandes.minus(totalPaye).toString(),
+  });
 });
 
 // PATCH /api/clientes/:id — modification (interdite sur une fiche archivée)

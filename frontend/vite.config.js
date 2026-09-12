@@ -10,7 +10,16 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg"],
+      includeAssets: ["favicon-512.png", "apple-touch-icon.png"],
+      workbox: {
+        // Par defaut, le service worker redirige TOUTE navigation (y
+        // compris l'ouverture d'un lien /api/... dans un nouvel onglet,
+        // comme le bouton "PDF" d'un reçu) vers index.html - la SPA ne
+        // reconnaissant pas cette URL, elle affichait sa page "introuvable"
+        // a la place du vrai fichier PDF. Les routes /api/* doivent toujours
+        // atteindre le serveur, jamais ce fallback.
+        navigateFallbackDenylist: [/^\/api\//],
+      },
       manifest: {
         name: "AM Couture",
         short_name: "AM Couture",
@@ -18,12 +27,11 @@ export default defineConfig({
         start_url: "/",
         display: "standalone",
         background_color: "#ffffff",
-        // Couleur de marque (voir --color-brand-600, index.css) : l'icone de
-        // l'app installee reste le ciseau AM Couture generique (meme repli
-        // que le logo dans la sidebar) - le vrai logo uploade par l'atelier
-        // n'a pas vocation a devenir l'icone d'app/l'ecran de demarrage.
+        // Couleur de marque (voir --color-brand-600, index.css) - reste
+        // independante du logo (icone d'app) ci-dessous, qui est le vrai
+        // logo AM Couture fourni par l'atelier, pas une couleur.
         theme_color: "#276386",
-        icons: [{ src: "/icons.svg", sizes: "any", type: "image/svg+xml", purpose: "any" }],
+        icons: [{ src: "/favicon-512.png", sizes: "512x512", type: "image/png", purpose: "any" }],
       },
     }),
   ],

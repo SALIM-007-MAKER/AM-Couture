@@ -1,6 +1,11 @@
 import { Link, useParams } from "react-router-dom";
-import { User, Pencil, Ruler, Plus } from "lucide-react";
-import { useClienteQuery, useArchiveClienteMutation, useRestoreClienteMutation } from "./hooks.js";
+import { User, Pencil, Ruler, Plus, ClipboardList } from "lucide-react";
+import {
+  useClienteQuery,
+  useArchiveClienteMutation,
+  useRestoreClienteMutation,
+  useClienteTotauxQuery,
+} from "./hooks.js";
 import { SEXE_OPTIONS } from "./constants.js";
 import { LoadingState, ErrorState } from "../../components/QueryState.jsx";
 import StatutBadge from "../../components/StatutBadge.jsx";
@@ -10,6 +15,8 @@ import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
 import MesuresHistory from "./components/MesuresHistory.jsx";
+import ClienteCommandesHistory from "./components/ClienteCommandesHistory.jsx";
+import RappelButton from "./components/RappelButton.jsx";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
@@ -32,6 +39,17 @@ export default function ClienteDetailPage() {
   if (clienteQuery.isError) return <ErrorState error={clienteQuery.error} onRetry={clienteQuery.refetch} />;
 
   const cliente = clienteQuery.data;
+
+  return <ClienteDetailContent id={id} cliente={cliente} archiveMutation={archiveMutation} restoreMutation={restoreMutation} />;
+}
+
+function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation }) {
+  // isPending/isError volontairement peu mis en avant : un total agrégé
+  // reste un complément d'information, jamais bloquant pour le reste de la
+  // fiche (même logique que le logo dans AppLayout.jsx) — l'historique
+  // détaillé juste en dessous (ClienteCommandesHistory) reste la source de
+  // vérité même si ce bloc n'a pas encore chargé.
+  const totauxQuery = useClienteTotauxQuery(id);
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -77,10 +95,51 @@ export default function ClienteDetailPage() {
 
       <div className="space-y-2">
         <SectionTitle
+          icon={ClipboardList}
+          actions={
+            !cliente.archivedAt && (
+              <div className="flex flex-wrap gap-2 justify-end">
+                {totauxQuery.data && <RappelButton cliente={cliente} totalRestant={totauxQuery.data.totalRestant} />}
+                <Button as={Link} to={`/commandes/nouvelle?clienteId=${id}`} variant="secondary" size="sm" icon={Plus}>
+                  Nouvelle commande
+                </Button>
+              </div>
+            )
+          }
+        >
+          Commandes
+        </SectionTitle>
+        {totauxQuery.data && (
+          <Card className="grid grid-cols-3 gap-3 text-sm text-center">
+            <div>
+              <p className="text-neutral-500 text-xs">Total commandes</p>
+              <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">
+                {totauxQuery.data.totalCommandes}
+              </p>
+            </div>
+            <div>
+              <p className="text-neutral-500 text-xs">Total payé</p>
+              <p className="text-lg font-semibold tabular-nums text-green-600 dark:text-green-400 mt-0.5">
+                {totauxQuery.data.totalPaye}
+              </p>
+            </div>
+            <div>
+              <p className="text-neutral-500 text-xs">Total restant</p>
+              <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">
+                {totauxQuery.data.totalRestant}
+              </p>
+            </div>
+          </Card>
+        )}
+        <ClienteCommandesHistory clienteId={id} />
+      </div>
+
+      <div className="space-y-2">
+        <SectionTitle
           icon={Ruler}
           actions={
             !cliente.archivedAt && (
-              <Button as={Link} to={`/clientes/${id}/mesures/nouvelle`} variant="ghost" size="sm" icon={Plus}>
+              <Button as={Link} to={`/clientes/${id}/mesures/nouvelle`} variant="secondary" size="sm" icon={Plus}>
                 Nouvelle mesure
               </Button>
             )

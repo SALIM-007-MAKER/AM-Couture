@@ -12,6 +12,12 @@ import recusRouter from "./routes/recus.routes.js";
 import dashboardRouter from "./routes/dashboard.routes.js";
 import rapportsRouter from "./routes/rapports.routes.js";
 import parametresRouter from "./routes/parametres.routes.js";
+import notificationsRouter from "./routes/notifications.routes.js";
+import compteRouter from "./routes/compte.routes.js";
+import abonnementsRouter from "./routes/abonnements.routes.js";
+import transactionsRouter from "./routes/transactions.routes.js";
+import formulesAbonnementRouter from "./routes/formulesAbonnement.routes.js";
+import webhooksRouter from "./routes/webhooks.routes.js";
 
 // Pas de app.listen() ici : ce fichier est importé à la fois par
 // backend/src/server.js (dev local) et par api/index.js (Vercel Function).
@@ -27,7 +33,20 @@ app.set("trust proxy", 1);
 // 5mb : les photos (modèles) et le logo de l'atelier sont uploadés en base64
 // dans le corps JSON (voir optionalImageField, zodHelpers.js) — une image de
 // 2 Mo encodée en base64 pèse ~2.7 Mo, plus le reste des champs du formulaire.
-app.use(express.json({ limit: "5mb" }));
+//
+// `verify` capture le Buffer BRUT de chaque requête dans req.rawBody, sans
+// changer le comportement du parsing JSON normal (req.body reste identique
+// partout ailleurs) — nécessaire pour le webhook Wave (webhooks.routes.js) :
+// la signature HMAC porte sur les octets exacts reçus, jamais sur une
+// reconstruction JSON.stringify(req.body) qui pourrait légèrement différer.
+app.use(
+  express.json({
+    limit: "5mb",
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
 app.use(cookieParser());
 
 app.use("/api/auth", authRouter);
@@ -44,6 +63,14 @@ app.use("/api/recus", recusRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/rapports", rapportsRouter);
 app.use("/api/parametres", parametresRouter);
+app.use("/api/notifications", notificationsRouter);
+app.use("/api/compte", compteRouter);
+app.use("/api/abonnements", abonnementsRouter);
+app.use("/api/transactions", transactionsRouter);
+app.use("/api/formules-abonnement", formulesAbonnementRouter);
+// Pas de requireAuth : Wave appelle cette route directement (voir
+// webhooks.routes.js — confiance basée sur la signature HMAC, pas un cookie).
+app.use("/api/webhooks", webhooksRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "am-couture-api" });

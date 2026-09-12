@@ -12,6 +12,7 @@ export const clientesApi = {
   update: (id, data) => api.patch(`/clientes/${id}`, data),
   archive: (id) => api.post(`/clientes/${id}/archiver`),
   restore: (id) => api.post(`/clientes/${id}/restaurer`),
+  totaux: (id) => api.get(`/clientes/${id}/totaux`),
   mesures: {
     list: (clienteId, params) => api.get(`/clientes/${clienteId}/mesures${buildQuery(params)}`),
     create: (clienteId, data) => api.post(`/clientes/${clienteId}/mesures`, data),

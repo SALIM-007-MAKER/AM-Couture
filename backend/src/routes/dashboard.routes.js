@@ -6,6 +6,7 @@ import { requireAuth } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { resolvePeriod, dateRangeWhere } from "../lib/period.js";
 import { periodQuerySchema, recentQuerySchema } from "../schemas/dashboard.schema.js";
+import { whereCommandesImpayees } from "../lib/commandesImpayees.js";
 
 // Module PUREMENT consultatif : aucune route de ce fichier n'écrit en base
 // (que des `count`/`aggregate`/`findMany` en lecture seule).
@@ -48,6 +49,7 @@ router.get("/summary", async (req, res) => {
     commandesTerminees,
     commandesLivrees,
     commandesEnRetard,
+    commandesNonPayees,
     paiementsPeriode,
     depensesPeriode,
   ] = await Promise.all([
@@ -63,6 +65,11 @@ router.get("/summary", async (req, res) => {
     prisma.commande.count({
       where: { statut: COMMANDES_NON_LIVREES_OU_ANNULEES, dateLivraisonPrevue: { lt: now } },
     }),
+    // "Non payées" = 0 FCFA réellement encaissé (voir commandesImpayees.js —
+    // définition partagée avec le module Notifications). Ne compte PAS les
+    // commandes partiellement payées : déjà visibles via le solde/statut de
+    // paiement affiché partout ailleurs, pas doublonné ici.
+    whereCommandesImpayees(prisma).then((where) => prisma.commande.count({ where })),
     // annuleAt: null — un paiement/une dépense annulé ne compte dans aucune
     // statistique (voir routes paiements/dépenses).
     prisma.paiement.aggregate({
@@ -95,6 +102,7 @@ router.get("/summary", async (req, res) => {
       terminees: commandesTerminees,
       livrees: commandesLivrees,
       enRetard: commandesEnRetard,
+      nonPayees: commandesNonPayees,
     },
     finances: {
       // Chiffre d'affaires (valeur des commandes) ≠ argent réellement

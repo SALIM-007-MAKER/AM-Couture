@@ -7,6 +7,7 @@ import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
 import Pagination from "../../components/Pagination.jsx";
 import CommandeStatutBadge from "./components/CommandeStatutBadge.jsx";
+import PaiementStatutBadge from "./components/PaiementStatutBadge.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
@@ -115,6 +116,7 @@ export default function CommandesListPage() {
                   <th className="px-4 py-3 font-medium hidden sm:table-cell">Livraison prévue</th>
                   <th className="px-4 py-3 font-medium hidden md:table-cell">Priorité</th>
                   <th className="px-4 py-3 font-medium text-right">Solde</th>
+                  <th className="px-4 py-3 font-medium">Paiement</th>
                   <th className="px-4 py-3 font-medium">Statut</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -137,6 +139,9 @@ export default function CommandesListPage() {
                       {prioriteLabel(commande.priorite)}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-neutral-900 dark:text-neutral-100">{commande.solde}</td>
+                    <td className="px-4 py-3">
+                      <PaiementStatutBadge statut={commande.statutPaiement} />
+                    </td>
                     <td className="px-4 py-3">
                       <CommandeStatutBadge statut={commande.statut} />
                     </td>
@@ -164,7 +169,10 @@ export default function CommandesListPage() {
                     <p className="text-neutral-600 dark:text-neutral-400 text-sm">
                       {commande.cliente.nom} {commande.cliente.prenom} — {formatDate(commande.dateLivraisonPrevue)}
                     </p>
-                    <p className="text-neutral-600 dark:text-neutral-400 text-sm">Solde : {commande.solde}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-neutral-600 dark:text-neutral-400 text-sm">Solde : {commande.solde}</p>
+                      <PaiementStatutBadge statut={commande.statutPaiement} />
+                    </div>
                   </Card>
                 </Link>
               </li>

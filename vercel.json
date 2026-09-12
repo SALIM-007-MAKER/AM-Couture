@@ -2,7 +2,13 @@
   "buildCommand": "npx prisma generate && npx prisma migrate deploy && npm run build -w frontend",
   "installCommand": "npm install",
   "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "backend/src/generated/**"
+    }
+  },
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

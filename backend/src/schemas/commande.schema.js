@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { emptyToUndefined, optionalTrimmed } from "../lib/zodHelpers.js";
+import { emptyToUndefined, optionalTrimmed, optionalImageField } from "../lib/zodHelpers.js";
 import { decimalField } from "../lib/decimalField.js";
 import { dateField } from "../lib/dateField.js";
 import { CATEGORIES_VETEMENT } from "./modele.schema.js";
@@ -68,6 +68,8 @@ export const createCommandeSchema = z
     dateCommande: z.preprocess(emptyToUndefined, dateField.optional()),
     dateLivraisonPrevue: dateField,
     observations: optionalTrimmed(2000),
+    photoTissuUrl: optionalImageField(),
+    photoModeleUrl: optionalImageField(),
     paiementInitial: z.preprocess(emptyToUndefined, paiementInitialSchema.optional()),
   })
   .strict()
@@ -109,6 +111,8 @@ export const updateCommandeSchema = z
     priorite: z.enum(PRIORITES).optional(),
     dateLivraisonPrevue: dateField.optional(),
     observations: optionalTrimmed(2000),
+    photoTissuUrl: optionalImageField(),
+    photoModeleUrl: optionalImageField(),
   })
   .strict()
   .refine((data) => Object.keys(data).length > 0, { message: "Aucune donnée à modifier." });

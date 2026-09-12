@@ -57,6 +57,30 @@ enum CategorieVetement {
   AUTRE
 }
 
+// Abonnement (Phase 6) : accès de L'ATELIER à l'application AM Couture
+// elle-même (pas un produit vendu par l'atelier à ses clientes). EN_ATTENTE
+// = créé, aucun paiement réussi ; CONFIRME = au moins un paiement réussi
+// l'a activé — "actif" vs "expiré" se DÉRIVENT de dateExpiration à la
+// lecture (jamais stockés), même principe que statutPaiement (money.js).
+// ANNULE = annulation explicite. Aucun blocage d'accès dans cette phase.
+enum StatutAbonnement {
+  EN_ATTENTE
+  CONFIRME
+  ANNULE
+}
+
+enum MoyenPaiement {
+  WAVE
+  NITA
+  AMANA
+}
+
+enum StatutTransaction {
+  EN_ATTENTE
+  REUSSIE
+  ECHOUEE
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Utilisateur (propriétaire) et paramètres de l'atelier
 // ─────────────────────────────────────────────────────────────────────────
@@ -65,6 +89,10 @@ model User {
   id           String   @id @default(cuid())
   identifiant  String   @unique
   passwordHash String
+  // Préférence stockée uniquement (Phase 6) : aucune infrastructure i18n,
+  // l'interface reste 100% en français pour l'instant — voir constants.js
+  // frontend pour la liste des valeurs acceptées.
+  langue       String   @default("fr")
   createdAt    DateTime @default(now())
 }
 
@@ -177,6 +205,13 @@ model Commande {
   dateLivraisonPrevue DateTime
   observations         String?
 
+  // Photos (Phase 2) : mêmes conventions que Modele.photoUrl / Atelier.logoUrl
+  // — data URL base64 stockée telle quelle (voir optionalImageField), pas de
+  // service de stockage externe. photoTissuUrl = échantillon du tissu choisi,
+  // photoModeleUrl = photo du modèle/design souhaité par la cliente.
+  photoTissuUrl  String?
+  photoModeleUrl String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -187,8 +222,9 @@ model Commande {
   // Livraison? unique en base l'aurait interdit à vie. "La" livraison
   // active (au plus une à la fois, contrainte partielle en base, voir
   // migration) se retrouve par livraisons.find(l => !l.annuleAt).
-  livraisons Livraison[]
-  recus      Recu[]
+  livraisons    Livraison[]
+  recus         Recu[]
+  notifications Notification[]
 
   @@index([clienteId])
   @@index([statut])
@@ -252,6 +288,35 @@ model Recu {
   createdAt   DateTime  @default(now())
 }
 
+enum NotificationType {
+  RETARD // dateLivraisonPrevue dépassée, statut non terminal
+  PRET // statut = TERMINEE (prête à récupérer, pas encore livrée)
+  LIVRAISON_PROCHE // dateLivraisonPrevue dans les prochains jours (voir lib/notifications.js)
+  IMPAYE // 0 FCFA encaissé, hors ANNULEE
+}
+
+/// Contenu volontairement minimal : AUCUN texte/libellé stocké — le message
+/// affiché est reconstruit à la lecture depuis la Commande/Cliente réelles
+/// (voir lib/notifications.js), même principe que le reste du projet (rien
+/// de calculable n'est stocké en dur). Cette table ne retient que l'état qui
+/// NE PEUT PAS être recalculé : "cette alerte a-t-elle été lue ?".
+///
+/// Réconciliée à chaque GET /api/notifications (pas de tâche planifiée) :
+/// une ligne est créée (non lue) dès qu'une condition devient vraie, et
+/// supprimée automatiquement dès qu'elle ne l'est plus (commande livrée,
+/// payée...). @@unique évite les doublons lors de cette réconciliation.
+model Notification {
+  id         String           @id @default(cuid())
+  type       NotificationType
+  commandeId String
+  commande   Commande         @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+  lu         Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  @@unique([type, commandeId])
+  @@index([lu])
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Dépenses
 // ─────────────────────────────────────────────────────────────────────────
@@ -271,6 +336,78 @@ model Depense {
 
   @@index([date])
   @@index([categorie])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Abonnement (Phase 6) — accès de l'atelier à AM Couture
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Table de CONFIGURATION des formules — le prix se modifie ICI (table),
+/// jamais en dur dans le code métier. Seedée avec 4 lignes à la migration,
+/// prix TEMPORAIRES/À CONFIGURER (voir migration.sql). Une formule n'est
+/// jamais supprimée après coup (Abonnement.formuleId la référence en
+/// Restrict) : `actif=false` la retire des choix proposés sans casser
+/// l'historique des abonnements déjà liés à elle.
+model FormuleAbonnement {
+  id        String   @id @default(cuid())
+  dureeMois Int      @unique // 1, 3, 6 ou 12
+  nom       String // "1 mois", "3 mois", "6 mois", "12 mois"
+  prix      Decimal  @db.Decimal(10, 2) // TEMPORAIRE — voir migration.sql pour les valeurs de seed
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  abonnements Abonnement[]
+}
+
+model Abonnement {
+  id        String            @id @default(cuid())
+  numero    String            @unique // ABN-2026-0001, même Counter que CMD/REC
+  formuleId String
+  formule   FormuleAbonnement @relation(fields: [formuleId], references: [id], onDelete: Restrict)
+  // Snapshot du prix de la formule AU MOMENT de la souscription — ne change
+  // jamais rétroactivement si le tarif de la formule est ajusté ensuite
+  // (même principe que Commande.prixTotal / Paiement.montant : un montant
+  // déjà engagé n'est jamais recalculé après coup).
+  prix           Decimal          @db.Decimal(10, 2)
+  dateDebut      DateTime?
+  dateExpiration DateTime?
+  statut         StatutAbonnement @default(EN_ATTENTE)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  transactions Transaction[]
+
+  @@index([statut])
+  @@index([formuleId])
+}
+
+model Transaction {
+  id           String            @id @default(cuid())
+  numero       String            @unique // TRX-2026-0001
+  abonnementId String
+  abonnement   Abonnement        @relation(fields: [abonnementId], references: [id], onDelete: Restrict)
+  moyenPaiement MoyenPaiement
+  montant      Decimal           @db.Decimal(10, 2)
+  statut       StatutTransaction @default(EN_ATTENTE)
+  // Notre clé d'idempotence — envoyée à Wave comme client_reference : permet
+  // de retrouver la transaction depuis le webhook sans jamais en créer deux
+  // pour un même paiement (rejeu webhook, double-clic sur "Payer"...).
+  referenceInterne String  @unique
+  // Id de session Wave (cos-...), ou référence de transfert saisie
+  // manuellement pour NITA/Amana (voir confirmeManuellement ci-dessous).
+  referenceExterne String?
+  // true UNIQUEMENT pour NITA/Amana — jamais mis à true automatiquement,
+  // seulement via une action explicite de l'admin (voir notifications.routes
+  // équivalent pour abonnements : POST .../confirmer-manuellement).
+  confirmeManuellement Boolean @default(false)
+  // Payload webhook Wave brut, conservé pour audit/litige — jamais
+  // réinterprété après coup, juste une preuve horodatée de ce qui a été reçu.
+  donneesBrutesWebhook Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([abonnementId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────

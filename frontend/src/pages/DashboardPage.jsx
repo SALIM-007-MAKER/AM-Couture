@@ -5,6 +5,7 @@ import {
   Truck,
   AlertTriangle,
   CheckCircle2,
+  CircleOff,
   Wallet,
   Receipt,
   TrendingUp,
@@ -33,7 +34,7 @@ function isToday(iso) {
 const KPI_TONES = {
   neutral: "bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400",
   success: "bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400",
-  warning: "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400",
+  warning: "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400",
   danger: "bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-400",
 };
 
@@ -46,15 +47,17 @@ const KPI_TONES = {
 function Kpi({ icon: Icon, label, value, sub, tone = "neutral" }) {
   return (
     <Card
-      className={`flex items-start gap-3 ${tone === "danger" ? "ring-1 ring-red-300 dark:ring-red-800" : ""}`}
+      className={`flex items-start gap-3 min-w-0 ${tone === "danger" ? "ring-1 ring-red-300 dark:ring-red-800" : ""}`}
     >
       <span className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${KPI_TONES[tone]}`}>
         <Icon className="size-4" aria-hidden="true" />
       </span>
       <div className="min-w-0">
-        <p className="text-xs font-medium text-neutral-500">{label}</p>
-        <p className="text-2xl font-bold tabular-nums text-neutral-900 dark:text-neutral-50 mt-0.5">{value}</p>
-        {sub && <p className="text-xs text-neutral-500 mt-0.5">{sub}</p>}
+        <p className="text-xs font-medium text-neutral-500 leading-tight">{label}</p>
+        <p className="text-2xl font-bold tabular-nums text-neutral-900 dark:text-neutral-50 mt-0.5 break-words">
+          {value}
+        </p>
+        {sub && <p className="text-xs text-neutral-500 mt-0.5 leading-tight">{sub}</p>}
       </div>
     </Card>
   );
@@ -67,7 +70,7 @@ function Kpi({ icon: Icon, label, value, sub, tone = "neutral" }) {
  * rassurant, particulièrement trompeur ici (section d'alerte) — bug réel
  * trouvé en testant avec des données réelles. */
 function WatchList({ icon: Icon, tone, title, items, isPending, isError, error, onRetry, renderMeta, emptyLabel, viewAllTo }) {
-  const toneText = tone === "danger" ? "text-red-600 dark:text-red-400" : "text-orange-600 dark:text-orange-400";
+  const toneText = tone === "danger" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400";
   return (
     <Card variant="outlined" padded={false}>
       <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-100 dark:border-neutral-800">
@@ -129,7 +132,10 @@ export default function DashboardPage() {
   // commande en retard l'est aujourd'hui, pas "pendant telle période
   // passée") — même logique déjà établie dans Rapports.
   const enRetardQuery = useCommandesEnRetardQuery({ page: 1, pageSize: 5 });
-  const aLivrerQuery = useCommandesALivrerQuery({ page: 1, pageSize: 5, horizonJours: 7 });
+  // 3 jours (demande Phase 4) — remplace l'horizon 7 jours utilisé jusqu'ici
+  // ici uniquement ; /rapports garde son propre horizon indépendant.
+  const HORIZON_JOURS = 3;
+  const aLivrerQuery = useCommandesALivrerQuery({ page: 1, pageSize: 5, horizonJours: HORIZON_JOURS });
   const recentesQuery = useCommandesQuery({ page: 1, pageSize: 6 });
 
   const nombreEnRetard = summaryQuery.data?.commandes.enRetard ?? 0;
@@ -152,11 +158,18 @@ export default function DashboardPage() {
           <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-600">
             Vue d'ensemble
           </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             <Kpi icon={Clock} label="En cours" value={summaryQuery.data.commandes.enCours} tone="neutral" />
             <Kpi
+              icon={CheckCircle2}
+              label="Prêtes"
+              value={summaryQuery.data.commandes.terminees}
+              sub="à récupérer"
+              tone={summaryQuery.data.commandes.terminees > 0 ? "warning" : "neutral"}
+            />
+            <Kpi
               icon={Truck}
-              label="À livrer (7 j)"
+              label={`Livraison ≤ ${HORIZON_JOURS} j`}
               value={aLivrerQuery.data?.meta.total ?? "—"}
               sub={aLivrerAujourdhui > 0 ? `dont ${aLivrerAujourdhui} aujourd'hui` : undefined}
               tone={aLivrerAujourdhui > 0 ? "warning" : "neutral"}
@@ -166,6 +179,13 @@ export default function DashboardPage() {
               label="En retard"
               value={nombreEnRetard}
               tone={nombreEnRetard > 0 ? "danger" : "success"}
+            />
+            <Kpi
+              icon={CircleOff}
+              label="Non payées"
+              value={summaryQuery.data.commandes.nonPayees}
+              sub="0 encaissé"
+              tone={summaryQuery.data.commandes.nonPayees > 0 ? "warning" : "neutral"}
             />
             <Kpi
               icon={Wallet}
@@ -206,14 +226,14 @@ export default function DashboardPage() {
           <WatchList
             icon={Truck}
             tone="warning"
-            title="À livrer bientôt"
+            title={`Livraison dans ${HORIZON_JOURS} jours`}
             items={aLivrerQuery.data?.data ?? []}
             isPending={aLivrerQuery.isPending}
             isError={aLivrerQuery.isError}
             error={aLivrerQuery.error}
             onRetry={aLivrerQuery.refetch}
             renderMeta={(c) => (isToday(c.dateLivraisonPrevue) ? "Aujourd'hui" : formatDate(c.dateLivraisonPrevue))}
-            emptyLabel="Aucune livraison prévue dans les 7 prochains jours."
+            emptyLabel={`Aucune livraison prévue dans les ${HORIZON_JOURS} prochains jours.`}
             viewAllTo="/rapports"
           />
         </div>

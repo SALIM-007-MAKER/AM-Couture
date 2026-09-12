@@ -42,6 +42,16 @@
      apparaissent/disparaissent instantanement (montage conditionnel, donc
      pas de transition possible) - voir GlobalFormError, ParametresPage. */
   --animate-fade-in: fade-in 0.18s ease-out;
+
+  /* Lueurs douces - raffinement visuel repris de la page de connexion
+     (LoginPage.jsx), generalise ici via le theme pour rester coherent
+     partout (Button, AppLayout, PageHeader...) sans repeter la meme valeur
+     arbitraire dans chaque fichier. shadow-glow-brand = couleur de marque ;
+     shadow-glow-accent = touche doree ponctuelle (CTA premium, ex: paiement
+     Wave) - jamais utilisee pour une action courante, seulement un moment
+     special (voir Button.jsx, variant "accent"). */
+  --shadow-glow-brand: 0 10px 28px -8px rgba(39, 99, 134, 0.45);
+  --shadow-glow-accent: 0 10px 28px -8px rgba(217, 158, 63, 0.5);
 }
 
 @keyframes fade-in {
