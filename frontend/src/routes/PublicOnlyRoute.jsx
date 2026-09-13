@@ -1,6 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { useMeQuery } from "../hooks/useAuth.js";
+import { useMeQuery, homePathForUser } from "../hooks/useAuth.js";
 
 /**
  * Empêche d'afficher /login à un utilisateur déjà connecté.
@@ -19,7 +19,7 @@ export default function PublicOnlyRoute() {
   }
 
   if (data) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={homePathForUser(data)} replace />;
   }
 
   return <Outlet />;

@@ -194,7 +194,12 @@ function BottomNav() {
   );
 }
 
-function Logo({ collapsed, logoUrl }) {
+// `nom` vient de l'atelier DE L'UTILISATEUR CONNECTÉ (Phase 8 — multi-tenant :
+// jamais un nom d'app codé en dur, chaque atelier a le sien, voir
+// useParametresQuery dans AppLayout). Tant que la fiche atelier n'est pas
+// encore chargée/configurée, on retombe sur un intitulé générique de
+// plateforme plutôt que sur le nom d'un atelier précis.
+function Logo({ collapsed, logoUrl, nom }) {
   return (
     <div
       className={`flex items-center gap-2 px-4 py-4 border-b border-neutral-200 dark:border-neutral-800 ${collapsed ? "justify-center px-0" : ""}`}
@@ -211,8 +216,8 @@ function Logo({ collapsed, logoUrl }) {
         </span>
       )}
       {!collapsed && (
-        <span className="text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">
-          AM Couture
+        <span className="text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 truncate">
+          {nom || "Gestion d'Atelier"}
         </span>
       )}
     </div>
@@ -254,6 +259,7 @@ export default function AppLayout() {
   // ciseaux tant que rien n'est chargé ou configuré).
   const parametresQuery = useParametresQuery();
   const logoUrl = parametresQuery.data?.logoUrl;
+  const nomAtelier = parametresQuery.data?.nom;
 
   return (
     <div className="min-h-svh flex bg-neutral-50 dark:bg-neutral-950">
@@ -267,7 +273,7 @@ export default function AppLayout() {
           sidebarCollapsed ? "w-16" : "w-56 lg:w-64 xl:w-72 2xl:w-80"
         }`}
       >
-        <Logo collapsed={sidebarCollapsed} logoUrl={logoUrl} />
+        <Logo collapsed={sidebarCollapsed} logoUrl={logoUrl} nom={nomAtelier} />
         <div className="flex-1 overflow-y-auto">
           <NavContent collapsed={sidebarCollapsed} />
         </div>
@@ -306,7 +312,7 @@ export default function AppLayout() {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <Logo collapsed={false} logoUrl={logoUrl} />
+        <Logo collapsed={false} logoUrl={logoUrl} nom={nomAtelier} />
         <div className="flex-1 overflow-y-auto">
           <NavContent collapsed={false} onNavigate={closeSidebar} groups={MOBILE_DRAWER_GROUPS} />
         </div>

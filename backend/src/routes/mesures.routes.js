@@ -20,7 +20,7 @@ router.param("mesureId", requireValidIdParam);
 // création, dernière, détail) : consulter des mesures suppose que la cliente
 // existe.
 router.use(async (req, res, next) => {
-  const cliente = await prisma.cliente.findUnique({ where: { id: req.params.id } });
+  const cliente = await prisma.cliente.findFirst({ where: { id: req.params.id, atelierId: req.user.atelierId } });
   if (!cliente) return next(new HttpError(404, "Client introuvable."));
   req.cliente = cliente;
   next();

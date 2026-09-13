@@ -5,5 +5,5 @@ import app from "./app.js";
 const port = process.env.PORT || 4000;
 
 app.listen(port, () => {
-  console.log(`AM Couture API — http://localhost:${port}/api/health`);
+  console.log(`Gestion d'Atelier API — http://localhost:${port}/api/health`);
 });

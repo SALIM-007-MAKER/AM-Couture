@@ -3,6 +3,15 @@
 // permet de toute façon pas de joindre un fichier automatiquement). Aucun
 // appel backend : tout se construit ici à partir de données déjà chargées
 // côté frontend.
+//
+// Partage du FICHIER PDF (pas juste un texte) : uniquement possible via la
+// Web Share API niveau 2 (`navigator.share({ files })`), qui ouvre la
+// feuille de partage NATIVE de l'appareil — l'utilisateur y choisit
+// WhatsApp lui-même, ce n'est jamais un envoi direct "à sens unique" vers
+// WhatsApp uniquement (aucune API ne permet ça depuis un navigateur). Pris
+// en charge sur mobile (Android/Chrome, iOS/Safari récents) ; absent sur la
+// plupart des navigateurs desktop — `peutPartagerFichier()` doit TOUJOURS
+// être vérifié avant d'afficher cette option, jamais supposé disponible.
 
 import { categorieLabel } from "../features/modeles/constants.js";
 
@@ -29,6 +38,48 @@ export function waMeLink(phone, message) {
   return `https://wa.me/${numero}?text=${encodeURIComponent(message)}`;
 }
 
+// Vérifie le support réel de l'appareil/navigateur COURANT avant de
+// proposer le partage de fichier — jamais supposé, jamais "on essaie et on
+// espère" (voir consigne générale du projet : aucune fonctionnalité
+// présentée comme fonctionnelle sans l'être réellement).
+export function peutPartagerFichier() {
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function") return false;
+  if (typeof navigator.canShare !== "function") return false;
+  try {
+    // Fichier factice minimal, juste pour interroger canShare() sur le type
+    // "fichier PDF" — jamais réellement partagé.
+    const sonde = new File([""], "sonde.pdf", { type: "application/pdf" });
+    return navigator.canShare({ files: [sonde] });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Récupère le PDF déjà généré par le backend (même origine, cookie de
+ * session envoyé automatiquement) et ouvre la feuille de partage native
+ * avec ce fichier — l'utilisateur choisit WhatsApp (ou toute autre app)
+ * dans cette feuille, ce n'est pas nous qui l'envoyons directement.
+ * Rejette explicitement si `peutPartagerFichier()` est faux : ne JAMAIS
+ * tenter un `navigator.share` non supporté en espérant que ça marche quand
+ * même.
+ */
+export async function partagerPdfNatif({ pdfUrl, nomFichier, texte }) {
+  if (!peutPartagerFichier()) {
+    throw new Error("Le partage de fichier n'est pas pris en charge sur cet appareil/navigateur.");
+  }
+  const res = await fetch(pdfUrl, { credentials: "include" });
+  if (!res.ok) {
+    throw new Error("Impossible de récupérer le PDF à partager.");
+  }
+  const blob = await res.blob();
+  const fichier = new File([blob], nomFichier, { type: "application/pdf" });
+  if (!navigator.canShare({ files: [fichier] })) {
+    throw new Error("Ce fichier ne peut pas être partagé sur cet appareil.");
+  }
+  await navigator.share({ files: [fichier], text: texte });
+}
+
 function formatMontant(montant, devise) {
   return `${montant} ${devise || "FCFA"}`;
 }
@@ -48,7 +99,7 @@ export function buildStatutMessage({ commande, cliente, atelier, statutLabel }) 
   const modele = commande.modele?.nom || categorieLabel(commande.typeVetement);
   const lignes = [
     `Bonjour ${cliente.prenom},`,
-    `Concernant votre commande ${commande.numero} (${modele}) chez ${atelier?.nom || "AM Couture"} :`,
+    `Concernant votre commande ${commande.numero} (${modele}) chez ${atelier?.nom || "l'atelier"} :`,
     `Statut actuel : ${statutLabel}.`,
   ];
   if (livraisonPertinente(commande.statut)) {
@@ -59,7 +110,7 @@ export function buildStatutMessage({ commande, cliente, atelier, statutLabel }) 
 }
 
 export function buildPretMessage({ cliente, atelier }) {
-  return `Bonjour ${cliente.prenom}, votre commande chez ${atelier?.nom || "AM Couture"} est prête ! Vous pouvez venir la récupérer. Merci 🙏`;
+  return `Bonjour ${cliente.prenom}, votre commande chez ${atelier?.nom || "l'atelier"} est prête ! Vous pouvez venir la récupérer. Merci 🙏`;
 }
 
 export function buildRecuMessage({ commande, cliente, atelier, totalPaye, solde }) {
@@ -70,7 +121,7 @@ export function buildRecuMessage({ commande, cliente, atelier, totalPaye, solde 
     `Total : ${formatMontant(commande.prixTotal, devise)}`,
     `Payé : ${formatMontant(totalPaye, devise)}`,
     `Solde restant : ${formatMontant(solde, devise)}`,
-    `— ${atelier?.nom || "AM Couture"}`,
+    `— ${atelier?.nom || "L'atelier"}`,
   ].join("\n");
 }
 
@@ -78,7 +129,7 @@ export function buildRecuMessage({ commande, cliente, atelier, totalPaye, solde 
 // commande prête à récupérer si elle existe, sinon rappel du solde global.
 export function buildRappelMessage({ cliente, atelier, commandePrete, totalRestant, devise }) {
   if (commandePrete) {
-    return `Bonjour ${cliente.prenom}, pour rappel votre commande ${commandePrete.numero} chez ${atelier?.nom || "AM Couture"} est prête ! Vous pouvez venir la récupérer. Merci 🙏`;
+    return `Bonjour ${cliente.prenom}, pour rappel votre commande ${commandePrete.numero} chez ${atelier?.nom || "l'atelier"} est prête ! Vous pouvez venir la récupérer. Merci 🙏`;
   }
-  return `Bonjour ${cliente.prenom}, pour rappel il reste un solde de ${formatMontant(totalRestant, devise || "FCFA")} sur votre/vos commande(s) chez ${atelier?.nom || "AM Couture"}. Merci de votre compréhension.`;
+  return `Bonjour ${cliente.prenom}, pour rappel il reste un solde de ${formatMontant(totalRestant, devise || "FCFA")} sur votre/vos commande(s) chez ${atelier?.nom || "l'atelier"}. Merci de votre compréhension.`;
 }

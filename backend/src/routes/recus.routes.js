@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { nextNumero } from "../lib/numero.js";
@@ -16,6 +16,19 @@ import { createRecuSchema, listRecusQuerySchema, listRecusGlobalQuerySchema } fr
 // routeur parent (commandes.routes.js) avant le montage.
 // ───────────────────────────────────────────────────────────────────────
 export const recusCommandeRouter = Router({ mergeParams: true });
+
+// Vérifie que la commande de l'URL appartient bien à l'atelier de
+// l'utilisateur connecté (Phase 8 — multi-tenant) — voir même middleware
+// dans paiements.routes.js/livraisons.routes.js (Recu n'a pas son propre
+// atelierId, scopé via Commande).
+recusCommandeRouter.use(async (req, res, next) => {
+  const commande = await prisma.commande.findFirst({
+    where: { id: req.params.commandeId, atelierId: req.user.atelierId },
+    select: { id: true },
+  });
+  if (!commande) return next(new HttpError(404, "Commande introuvable."));
+  next();
+});
 
 // POST /api/commandes/:commandeId/recus — reçu RÉCAPITULATIF (sans paiement
 // précis) : montantPaye = total encaissé sur la commande à cet instant,
@@ -79,9 +92,7 @@ recusCommandeRouter.get("/", async (req, res) => {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
   }
   const { page, pageSize } = parsed.data;
-
-  const commande = await prisma.commande.findUnique({ where: { id: commandeId }, select: { id: true } });
-  if (!commande) throw new HttpError(404, "Commande introuvable.");
+  // Existence + appartenance à cet atelier déjà vérifiées par le middleware ci-dessus.
 
   const [data, total] = await Promise.all([
     prisma.recu.findMany({
@@ -107,7 +118,7 @@ recusCommandeRouter.get("/", async (req, res) => {
 // ───────────────────────────────────────────────────────────────────────
 const router = Router();
 
-router.use(requireAuth);
+router.use(requireAuth, requireAtelier);
 router.param("id", requireValidIdParam);
 
 // GET /api/recus — liste globale (tous reçus, toutes commandes confondues),
@@ -120,7 +131,7 @@ router.get("/", async (req, res) => {
   }
   const { q, dateFrom, dateTo, page, pageSize } = parsed.data;
 
-  const where = {};
+  const where = { commande: { atelierId: req.user.atelierId } };
   if (dateFrom || dateTo) {
     where.createdAt = {
       ...(dateFrom ? { gte: dateFrom } : {}),
@@ -155,20 +166,26 @@ router.get("/", async (req, res) => {
 
 // GET /api/recus/:id — détail JSON
 router.get("/:id", async (req, res) => {
-  const recu = await prisma.recu.findUnique({ where: { id: req.params.id }, include: RECU_INCLUDE });
+  const recu = await prisma.recu.findFirst({
+    where: { id: req.params.id, commande: { atelierId: req.user.atelierId } },
+    include: RECU_INCLUDE,
+  });
   if (!recu) throw new HttpError(404, "Reçu introuvable.");
   res.json(recu);
 });
 
 // GET /api/recus/:id/pdf — flux PDF (jamais stocké : régénéré à chaque appel)
 router.get("/:id/pdf", async (req, res) => {
-  const recu = await prisma.recu.findUnique({ where: { id: req.params.id }, include: RECU_INCLUDE });
+  const recu = await prisma.recu.findFirst({
+    where: { id: req.params.id, commande: { atelierId: req.user.atelierId } },
+    include: RECU_INCLUDE,
+  });
   if (!recu) throw new HttpError(404, "Reçu introuvable.");
 
-  // Singleton facultatif : le module Paramètres Atelier (pas encore
-  // implémenté) n'a peut-être pas encore créé cette ligne. On dégrade
-  // proprement (nom générique, pas de coordonnées) plutôt que d'échouer.
-  const atelier = await prisma.atelier.findFirst();
+  // L'atelier PROPRIÉTAIRE de ce reçu (Phase 8 — multi-tenant), pas "le
+  // premier trouvé" : req.user.atelierId == recu.commande.atelierId ici,
+  // déjà vérifié par le where ci-dessus.
+  const atelier = await prisma.atelier.findUnique({ where: { id: req.user.atelierId } });
 
   streamRecuPdf(res, { recu, atelier });
 });

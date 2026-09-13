@@ -9,10 +9,18 @@
 //
 // ANNULEE exclue : une commande annulée sans paiement n'est pas un impayé à
 // relancer (voir même exclusion dans dashboard.routes.js pour enCours/enRetard).
-export async function whereCommandesImpayees(prisma) {
+//
+// atelierId (Phase 8 — multi-tenant) : Paiement n'a pas sa propre colonne
+// atelierId (scopé via Commande), d'où le filtre `commande: { atelierId }`
+// sur le groupBy — sans lui, un paiement d'un AUTRE atelier suffirait à
+// exclure à tort une commande de cet atelier du décompte des impayées.
+export async function whereCommandesImpayees(prisma, atelierId) {
   // Un paiement a toujours un montant > 0 (voir paiement.schema.js) : la
   // seule présence d'une ligne non annulée suffit à exclure la commande.
-  const rows = await prisma.paiement.groupBy({ by: ["commandeId"], where: { annuleAt: null } });
+  const rows = await prisma.paiement.groupBy({
+    by: ["commandeId"],
+    where: { annuleAt: null, commande: { atelierId } },
+  });
   const idsAvecPaiement = rows.map((r) => r.commandeId);
-  return { statut: { not: "ANNULEE" }, id: { notIn: idsAvecPaiement } };
+  return { atelierId, statut: { not: "ANNULEE" }, id: { notIn: idsAvecPaiement } };
 }

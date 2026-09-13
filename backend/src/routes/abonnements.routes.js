@@ -2,7 +2,7 @@ import { Router } from "express";
 import crypto from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { formatZodError } from "../lib/validation.js";
 import { nextNumero } from "../lib/numero.js";
@@ -11,7 +11,9 @@ import { statutEffectif } from "../lib/abonnement.js";
 import { creerSessionCheckout } from "../lib/wave.js";
 
 const router = Router();
-router.use(requireAuth);
+// L'abonnement est celui DE L'ATELIER (Phase 8) — un SUPERADMIN n'a pas
+// d'atelier et ne souscrit/consulte pas d'abonnement via cette route.
+router.use(requireAuth, requireAtelier);
 router.param("id", requireValidIdParam);
 
 const FORMULE_SELECT = { id: true, dureeMois: true, nom: true, prix: true, actif: true };
@@ -46,7 +48,13 @@ router.post("/", async (req, res) => {
     async (tx) => {
       const numeroAbn = await nextNumero(tx, "ABN");
       const abonnementCree = await tx.abonnement.create({
-        data: { numero: numeroAbn, formuleId: formule.id, prix: formule.prix, statut: "EN_ATTENTE" },
+        data: {
+          numero: numeroAbn,
+          atelierId: req.user.atelierId,
+          formuleId: formule.id,
+          prix: formule.prix,
+          statut: "EN_ATTENTE",
+        },
       });
       const numeroTrx = await nextNumero(tx, "TRX");
       const transactionCreee = await tx.transaction.create({
@@ -106,12 +114,13 @@ router.get("/", async (req, res) => {
 
   const [data, total] = await Promise.all([
     prisma.abonnement.findMany({
+      where: { atelierId: req.user.atelierId },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: { formule: { select: FORMULE_SELECT }, transactions: { orderBy: { createdAt: "desc" } } },
     }),
-    prisma.abonnement.count(),
+    prisma.abonnement.count({ where: { atelierId: req.user.atelierId } }),
   ]);
 
   res.json({
@@ -126,14 +135,14 @@ router.get("/", async (req, res) => {
 // "/:id" pour ne pas être capturée comme un identifiant.
 router.get("/actuel", async (req, res) => {
   const confirme = await prisma.abonnement.findFirst({
-    where: { statut: "CONFIRME" },
+    where: { atelierId: req.user.atelierId, statut: "CONFIRME" },
     orderBy: { dateExpiration: "desc" },
     include: { formule: { select: FORMULE_SELECT }, transactions: { orderBy: { createdAt: "desc" } } },
   });
   if (confirme) return res.json(serialiser(confirme));
 
   const enAttente = await prisma.abonnement.findFirst({
-    where: { statut: "EN_ATTENTE" },
+    where: { atelierId: req.user.atelierId, statut: "EN_ATTENTE" },
     orderBy: { createdAt: "desc" },
     include: { formule: { select: FORMULE_SELECT }, transactions: { orderBy: { createdAt: "desc" } } },
   });
@@ -144,8 +153,8 @@ router.get("/actuel", async (req, res) => {
 
 // GET /api/abonnements/:id — détail.
 router.get("/:id", async (req, res) => {
-  const abonnement = await prisma.abonnement.findUnique({
-    where: { id: req.params.id },
+  const abonnement = await prisma.abonnement.findFirst({
+    where: { id: req.params.id, atelierId: req.user.atelierId },
     include: { formule: { select: FORMULE_SELECT }, transactions: { orderBy: { createdAt: "desc" } } },
   });
   if (!abonnement) throw new HttpError(404, "Abonnement introuvable.");

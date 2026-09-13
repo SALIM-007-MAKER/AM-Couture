@@ -12,10 +12,15 @@ if (!JWT_SECRET) {
 // Durée alignée sur celle du cookie (voir authCookie.js).
 const EXPIRES_IN = "7d";
 
+// role/atelierId (Phase 8, multi-tenant) embarqués dans le token — évite une
+// requête DB supplémentaire à chaque requête juste pour savoir de quel
+// atelier relève l'utilisateur. atelierId est `null` pour un SUPERADMIN.
 export function signAuthToken(user) {
-  return jwt.sign({ sub: user.id, identifiant: user.identifiant }, JWT_SECRET, {
-    expiresIn: EXPIRES_IN,
-  });
+  return jwt.sign(
+    { sub: user.id, identifiant: user.identifiant, role: user.role, atelierId: user.atelierId },
+    JWT_SECRET,
+    { expiresIn: EXPIRES_IN },
+  );
 }
 
 export function verifyAuthToken(token) {

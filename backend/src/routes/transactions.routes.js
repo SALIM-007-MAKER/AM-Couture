@@ -1,12 +1,16 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { calculerDateExpiration } from "../lib/abonnement.js";
 
 const router = Router();
-router.use(requireAuth);
+// Transaction n'a pas sa propre atelierId (scopée via Abonnement) — chaque
+// route ci-dessous vérifie explicitement transaction.abonnement.atelierId
+// avant toute action (Phase 8 — multi-tenant, évite qu'un ADMIN confirme/
+// rejette la transaction d'un AUTRE atelier).
+router.use(requireAuth, requireAtelier);
 router.param("id", requireValidIdParam);
 
 // POST /api/transactions/:id/confirmer-manuel — UNIQUEMENT pour NITA/AMANA
@@ -19,8 +23,8 @@ router.param("id", requireValidIdParam);
 // cette transaction est affichée, pour ne jamais la confondre avec une
 // vérification automatique.
 router.post("/:id/confirmer-manuel", async (req, res) => {
-  const transaction = await prisma.transaction.findUnique({
-    where: { id: req.params.id },
+  const transaction = await prisma.transaction.findFirst({
+    where: { id: req.params.id, abonnement: { atelierId: req.user.atelierId } },
     include: { abonnement: { include: { formule: true } } },
   });
   if (!transaction) throw new HttpError(404, "Transaction introuvable.");
@@ -53,7 +57,9 @@ router.post("/:id/confirmer-manuel", async (req, res) => {
 // clôt cette tentative sans jamais la modifier après coup (l'atelier
 // recommence via un nouvel abonnement si besoin).
 router.post("/:id/rejeter-manuel", async (req, res) => {
-  const transaction = await prisma.transaction.findUnique({ where: { id: req.params.id } });
+  const transaction = await prisma.transaction.findFirst({
+    where: { id: req.params.id, abonnement: { atelierId: req.user.atelierId } },
+  });
   if (!transaction) throw new HttpError(404, "Transaction introuvable.");
   if (transaction.moyenPaiement === "WAVE") {
     throw new HttpError(409, "Un paiement Wave ne se rejette pas manuellement.");

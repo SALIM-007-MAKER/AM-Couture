@@ -1,8 +1,12 @@
 import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 import PublicOnlyRoute from "./routes/PublicOnlyRoute.jsx";
+import { RequireAtelier, RequireSuperadmin } from "./routes/RoleGuards.jsx";
 import AppLayout from "./layouts/AppLayout.jsx";
+import SuperadminLayout from "./layouts/SuperadminLayout.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
+import InscriptionAtelierPage from "./pages/auth/InscriptionAtelierPage.jsx";
+import AteliersPage from "./pages/superadmin/AteliersPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import FinancesPage from "./pages/FinancesPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
@@ -34,37 +38,46 @@ export default function App() {
     <Routes>
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/inscription" element={<InscriptionAtelierPage />} />
       </Route>
 
       <Route element={<ProtectedRoute />}>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/clientes" element={<ClientesListPage />} />
-          <Route path="/clientes/nouvelle" element={<ClienteFormPage mode="create" />} />
-          <Route path="/clientes/:id" element={<ClienteDetailPage />} />
-          <Route path="/clientes/:id/modifier" element={<ClienteFormPage mode="edit" />} />
-          <Route path="/clientes/:id/mesures/nouvelle" element={<MesureFormPage />} />
-          <Route path="/modeles" element={<ModelesListPage />} />
-          <Route path="/modeles/nouveau" element={<ModeleFormPage mode="create" />} />
-          <Route path="/modeles/:id" element={<ModeleDetailPage />} />
-          <Route path="/modeles/:id/modifier" element={<ModeleFormPage mode="edit" />} />
-          <Route path="/commandes" element={<CommandesListPage />} />
-          <Route path="/commandes/nouvelle" element={<CommandeFormPage mode="create" />} />
-          <Route path="/commandes/:id" element={<CommandeDetailPage />} />
-          <Route path="/commandes/:id/modifier" element={<CommandeFormPage mode="edit" />} />
-          <Route path="/finances" element={<FinancesPage />} />
-          <Route path="/livraisons" element={<LivraisonsListPage />} />
-          <Route path="/paiements" element={<PaiementsListPage />} />
-          <Route path="/depenses" element={<DepensesListPage />} />
-          <Route path="/depenses/nouvelle" element={<DepenseFormPage />} />
-          <Route path="/depenses/:id" element={<DepenseDetailPage />} />
-          <Route path="/recus" element={<RecusListPage />} />
-          <Route path="/rapports" element={<RapportsPage />} />
-          <Route path="/calendrier" element={<CalendrierPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="/parametres" element={<ParametresPage />} />
-          <Route path="/compte" element={<ComptePage />} />
-          <Route path="/abonnement" element={<AbonnementPage />} />
+        <Route element={<RequireAtelier />}>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/clientes" element={<ClientesListPage />} />
+            <Route path="/clientes/nouvelle" element={<ClienteFormPage mode="create" />} />
+            <Route path="/clientes/:id" element={<ClienteDetailPage />} />
+            <Route path="/clientes/:id/modifier" element={<ClienteFormPage mode="edit" />} />
+            <Route path="/clientes/:id/mesures/nouvelle" element={<MesureFormPage />} />
+            <Route path="/modeles" element={<ModelesListPage />} />
+            <Route path="/modeles/nouveau" element={<ModeleFormPage mode="create" />} />
+            <Route path="/modeles/:id" element={<ModeleDetailPage />} />
+            <Route path="/modeles/:id/modifier" element={<ModeleFormPage mode="edit" />} />
+            <Route path="/commandes" element={<CommandesListPage />} />
+            <Route path="/commandes/nouvelle" element={<CommandeFormPage mode="create" />} />
+            <Route path="/commandes/:id" element={<CommandeDetailPage />} />
+            <Route path="/commandes/:id/modifier" element={<CommandeFormPage mode="edit" />} />
+            <Route path="/finances" element={<FinancesPage />} />
+            <Route path="/livraisons" element={<LivraisonsListPage />} />
+            <Route path="/paiements" element={<PaiementsListPage />} />
+            <Route path="/depenses" element={<DepensesListPage />} />
+            <Route path="/depenses/nouvelle" element={<DepenseFormPage />} />
+            <Route path="/depenses/:id" element={<DepenseDetailPage />} />
+            <Route path="/recus" element={<RecusListPage />} />
+            <Route path="/rapports" element={<RapportsPage />} />
+            <Route path="/calendrier" element={<CalendrierPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/parametres" element={<ParametresPage />} />
+            <Route path="/compte" element={<ComptePage />} />
+            <Route path="/abonnement" element={<AbonnementPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<RequireSuperadmin />}>
+          <Route element={<SuperadminLayout />}>
+            <Route path="/ateliers" element={<AteliersPage />} />
+          </Route>
         </Route>
       </Route>
 

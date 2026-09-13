@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { reconcilierNotifications } from "../lib/notifications.js";
@@ -12,7 +12,7 @@ import {
 } from "../schemas/notification.schema.js";
 
 const router = Router();
-router.use(requireAuth);
+router.use(requireAuth, requireAtelier);
 router.param("id", requireValidIdParam);
 
 // Champs commande nécessaires pour reconstruire l'affichage (client, modèle,
@@ -36,9 +36,9 @@ router.get("/", async (req, res) => {
   if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
   const { lu, page, pageSize } = parsed.data;
 
-  await reconcilierNotifications(prisma);
+  await reconcilierNotifications(prisma, req.user.atelierId);
 
-  const where = lu === undefined ? {} : { lu };
+  const where = { commande: { atelierId: req.user.atelierId }, ...(lu === undefined ? {} : { lu }) };
   const [data, total] = await Promise.all([
     prisma.notification.findMany({
       where,
@@ -57,8 +57,10 @@ router.get("/", async (req, res) => {
 // AppLayout.jsx). Déclarée avant "/:id" pour ne pas être capturée comme un
 // identifiant (même précaution que /derniere sur Mesures).
 router.get("/nombre-non-lues", async (req, res) => {
-  await reconcilierNotifications(prisma);
-  const count = await prisma.notification.count({ where: { lu: false } });
+  await reconcilierNotifications(prisma, req.user.atelierId);
+  const count = await prisma.notification.count({
+    where: { lu: false, commande: { atelierId: req.user.atelierId } },
+  });
   res.json({ count });
 });
 
@@ -67,7 +69,9 @@ router.patch("/:id", async (req, res) => {
   const parsed = patchNotificationSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
 
-  const notif = await prisma.notification.findUnique({ where: { id: req.params.id } });
+  const notif = await prisma.notification.findFirst({
+    where: { id: req.params.id, commande: { atelierId: req.user.atelierId } },
+  });
   if (!notif) throw new HttpError(404, "Notification introuvable.");
 
   const updated = await prisma.notification.update({ where: { id: req.params.id }, data: parsed.data });
@@ -75,10 +79,15 @@ router.patch("/:id", async (req, res) => {
 });
 
 // POST /api/notifications/marquer-lu { ids: [...] } — sélection multiple.
+// atelierId dans le where : un id d'une autre atelier dans la sélection est
+// silencieusement ignoré (0 ligne affectée pour lui), jamais modifié (IDOR).
 router.post("/marquer-lu", async (req, res) => {
   const parsed = idsBodySchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
-  const result = await prisma.notification.updateMany({ where: { id: { in: parsed.data.ids } }, data: { lu: true } });
+  const result = await prisma.notification.updateMany({
+    where: { id: { in: parsed.data.ids }, commande: { atelierId: req.user.atelierId } },
+    data: { lu: true },
+  });
   res.json({ count: result.count });
 });
 
@@ -89,7 +98,9 @@ router.post("/marquer-lu", async (req, res) => {
 router.post("/supprimer", async (req, res) => {
   const parsed = idsBodySchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
-  const result = await prisma.notification.deleteMany({ where: { id: { in: parsed.data.ids } } });
+  const result = await prisma.notification.deleteMany({
+    where: { id: { in: parsed.data.ids }, commande: { atelierId: req.user.atelierId } },
+  });
   res.json({ count: result.count });
 });
 

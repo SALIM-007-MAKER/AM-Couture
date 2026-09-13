@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { computeSolde } from "../lib/money.js";
@@ -23,6 +23,23 @@ import { annulerSchema } from "../schemas/annulation.schema.js";
 const router = Router({ mergeParams: true });
 
 router.param("paiementId", requireValidIdParam);
+
+// Vérifie que la commande de l'URL appartient bien à l'atelier de
+// l'utilisateur connecté (Phase 8 — multi-tenant) AVANT toute route
+// ci-dessous — Paiement n'a pas son propre atelierId (scopé via Commande),
+// donc ce contrôle unique protège aussi les comparaisons
+// `paiement.commandeId !== commandeId` plus bas (IDOR) : sans lui, un
+// commandeId valide d'UN AUTRE atelier suffirait à faire matcher un
+// paiementId de ce même autre atelier.
+router.use(async (req, res, next) => {
+  const commande = await prisma.commande.findFirst({
+    where: { id: req.params.commandeId, atelierId: req.user.atelierId },
+    select: { id: true, prixTotal: true },
+  });
+  if (!commande) return next(new HttpError(404, "Commande introuvable."));
+  req.commande = commande;
+  next();
+});
 
 // POST /api/commandes/:commandeId/paiements — création (protégée contre la concurrence)
 router.post("/", async (req, res) => {
@@ -90,12 +107,7 @@ router.get("/", async (req, res) => {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
   }
   const { page, pageSize } = parsed.data;
-
-  const commande = await prisma.commande.findUnique({
-    where: { id: commandeId },
-    select: { id: true, prixTotal: true },
-  });
-  if (!commande) throw new HttpError(404, "Commande introuvable.");
+  const commande = req.commande; // déjà vérifié appartenir à cet atelier (voir middleware ci-dessus)
 
   const [data, total, agrege] = await Promise.all([
     prisma.paiement.findMany({
@@ -259,7 +271,7 @@ router.get("/:paiementId/recu", async (req, res) => {
 // contexte nécessaire (verrou de la commande, calcul du solde disponible).
 // ───────────────────────────────────────────────────────────────────────
 export const paiementsGlobalRouter = Router();
-paiementsGlobalRouter.use(requireAuth);
+paiementsGlobalRouter.use(requireAuth, requireAtelier);
 
 const PAIEMENT_GLOBAL_INCLUDE = {
   commande: {
@@ -282,7 +294,7 @@ paiementsGlobalRouter.get("/", async (req, res) => {
   }
   const { q, mode, dateFrom, dateTo, page, pageSize } = parsed.data;
 
-  const where = {};
+  const where = { commande: { atelierId: req.user.atelierId } };
   if (mode) where.mode = mode;
   if (dateFrom || dateTo) {
     where.date = {

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { resolvePeriod, dateRangeWhere } from "../lib/period.js";
 import { periodQuerySchema, recentQuerySchema } from "../schemas/dashboard.schema.js";
@@ -11,7 +11,7 @@ import { whereCommandesImpayees } from "../lib/commandesImpayees.js";
 // Module PUREMENT consultatif : aucune route de ce fichier n'écrit en base
 // (que des `count`/`aggregate`/`findMany` en lecture seule).
 const router = Router();
-router.use(requireAuth);
+router.use(requireAuth, requireAtelier);
 
 // "en cours" / "terminées" / "livrées" sont des compartiments MUTUELLEMENT
 // EXCLUSIFS (chaque commande n'appartient qu'à un seul), contrairement à
@@ -41,6 +41,7 @@ router.get("/summary", async (req, res) => {
   const { from, to } = resolvePeriod(parsed.data);
   const periodeCommandeWhere = dateRangeWhere(from, to);
   const now = new Date();
+  const { atelierId } = req.user;
 
   const [
     clientesActives,
@@ -53,32 +54,37 @@ router.get("/summary", async (req, res) => {
     paiementsPeriode,
     depensesPeriode,
   ] = await Promise.all([
-    prisma.cliente.count({ where: { archivedAt: null } }),
+    prisma.cliente.count({ where: { atelierId, archivedAt: null } }),
     prisma.commande.aggregate({
-      where: periodeCommandeWhere ? { dateCommande: periodeCommandeWhere } : {},
+      where: { atelierId, ...(periodeCommandeWhere ? { dateCommande: periodeCommandeWhere } : {}) },
       _count: true,
       _sum: { prixTotal: true },
     }),
-    prisma.commande.count({ where: COMMANDES_EN_COURS_WHERE }),
-    prisma.commande.count({ where: { statut: "TERMINEE" } }),
-    prisma.commande.count({ where: { statut: "LIVREE" } }),
+    prisma.commande.count({ where: { atelierId, ...COMMANDES_EN_COURS_WHERE } }),
+    prisma.commande.count({ where: { atelierId, statut: "TERMINEE" } }),
+    prisma.commande.count({ where: { atelierId, statut: "LIVREE" } }),
     prisma.commande.count({
-      where: { statut: COMMANDES_NON_LIVREES_OU_ANNULEES, dateLivraisonPrevue: { lt: now } },
+      where: { atelierId, statut: COMMANDES_NON_LIVREES_OU_ANNULEES, dateLivraisonPrevue: { lt: now } },
     }),
     // "Non payées" = 0 FCFA réellement encaissé (voir commandesImpayees.js —
     // définition partagée avec le module Notifications). Ne compte PAS les
     // commandes partiellement payées : déjà visibles via le solde/statut de
     // paiement affiché partout ailleurs, pas doublonné ici.
-    whereCommandesImpayees(prisma).then((where) => prisma.commande.count({ where })),
+    whereCommandesImpayees(prisma, atelierId).then((where) => prisma.commande.count({ where })),
     // annuleAt: null — un paiement/une dépense annulé ne compte dans aucune
-    // statistique (voir routes paiements/dépenses).
+    // statistique (voir routes paiements/dépenses). Paiement scopé via sa
+    // commande (pas de colonne atelierId propre).
     prisma.paiement.aggregate({
-      where: { annuleAt: null, ...(periodeCommandeWhere ? { date: periodeCommandeWhere } : {}) },
+      where: {
+        annuleAt: null,
+        commande: { atelierId },
+        ...(periodeCommandeWhere ? { date: periodeCommandeWhere } : {}),
+      },
       _count: true,
       _sum: { montant: true },
     }),
     prisma.depense.aggregate({
-      where: { annuleAt: null, ...(periodeCommandeWhere ? { date: periodeCommandeWhere } : {}) },
+      where: { atelierId, annuleAt: null, ...(periodeCommandeWhere ? { date: periodeCommandeWhere } : {}) },
       _count: true,
       _sum: { montant: true },
     }),
@@ -128,9 +134,11 @@ router.get("/recent", async (req, res) => {
   const parsed = recentQuerySchema.safeParse(req.query);
   if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
   const { limit } = parsed.data;
+  const { atelierId } = req.user;
 
   const [commandes, paiements, livraisons, depenses] = await Promise.all([
     prisma.commande.findMany({
+      where: { atelierId },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit,
       select: {
@@ -144,9 +152,10 @@ router.get("/recent", async (req, res) => {
     }),
     // annuleAt: null sur les trois — un événement annulé n'est plus une
     // "activité récente" pertinente à mettre en avant (il reste consultable
-    // dans son historique dédié, avec son motif).
+    // dans son historique dédié, avec son motif). commande.atelierId : Paiement
+    // et Livraison n'ont pas leur propre colonne atelierId (scopés via Commande).
     prisma.paiement.findMany({
-      where: { annuleAt: null },
+      where: { annuleAt: null, commande: { atelierId } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit,
       select: {
@@ -158,7 +167,7 @@ router.get("/recent", async (req, res) => {
       },
     }),
     prisma.livraison.findMany({
-      where: { annuleAt: null },
+      where: { annuleAt: null, commande: { atelierId } },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit,
       select: {
@@ -169,7 +178,7 @@ router.get("/recent", async (req, res) => {
       },
     }),
     prisma.depense.findMany({
-      where: { annuleAt: null },
+      where: { atelierId, annuleAt: null },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit,
       select: { id: true, categorie: true, montant: true, date: true, createdAt: true },

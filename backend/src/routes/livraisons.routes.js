@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { isUniqueConstraintViolation } from "../lib/prismaErrors.js";
@@ -20,6 +20,19 @@ import { annulerSchema } from "../schemas/annulation.schema.js";
 const router = Router({ mergeParams: true });
 
 router.param("livraisonId", requireValidIdParam);
+
+// Vérifie que la commande de l'URL appartient bien à l'atelier de
+// l'utilisateur connecté (Phase 8 — multi-tenant) — voir même middleware
+// dans paiements.routes.js pour le raisonnement complet (Livraison n'a pas
+// son propre atelierId, scopée via Commande).
+router.use(async (req, res, next) => {
+  const commande = await prisma.commande.findFirst({
+    where: { id: req.params.commandeId, atelierId: req.user.atelierId },
+    select: { id: true },
+  });
+  if (!commande) return next(new HttpError(404, "Commande introuvable."));
+  next();
+});
 
 // POST /api/commandes/:commandeId/livraisons — création (+ paiement final optionnel, atomique)
 router.post("/", async (req, res) => {
@@ -142,9 +155,7 @@ router.get("/", async (req, res) => {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
   }
   const { page, pageSize } = parsed.data;
-
-  const commande = await prisma.commande.findUnique({ where: { id: commandeId }, select: { id: true } });
-  if (!commande) throw new HttpError(404, "Commande introuvable.");
+  // Existence + appartenance à cet atelier déjà vérifiées par le middleware ci-dessus.
 
   const [data, total] = await Promise.all([
     prisma.livraison.findMany({
@@ -240,7 +251,7 @@ router.post("/:livraisonId/annuler", async (req, res) => {
 // (paiements.routes.js) : lecture seule, requireAuth explicite.
 // ───────────────────────────────────────────────────────────────────────
 export const livraisonsGlobalRouter = Router();
-livraisonsGlobalRouter.use(requireAuth);
+livraisonsGlobalRouter.use(requireAuth, requireAtelier);
 
 const LIVRAISON_GLOBAL_INCLUDE = {
   commande: {
@@ -260,7 +271,7 @@ livraisonsGlobalRouter.get("/", async (req, res) => {
   }
   const { q, dateFrom, dateTo, page, pageSize } = parsed.data;
 
-  const where = {};
+  const where = { commande: { atelierId: req.user.atelierId } };
   if (dateFrom || dateTo) {
     where.dateLivraison = {
       ...(dateFrom ? { gte: dateFrom } : {}),

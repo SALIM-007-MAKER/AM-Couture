@@ -1,5 +1,5 @@
 {
-  "name": "am-couture",
+  "name": "gestion-atelier",
   "private": true,
   "type": "module",
   "workspaces": [
@@ -13,6 +13,7 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "node --experimental-strip-types --env-file=.env prisma/seed.js",
+    "prisma:seed:superadmin": "node --experimental-strip-types --env-file=.env prisma/seedSuperadmin.js",
     "build": "npm run build -w frontend"
   },
   "devDependencies": {

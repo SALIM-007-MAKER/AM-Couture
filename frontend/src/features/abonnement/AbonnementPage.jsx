@@ -40,7 +40,7 @@ export default function AbonnementPage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <PageHeader icon={CreditCard} title="Abonnement" subtitle="Accès de l'atelier à AM Couture." />
+      <PageHeader icon={CreditCard} title="Abonnement" subtitle="Accès de l'atelier à la plateforme Gestion d'Atelier." />
 
       {paiement === "succes" && (
         <Card className="bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 text-sm">

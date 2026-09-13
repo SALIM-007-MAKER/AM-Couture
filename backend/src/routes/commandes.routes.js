@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { nextNumero } from "../lib/numero.js";
 import { computeSolde, statutPaiement } from "../lib/money.js";
@@ -21,8 +21,10 @@ import { recusCommandeRouter } from "./recus.routes.js";
 
 const router = Router();
 
-// Toutes les routes Commandes (et Paiements, montées ci-dessous) exigent une session valide.
-router.use(requireAuth);
+// Toutes les routes Commandes (et Paiements/Livraisons/Reçus, montées
+// ci-dessous) exigent une session valide et un compte ADMIN rattaché à un
+// atelier (Phase 8 — multi-tenant).
+router.use(requireAuth, requireAtelier);
 
 // Valide le format de :id / :commandeId sur toutes les routes avant toute requête Prisma.
 router.param("id", requireValidIdParam);
@@ -44,8 +46,8 @@ router.post("/", async (req, res) => {
   }
   const data = parsed.data;
 
-  const cliente = await prisma.cliente.findUnique({
-    where: { id: data.clienteId },
+  const cliente = await prisma.cliente.findFirst({
+    where: { id: data.clienteId, atelierId: req.user.atelierId },
     select: { id: true, archivedAt: true },
   });
   if (!cliente) throw new HttpError(404, "Client introuvable.");
@@ -54,8 +56,8 @@ router.post("/", async (req, res) => {
   }
 
   if (data.modeleId) {
-    const modele = await prisma.modele.findUnique({
-      where: { id: data.modeleId },
+    const modele = await prisma.modele.findFirst({
+      where: { id: data.modeleId, atelierId: req.user.atelierId },
       select: { id: true, archivedAt: true },
     });
     if (!modele) throw new HttpError(404, "Modèle introuvable.");
@@ -75,7 +77,7 @@ router.post("/", async (req, res) => {
     async (tx) => {
       const numero = await nextNumero(tx, "CMD");
       const commande = await tx.commande.create({
-        data: { ...commandeInput, numero },
+        data: { ...commandeInput, numero, atelierId: req.user.atelierId },
       });
 
       let paiement = null;
@@ -108,7 +110,7 @@ router.get("/", async (req, res) => {
   }
   const { q, statut, priorite, clienteId, livraisonDu, livraisonAu, page, pageSize } = parsed.data;
 
-  const where = {};
+  const where = { atelierId: req.user.atelierId };
   if (statut) where.statut = statut;
   if (priorite) where.priorite = priorite;
   if (clienteId) where.clienteId = clienteId;
@@ -174,8 +176,8 @@ router.get("/", async (req, res) => {
 
 // GET /api/commandes/:id — détail : commande + cliente + modèle + paiements + livraisons + totaux calculés
 router.get("/:id", async (req, res) => {
-  const commande = await prisma.commande.findUnique({
-    where: { id: req.params.id },
+  const commande = await prisma.commande.findFirst({
+    where: { id: req.params.id, atelierId: req.user.atelierId },
     include: {
       cliente: true,
       modele: true,
@@ -201,8 +203,8 @@ router.get("/:id", async (req, res) => {
 // solde/statut en direct à chaque appel, contrairement au Reçu qui est un
 // instantané figé (voir commentaire dans recus.routes.js).
 router.get("/:id/fiche-pdf", async (req, res) => {
-  const commande = await prisma.commande.findUnique({
-    where: { id: req.params.id },
+  const commande = await prisma.commande.findFirst({
+    where: { id: req.params.id, atelierId: req.user.atelierId },
     include: {
       cliente: { select: CLIENTE_SUMMARY_SELECT },
       modele: { select: MODELE_SUMMARY_SELECT },
@@ -213,9 +215,9 @@ router.get("/:id/fiche-pdf", async (req, res) => {
 
   const { totalPaye, solde } = computeSolde(commande.prixTotal, commande.paiements);
 
-  // Singleton facultatif, comme pour le Reçu (voir recus.routes.js) : dégrade
-  // proprement (pas de logo/coordonnées) si Paramètres n'a jamais été rempli.
-  const atelier = await prisma.atelier.findFirst();
+  // L'atelier PROPRIÉTAIRE de cette commande, pas "le premier trouvé" — Phase
+  // 8 (multi-tenant), voir requireAtelier : req.user.atelierId == commande.atelierId ici.
+  const atelier = await prisma.atelier.findUnique({ where: { id: req.user.atelierId } });
 
   streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde });
 });
@@ -229,8 +231,8 @@ router.patch("/:id", async (req, res) => {
   const data = parsed.data;
   const { id } = req.params;
 
-  const current = await prisma.commande.findUnique({
-    where: { id },
+  const current = await prisma.commande.findFirst({
+    where: { id, atelierId: req.user.atelierId },
     select: { dateCommande: true },
   });
   if (!current) throw new HttpError(404, "Commande introuvable.");
@@ -242,8 +244,8 @@ router.patch("/:id", async (req, res) => {
   }
 
   if (data.modeleId) {
-    const modele = await prisma.modele.findUnique({
-      where: { id: data.modeleId },
+    const modele = await prisma.modele.findFirst({
+      where: { id: data.modeleId, atelierId: req.user.atelierId },
       select: { id: true, archivedAt: true },
     });
     if (!modele) throw new HttpError(404, "Modèle introuvable.");
@@ -281,7 +283,10 @@ router.post("/:id/statut", async (req, res) => {
     );
   }
 
-  const current = await prisma.commande.findUnique({ where: { id }, select: { statut: true } });
+  const current = await prisma.commande.findFirst({
+    where: { id, atelierId: req.user.atelierId },
+    select: { statut: true },
+  });
   if (!current) throw new HttpError(404, "Commande introuvable.");
 
   const allowed = STATUT_TRANSITIONS[current.statut] ?? [];
@@ -296,7 +301,7 @@ router.post("/:id/statut", async (req, res) => {
   // l'écriture (course concurrente), count=0 -> conflit propre plutôt qu'une
   // transition appliquée sur un état qui n'est plus le bon.
   const result = await prisma.commande.updateMany({
-    where: { id, statut: current.statut },
+    where: { id, atelierId: req.user.atelierId, statut: current.statut },
     data: { statut: nextStatut },
   });
   if (result.count === 0) {

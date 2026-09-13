@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import {
@@ -14,8 +14,10 @@ import mesuresRouter from "./mesures.routes.js";
 
 const router = Router();
 
-// Toutes les routes Clientes (et Mesures, montées ci-dessous) exigent une session valide.
-router.use(requireAuth);
+// Toutes les routes Clientes (et Mesures, montées ci-dessous) exigent une
+// session valide ET un compte ADMIN rattaché à un atelier (Phase 8 —
+// multi-tenant, voir auth.middleware.js).
+router.use(requireAuth, requireAtelier);
 
 // Rétro-portage du garde-fou anti-octet-nul/caractères de contrôle, déjà en
 // place sur Commandes/Paiements/Livraisons/Dépenses/Reçus depuis le module 5
@@ -33,9 +35,10 @@ router.use("/:id/mesures", mesuresRouter);
  * doublon même si l'ancienne fiche a été archivée (le bon geste est alors de
  * la restaurer, pas d'en recréer une nouvelle).
  */
-async function assertPhoneAvailable(telephone, excludeId) {
+async function assertPhoneAvailable(atelierId, telephone, excludeId) {
   const existing = await prisma.cliente.findFirst({
     where: {
+      atelierId,
       telephone,
       ...(excludeId ? { id: { not: excludeId } } : {}),
     },
@@ -59,9 +62,9 @@ router.post("/", async (req, res) => {
   }
   const data = parsed.data;
 
-  await assertPhoneAvailable(data.telephone);
+  await assertPhoneAvailable(req.user.atelierId, data.telephone);
 
-  const cliente = await prisma.cliente.create({ data });
+  const cliente = await prisma.cliente.create({ data: { ...data, atelierId: req.user.atelierId } });
   res.status(201).json(cliente);
 });
 
@@ -73,7 +76,7 @@ router.get("/", async (req, res) => {
   }
   const { q, archived, page, pageSize } = parsed.data;
 
-  const where = {};
+  const where = { atelierId: req.user.atelierId };
   // Par défaut : uniquement les clientes actives. "archived=true" isole les
   // archivées, "archived=all" retire le filtre pour tout voir.
   if (archived === "false") where.archivedAt = null;
@@ -125,7 +128,7 @@ router.get("/", async (req, res) => {
 
 // GET /api/clientes/:id — consultation (y compris archivée : la fiche reste consultable)
 router.get("/:id", async (req, res) => {
-  const cliente = await prisma.cliente.findUnique({ where: { id: req.params.id } });
+  const cliente = await prisma.cliente.findFirst({ where: { id: req.params.id, atelierId: req.user.atelierId } });
   if (!cliente) throw new HttpError(404, "Client introuvable.");
   res.json(cliente);
 });
@@ -143,7 +146,10 @@ const dec = (v) => (v == null ? D0 : new Prisma.Decimal(v));
 // informations distinctes ici, jamais mélangées.
 router.get("/:id/totaux", async (req, res) => {
   const { id } = req.params;
-  const cliente = await prisma.cliente.findUnique({ where: { id }, select: { id: true } });
+  const cliente = await prisma.cliente.findFirst({
+    where: { id, atelierId: req.user.atelierId },
+    select: { id: true },
+  });
   if (!cliente) throw new HttpError(404, "Client introuvable.");
 
   const [commandesAgg, paiementsAgg] = await Promise.all([
@@ -174,18 +180,24 @@ router.patch("/:id", async (req, res) => {
   const { id } = req.params;
 
   if (data.telephone) {
-    await assertPhoneAvailable(data.telephone, id);
+    await assertPhoneAvailable(req.user.atelierId, data.telephone, id);
   }
 
   // updateMany avec condition sur archivedAt : évite une lecture-puis-écriture
   // non atomique (double-clic / retry concurrent sur la même fiche).
+  // atelierId dans le where : une commande d'un autre atelier avec le même
+  // id (impossible en pratique, cuid, mais gardé par défense en profondeur)
+  // ne serait de toute façon jamais modifiée.
   const result = await prisma.cliente.updateMany({
-    where: { id, archivedAt: null },
+    where: { id, atelierId: req.user.atelierId, archivedAt: null },
     data,
   });
 
   if (result.count === 0) {
-    const existing = await prisma.cliente.findUnique({ where: { id }, select: { archivedAt: true } });
+    const existing = await prisma.cliente.findFirst({
+      where: { id, atelierId: req.user.atelierId },
+      select: { archivedAt: true },
+    });
     if (!existing) throw new HttpError(404, "Client introuvable.");
     throw new HttpError(409, "Client archivé : restaurez-le avant de le modifier.");
   }
@@ -198,12 +210,15 @@ router.patch("/:id", async (req, res) => {
 router.post("/:id/archiver", async (req, res) => {
   const { id } = req.params;
   const result = await prisma.cliente.updateMany({
-    where: { id, archivedAt: null },
+    where: { id, atelierId: req.user.atelierId, archivedAt: null },
     data: { archivedAt: new Date() },
   });
 
   if (result.count === 0) {
-    const existing = await prisma.cliente.findUnique({ where: { id }, select: { archivedAt: true } });
+    const existing = await prisma.cliente.findFirst({
+      where: { id, atelierId: req.user.atelierId },
+      select: { archivedAt: true },
+    });
     if (!existing) throw new HttpError(404, "Client introuvable.");
     throw new HttpError(409, "Client déjà archivé.");
   }
@@ -216,12 +231,15 @@ router.post("/:id/archiver", async (req, res) => {
 router.post("/:id/restaurer", async (req, res) => {
   const { id } = req.params;
   const result = await prisma.cliente.updateMany({
-    where: { id, archivedAt: { not: null } },
+    where: { id, atelierId: req.user.atelierId, archivedAt: { not: null } },
     data: { archivedAt: null },
   });
 
   if (result.count === 0) {
-    const existing = await prisma.cliente.findUnique({ where: { id }, select: { archivedAt: true } });
+    const existing = await prisma.cliente.findFirst({
+      where: { id, atelierId: req.user.atelierId },
+      select: { archivedAt: true },
+    });
     if (!existing) throw new HttpError(404, "Client introuvable.");
     throw new HttpError(409, "Client déjà actif.");
   }

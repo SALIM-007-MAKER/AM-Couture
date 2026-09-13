@@ -1,4 +1,5 @@
-// AM COUTURE — Schéma de données
+// GESTION D'ATELIER — Schéma de données (plateforme multi-atelier ; "AM
+// Couture" est le premier atelier/tenant enregistré, pas le nom de l'app).
 // Prisma ORM v7 — generator "prisma-client" + adapter obligatoire (voir backend/src/lib/prisma.js)
 
 generator client {
@@ -57,7 +58,7 @@ enum CategorieVetement {
   AUTRE
 }
 
-// Abonnement (Phase 6) : accès de L'ATELIER à l'application AM Couture
+// Abonnement (Phase 6) : accès de l'atelier à la plateforme Gestion d'Atelier
 // elle-même (pas un produit vendu par l'atelier à ses clientes). EN_ATTENTE
 // = créé, aucun paiement réussi ; CONFIRME = au moins un paiement réussi
 // l'a activé — "actif" vs "expiré" se DÉRIVENT de dateExpiration à la
@@ -81,32 +82,71 @@ enum StatutTransaction {
   ECHOUEE
 }
 
+// Multi-tenant (Phase 8) — plateforme "Gestion d'Atelier" : SUPERADMIN gère
+// toute la plateforme (aucun atelierId, voir User ci-dessous) ; ADMIN
+// appartient à exactement un atelier et n'accède qu'à ses propres données
+// (cloisonnement appliqué côté backend, voir lib/scopeAtelier.js).
+enum RoleUtilisateur {
+  SUPERADMIN
+  ADMIN
+}
+
 // ─────────────────────────────────────────────────────────────────────────
-// Utilisateur (propriétaire) et paramètres de l'atelier
+// Utilisateurs et ateliers (tenants)
 // ─────────────────────────────────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(cuid())
-  identifiant  String   @unique
+  id           String          @id @default(cuid())
+  identifiant  String          @unique
   passwordHash String
+  // Identité de la personne (Phase 8 — inscription en libre-service, voir
+  // auth.routes.js POST /inscription-atelier) — optionnels car les comptes
+  // créés avant cette phase (ex: le seed "admin") n'en ont pas ; jamais
+  // utilisés pour la connexion, qui reste basée sur `identifiant` uniquement.
+  prenom       String?
+  nom          String?
+  email        String?         @unique
   // Préférence stockée uniquement (Phase 6) : aucune infrastructure i18n,
   // l'interface reste 100% en français pour l'instant — voir constants.js
   // frontend pour la liste des valeurs acceptées.
-  langue       String   @default("fr")
-  createdAt    DateTime @default(now())
+  langue       String          @default("fr")
+  role         RoleUtilisateur @default(ADMIN)
+  // null UNIQUEMENT pour SUPERADMIN — un ADMIN doit toujours appartenir à un
+  // atelier (contrainte applicative vérifiée au login/à la création, voir
+  // auth.routes.js/ateliers.routes.js ; pas de contrainte CHECK SQL native
+  // pour ce genre de règle croisée avec Prisma).
+  atelierId    String?
+  atelier      Atelier?        @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  createdAt    DateTime        @default(now())
+
+  @@index([atelierId])
 }
 
-/// Ligne unique (singleton) — sert de source pour la route /api/parametres.
+/// Un atelier = un tenant de la plateforme. Chaque atelier a son propre nom,
+/// logo, coordonnées, comptes ADMIN et données métier (Clientes, Commandes,
+/// Modèles, Dépenses, Abonnement) — jamais partagés entre ateliers.
 model Atelier {
   id         String   @id @default(cuid())
   nom        String
   logoUrl    String?
   telephone  String?
   adresse    String?
+  // Distincts d'`adresse` (rue/complément, en texte libre) — ajoutés pour
+  // l'inscription en libre-service (Phase 8), qui les demande séparément.
+  ville      String?
+  pays       String?
   slogan     String?
   devise     String   @default("FCFA")
   recuConfig Json?
+  createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  users       User[]
+  clientes    Cliente[]
+  modeles     Modele[]
+  commandes   Commande[]
+  depenses    Depense[]
+  abonnements Abonnement[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -115,6 +155,8 @@ model Atelier {
 
 model Cliente {
   id         String     @id @default(cuid())
+  atelierId  String
+  atelier    Atelier    @relation(fields: [atelierId], references: [id], onDelete: Restrict)
   nom        String
   prenom     String
   telephone  String
@@ -129,6 +171,7 @@ model Cliente {
   mesures   Mesure[]
   commandes Commande[]
 
+  @@index([atelierId])
   @@index([nom, prenom])
   @@index([telephone])
 }
@@ -162,6 +205,8 @@ model Mesure {
 
 model Modele {
   id            String            @id @default(cuid())
+  atelierId     String
+  atelier       Atelier           @relation(fields: [atelierId], references: [id], onDelete: Restrict)
   nom           String
   categorie     CategorieVetement
   description   String?
@@ -173,6 +218,7 @@ model Modele {
 
   commandes Commande[]
 
+  @@index([atelierId])
   @@index([nom])
 }
 
@@ -182,7 +228,9 @@ model Modele {
 
 model Commande {
   id        String  @id @default(cuid())
-  numero    String  @unique // CMD-2026-0001, généré atomiquement — voir Counter
+  atelierId String
+  atelier   Atelier @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  numero    String  @unique // CMD-2026-0001, généré atomiquement — voir Counter (numérotation globale à la plateforme, pas par atelier — voir note de simplification)
   clienteId String
   cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
   modeleId  String?
@@ -323,6 +371,8 @@ model Notification {
 
 model Depense {
   id              String   @id @default(cuid())
+  atelierId       String
+  atelier         Atelier  @relation(fields: [atelierId], references: [id], onDelete: Restrict)
   categorie       String
   montant         Decimal  @db.Decimal(10, 2)
   date            DateTime @default(now())
@@ -339,7 +389,7 @@ model Depense {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Abonnement (Phase 6) — accès de l'atelier à AM Couture
+// Abonnement (Phase 6) — accès de l'atelier à la plateforme
 // ─────────────────────────────────────────────────────────────────────────
 
 /// Table de CONFIGURATION des formules — le prix se modifie ICI (table),
@@ -362,6 +412,8 @@ model FormuleAbonnement {
 
 model Abonnement {
   id        String            @id @default(cuid())
+  atelierId String
+  atelier   Atelier           @relation(fields: [atelierId], references: [id], onDelete: Restrict)
   numero    String            @unique // ABN-2026-0001, même Counter que CMD/REC
   formuleId String
   formule   FormuleAbonnement @relation(fields: [formuleId], references: [id], onDelete: Restrict)
@@ -378,6 +430,7 @@ model Abonnement {
 
   transactions Transaction[]
 
+  @@index([atelierId])
   @@index([statut])
   @@index([formuleId])
 }

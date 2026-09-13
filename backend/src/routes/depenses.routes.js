@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import {
@@ -14,14 +14,15 @@ import { annulerSchema } from "../schemas/annulation.schema.js";
 
 const router = Router();
 
-// Toutes les routes Dépenses exigent une session valide.
-router.use(requireAuth);
+// Toutes les routes Dépenses exigent une session valide et un compte ADMIN
+// rattaché à un atelier (Phase 8 — multi-tenant).
+router.use(requireAuth, requireAtelier);
 
 router.param("id", requireValidIdParam);
 
 // Construit le "where" Prisma commun à la liste et aux statistiques.
-function buildWhere({ categorie, dateFrom, dateTo, q }) {
-  const where = {};
+function buildWhere(atelierId, { categorie, dateFrom, dateTo, q }) {
+  const where = { atelierId };
   if (categorie) where.categorie = { equals: categorie, mode: "insensitive" };
   if (dateFrom || dateTo) {
     where.date = {
@@ -46,7 +47,7 @@ router.post("/", async (req, res) => {
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
-  const depense = await prisma.depense.create({ data: parsed.data });
+  const depense = await prisma.depense.create({ data: { ...parsed.data, atelierId: req.user.atelierId } });
   res.status(201).json(depense);
 });
 
@@ -59,7 +60,7 @@ router.get("/stats", async (req, res) => {
   }
   // annuleAt: null uniquement ici (stats) — la LISTE (GET /depenses ci-
   // dessous) continue de tout renvoyer, annulées comprises, pour l'historique.
-  const where = { ...buildWhere(parsed.data), annuleAt: null };
+  const where = { ...buildWhere(req.user.atelierId, parsed.data), annuleAt: null };
 
   const [global, parCategorieBrut] = await Promise.all([
     prisma.depense.aggregate({ where, _sum: { montant: true }, _count: true }),
@@ -89,7 +90,7 @@ router.get("/", async (req, res) => {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
   }
   const { page, pageSize, ...filtres } = parsed.data;
-  const where = buildWhere(filtres);
+  const where = buildWhere(req.user.atelierId, filtres);
 
   const [data, total] = await Promise.all([
     prisma.depense.findMany({
@@ -111,7 +112,7 @@ router.get("/", async (req, res) => {
 
 // GET /api/depenses/:id — consultation
 router.get("/:id", async (req, res) => {
-  const depense = await prisma.depense.findUnique({ where: { id: req.params.id } });
+  const depense = await prisma.depense.findFirst({ where: { id: req.params.id, atelierId: req.user.atelierId } });
   if (!depense) throw new HttpError(404, "Dépense introuvable.");
   res.json(depense);
 });
@@ -129,12 +130,15 @@ router.post("/:id/annuler", async (req, res) => {
   const { id } = req.params;
 
   const result = await prisma.depense.updateMany({
-    where: { id, annuleAt: null },
+    where: { id, atelierId: req.user.atelierId, annuleAt: null },
     data: { annuleAt: new Date(), annuleMotif: parsed.data.motif },
   });
 
   if (result.count === 0) {
-    const existing = await prisma.depense.findUnique({ where: { id }, select: { annuleAt: true } });
+    const existing = await prisma.depense.findFirst({
+      where: { id, atelierId: req.user.atelierId },
+      select: { annuleAt: true },
+    });
     if (!existing) throw new HttpError(404, "Dépense introuvable.");
     throw new HttpError(409, "Cette dépense est déjà annulée.");
   }

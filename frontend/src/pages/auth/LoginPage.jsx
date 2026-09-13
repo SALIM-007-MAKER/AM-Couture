@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { Scissors, User, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
-import { useLoginMutation } from "../../hooks/useAuth.js";
-import { useParametresPublicQuery } from "../../features/parametres/hooks.js";
+import { useLoginMutation, useAtelierPourIdentifiantQuery } from "../../hooks/useAuth.js";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { ApiError } from "../../lib/apiClient.js";
 import { GlobalFormError, FieldError } from "../../components/QueryState.jsx";
 
@@ -16,6 +16,17 @@ import { GlobalFormError, FieldError } from "../../components/QueryState.jsx";
 // Pas de photo de fond : aucun asset fourni/adapté à un atelier de couture
 // (le fond « bureau industriel » de la maquette ne correspond pas au métier)
 // — remplacé par un jeu de dégradés sombres + une touche dorée, en CSS pur.
+//
+// Branding par identifiant (Phase 8 — multi-tenant) : avant connexion, on ne
+// sait pas à quel atelier l'utilisateur appartient tant qu'il n'a pas
+// commencé à taper son identifiant — plusieurs ateliers partagent cette même
+// page, impossible d'en privilégier un par défaut (voir GET
+// /api/auth/atelier-pour-identifiant, auth.routes.js). Dès que l'identifiant
+// tapé (débouncé) correspond à un compte existant, son logo remplace l'icône
+// générique — sinon on garde ce repli de plateforme, jamais le logo d'un
+// atelier en particulier.
+const NOM_PLATEFORME = "Gestion d'Atelier";
+
 export default function LoginPage() {
   const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
@@ -23,13 +34,10 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const loginMutation = useLoginMutation();
-  // isPending/isError ignorés volontairement : en cas d'échec (ou pendant le
-  // chargement), la page garde son repli générique (icône ciseaux + "AM
-  // Couture") plutôt que de bloquer l'écran de connexion pour un détail
-  // décoratif.
-  const publicQuery = useParametresPublicQuery();
-  const nom = publicQuery.data?.nom || "AM Couture";
-  const logoUrl = publicQuery.data?.logoUrl;
+  const debouncedIdentifiant = useDebouncedValue(identifiant, 400);
+  const brandingQuery = useAtelierPourIdentifiantQuery(debouncedIdentifiant);
+  const logoUrl = brandingQuery.data?.logoUrl;
+  const nomAtelier = brandingQuery.data?.nom;
 
   const redirectTo = location.state?.from?.pathname ?? "/";
 
@@ -58,7 +66,7 @@ export default function LoginPage() {
           {logoUrl ? (
             <img
               src={logoUrl}
-              alt={`Logo ${nom}`}
+              alt={`Logo ${nomAtelier}`}
               className="size-24 rounded-2xl object-contain bg-white/5 border border-white/10 p-2 shadow-[0_0_50px_-5px_rgba(217,158,63,0.35)]"
             />
           ) : (
@@ -76,7 +84,7 @@ export default function LoginPage() {
             <h1 className="text-2xl font-semibold tracking-tight text-white">
               Bon retour <span className="text-amber-400">parmi nous</span>
             </h1>
-            <p className="text-sm text-neutral-400">Connectez-vous pour accéder à {nom}</p>
+            <p className="text-sm text-neutral-400">Connectez-vous à {NOM_PLATEFORME}</p>
           </div>
 
           <GlobalFormError error={loginMutation.error} />
@@ -139,9 +147,16 @@ export default function LoginPage() {
             {loginMutation.isPending ? "Connexion…" : "Se connecter"}
             {!loginMutation.isPending && <ArrowRight className="size-4" aria-hidden="true" />}
           </button>
+
+          <p className="text-center text-sm text-neutral-400">
+            Propriétaire d'un atelier ?{" "}
+            <Link to="/inscription" className="text-amber-400 hover:text-amber-300 font-medium transition-colors">
+              Créer votre atelier
+            </Link>
+          </p>
         </form>
 
-        <p className="mt-6 text-xs text-neutral-500">{nom}</p>
+        <p className="mt-6 text-xs text-neutral-500">{NOM_PLATEFORME}</p>
       </div>
     </div>
   );

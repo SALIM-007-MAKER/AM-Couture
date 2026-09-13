@@ -10,7 +10,7 @@
    pour l'application avant le premier rendu (evite le flash). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Design system AM Couture.
+/* Design system Gestion d'Atelier.
    Palette de marque bleu marine/petrole, sobre et professionnelle - genere
    automatiquement bg-brand-*, text-brand-*, border-brand-* via le systeme de
    theme CSS-first de Tailwind v4. Le reste de l'interface continue

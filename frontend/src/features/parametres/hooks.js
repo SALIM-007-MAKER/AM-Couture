@@ -14,17 +14,6 @@ export function useParametresQuery() {
   });
 }
 
-// Sans authentification — utilisée par LoginPage. Jamais retentée en boucle
-// ni affichée comme une erreur si elle échoue : la page de connexion garde
-// alors simplement son repli (icône + "AM Couture" génériques).
-export function useParametresPublicQuery() {
-  return useQuery({
-    queryKey: ["parametres", "public"],
-    queryFn: () => parametresApi.getPublic(),
-    retry: false,
-  });
-}
-
 export function usePutParametresMutation() {
   const queryClient = useQueryClient();
   return useMutation({

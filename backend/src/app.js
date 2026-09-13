@@ -18,6 +18,7 @@ import abonnementsRouter from "./routes/abonnements.routes.js";
 import transactionsRouter from "./routes/transactions.routes.js";
 import formulesAbonnementRouter from "./routes/formulesAbonnement.routes.js";
 import webhooksRouter from "./routes/webhooks.routes.js";
+import ateliersRouter from "./routes/ateliers.routes.js";
 
 // Pas de app.listen() ici : ce fichier est importé à la fois par
 // backend/src/server.js (dev local) et par api/index.js (Vercel Function).
@@ -71,9 +72,11 @@ app.use("/api/formules-abonnement", formulesAbonnementRouter);
 // Pas de requireAuth : Wave appelle cette route directement (voir
 // webhooks.routes.js — confiance basée sur la signature HMAC, pas un cookie).
 app.use("/api/webhooks", webhooksRouter);
+// Réservé SUPERADMIN (Phase 8 — multi-tenant) : gestion des ateliers/tenants.
+app.use("/api/ateliers", ateliersRouter);
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", service: "am-couture-api" });
+  res.json({ status: "ok", service: "gestion-atelier-api" });
 });
 
 // Paiements/Livraisons/Reçus : toute ÉCRITURE (création, annulation) reste

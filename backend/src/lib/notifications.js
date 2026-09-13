@@ -5,31 +5,33 @@ import { whereCommandesImpayees } from "./commandesImpayees.js";
 // réconcilie la table Notification avec la réalité à chaque appel de
 // GET /api/notifications (pas de tâche planifiée nécessaire à cette échelle).
 //
-// COMMANDES_NON_TERMINALES : copie du même filtre que dashboard.routes.js /
-// rapports.routes.js (statut hors TERMINEE/LIVREE/ANNULEE pour RETARD, hors
-// LIVREE/ANNULEE pour LIVRAISON_PROCHE) — voir constantes ci-dessous.
+// atelierId (Phase 8 — multi-tenant) : OBLIGATOIRE partout ici. Notification
+// n'a pas sa propre colonne atelierId (scopée via Commande) — sans ce
+// cloisonnement, réconcilier "pour l'atelier A" supprimerait à tort les
+// notifications de TOUS LES AUTRES ateliers (leurs paires ne correspondant
+// jamais à l'ensemble "attendu" calculé pour A seul).
 const HORIZON_LIVRAISON_PROCHE_JOURS = 3;
 
 /**
- * Calcule l'ensemble des notifications qui DEVRAIENT exister maintenant,
- * sous forme de paires {type, commandeId} — une commande peut apparaître
- * dans plusieurs types à la fois (ex: en retard ET impayée).
+ * Calcule l'ensemble des notifications qui DEVRAIENT exister maintenant POUR
+ * CET ATELIER, sous forme de paires {type, commandeId} — une commande peut
+ * apparaître dans plusieurs types à la fois (ex: en retard ET impayée).
  */
-async function calculerNotificationsAttendues(prisma) {
+async function calculerNotificationsAttendues(prisma, atelierId) {
   const now = new Date();
   const horizon = new Date(now.getTime() + HORIZON_LIVRAISON_PROCHE_JOURS * 86_400_000);
 
   const [enRetard, pretes, livraisonProche, impayees] = await Promise.all([
     prisma.commande.findMany({
-      where: { statut: { notIn: ["TERMINEE", "LIVREE", "ANNULEE"] }, dateLivraisonPrevue: { lt: now } },
+      where: { atelierId, statut: { notIn: ["TERMINEE", "LIVREE", "ANNULEE"] }, dateLivraisonPrevue: { lt: now } },
       select: { id: true },
     }),
-    prisma.commande.findMany({ where: { statut: "TERMINEE" }, select: { id: true } }),
+    prisma.commande.findMany({ where: { atelierId, statut: "TERMINEE" }, select: { id: true } }),
     prisma.commande.findMany({
-      where: { statut: { notIn: ["LIVREE", "ANNULEE"] }, dateLivraisonPrevue: { gte: now, lt: horizon } },
+      where: { atelierId, statut: { notIn: ["LIVREE", "ANNULEE"] }, dateLivraisonPrevue: { gte: now, lt: horizon } },
       select: { id: true },
     }),
-    whereCommandesImpayees(prisma).then((where) => prisma.commande.findMany({ where, select: { id: true } })),
+    whereCommandesImpayees(prisma, atelierId).then((where) => prisma.commande.findMany({ where, select: { id: true } })),
   ]);
 
   const paires = [];
@@ -41,14 +43,18 @@ async function calculerNotificationsAttendues(prisma) {
 }
 
 /**
- * Réconcilie la table Notification avec l'état actuel : crée les paires
- * manquantes (non lues), supprime celles dont la cause a disparu. Ne touche
- * jamais `lu` sur une notification déjà existante (une alerte lue le reste
- * tant que sa cause n'a pas disparu puis réapparu).
+ * Réconcilie la table Notification avec l'état actuel, POUR UN ATELIER
+ * DONNÉ : crée les paires manquantes (non lues), supprime celles dont la
+ * cause a disparu. Ne touche jamais `lu` sur une notification déjà
+ * existante (une alerte lue le reste tant que sa cause n'a pas disparu puis
+ * réapparu). Ne lit/n'écrit jamais les notifications des autres ateliers.
  */
-export async function reconcilierNotifications(prisma) {
-  const attendues = await calculerNotificationsAttendues(prisma);
-  const existantes = await prisma.notification.findMany({ select: { id: true, type: true, commandeId: true } });
+export async function reconcilierNotifications(prisma, atelierId) {
+  const attendues = await calculerNotificationsAttendues(prisma, atelierId);
+  const existantes = await prisma.notification.findMany({
+    where: { commande: { atelierId } },
+    select: { id: true, type: true, commandeId: true },
+  });
 
   const cleAttendues = new Set(attendues.map((p) => `${p.type}:${p.commandeId}`));
   const cleExistantes = new Set(existantes.map((n) => `${n.type}:${n.commandeId}`));

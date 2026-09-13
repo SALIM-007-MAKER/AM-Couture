@@ -21,16 +21,21 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
       },
       manifest: {
-        name: "AM Couture",
-        short_name: "AM Couture",
-        description: "Application de gestion pour atelier de couture",
+        // Plateforme partagée par plusieurs ateliers (Phase 8 — multi-tenant) :
+        // ce nom d'installation PWA est vu par TOUS les ateliers, jamais un
+        // seul tenant en particulier - voir aussi AppLayout.jsx (Logo), qui
+        // affiche lui le nom de l'atelier de l'utilisateur connecté.
+        name: "Gestion d'Atelier",
+        short_name: "Gestion d'Atelier",
+        description: "Plateforme de gestion pour ateliers de couture",
         start_url: "/",
         display: "standalone",
         background_color: "#ffffff",
-        // Couleur de marque (voir --color-brand-600, index.css) - reste
-        // independante du logo (icone d'app) ci-dessous, qui est le vrai
-        // logo AM Couture fourni par l'atelier, pas une couleur.
         theme_color: "#276386",
+        // TODO Phase 8 : favicon-512.png est encore le logo spécifique de
+        // l'atelier "AM Couture" (premier tenant) - à remplacer par une icône
+        // générique de plateforme avant qu'un second atelier n'installe
+        // l'app (voir aussi apple-touch-icon.png, même image).
         icons: [{ src: "/favicon-512.png", sizes: "512x512", type: "image/png", purpose: "any" }],
       },
     }),

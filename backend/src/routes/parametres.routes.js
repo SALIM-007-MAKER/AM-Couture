@@ -1,52 +1,32 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { putParametresSchema, patchParametresSchema } from "../schemas/atelier.schema.js";
 
-// Atelier est un singleton (voir le commentaire du modèle dans
-// schema.prisma : "sert de source pour la route /api/parametres") — mais
-// `id` reste `@id @default(cuid())`, rien dans le schéma n'empêche à lui
-// seul l'existence de PLUSIEURS lignes. Pour garantir l'invariant "une seule
-// ligne" SANS migration (pas de contrainte supplémentaire), on force
-// toujours le même id applicatif fixe : `prisma.atelier.upsert({where:{id:
-// ATELIER_ID}})` devient alors un INSERT...ON CONFLICT DO UPDATE atomique
-// côté PostgreSQL — intrinsèquement sûr sous PUT concurrents, sans verrou
-// explicite nécessaire (testé : voir rapport du module).
-const ATELIER_ID = "atelier-config";
-
+// Phase 8 (multi-tenant) : Atelier n'est plus un singleton — chaque atelier
+// a sa PROPRE ligne (voir ateliers.routes.js, créée au provisioning par le
+// SUPERADMIN). Ce module gère les paramètres de L'ATELIER DE L'UTILISATEUR
+// CONNECTÉ (req.user.atelierId), plus jamais un id fixe global.
 const router = Router();
 
-// GET /api/parametres/public — nom et logo UNIQUEMENT, sans authentification
-// (placée avant router.use(requireAuth) ci-dessous) : utilisée par la page
-// de connexion, avant toute session, pour afficher le vrai nom/logo de
-// l'atelier plutôt qu'un texte et une icône génériques. Champs
-// volontairement limités — jamais téléphone, adresse ou recuConfig, qui
-// restent réservés aux utilisateurs authentifiés. Toujours 200, même si
-// l'atelier n'est pas encore configuré (nom/logoUrl à null) : la page de
-// connexion n'a pas à distinguer "pas configuré" d'une vraie erreur.
-router.get("/public", async (req, res) => {
-  const atelier = await prisma.atelier.findUnique({
-    where: { id: ATELIER_ID },
-    select: { nom: true, logoUrl: true },
-  });
-  res.json({ nom: atelier?.nom ?? null, logoUrl: atelier?.logoUrl ?? null });
-});
+router.use(requireAuth, requireAtelier);
 
-router.use(requireAuth);
-
-// GET /api/parametres — configuration actuelle, ou 404 si jamais configurée.
+// GET /api/parametres — configuration actuelle, ou 404 si jamais configurée
+// (cas résiduel : un atelier créé sans nom initial — ne devrait plus arriver
+// via ateliers.routes.js, qui exige un nom à la création, mais reste géré
+// proprement au cas où).
 router.get("/", async (req, res) => {
-  const atelier = await prisma.atelier.findUnique({ where: { id: ATELIER_ID } });
+  const atelier = await prisma.atelier.findUnique({ where: { id: req.user.atelierId } });
   if (!atelier) throw new HttpError(404, "Paramètres de l'atelier non configurés.");
   res.json(atelier);
 });
 
-// PUT /api/parametres — crée la ligne si elle n'existe pas (nom + devise
-// obligatoires), ou met à jour les champs fournis si elle existe déjà (voir
-// atelier.schema.js : un champ optionnel omis n'efface jamais une valeur
-// déjà en base, ni au create ni à l'update — Prisma ignore les clés
+// PUT /api/parametres — crée la ligne si elle n'existe pas encore (nom +
+// devise obligatoires), ou met à jour les champs fournis si elle existe déjà
+// (voir atelier.schema.js : un champ optionnel omis n'efface jamais une
+// valeur déjà en base, ni au create ni à l'update — Prisma ignore les clés
 // `undefined` dans `data`).
 router.put("/", async (req, res) => {
   const parsed = putParametresSchema.safeParse(req.body);
@@ -54,8 +34,8 @@ router.put("/", async (req, res) => {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
   const atelier = await prisma.atelier.upsert({
-    where: { id: ATELIER_ID },
-    create: { id: ATELIER_ID, ...parsed.data },
+    where: { id: req.user.atelierId },
+    create: { id: req.user.atelierId, ...parsed.data },
     update: { ...parsed.data },
   });
   res.json(atelier);
@@ -70,7 +50,7 @@ router.patch("/", async (req, res) => {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
   try {
-    const atelier = await prisma.atelier.update({ where: { id: ATELIER_ID }, data: parsed.data });
+    const atelier = await prisma.atelier.update({ where: { id: req.user.atelierId }, data: parsed.data });
     res.json(atelier);
   } catch (err) {
     if (err?.code === "P2025") {

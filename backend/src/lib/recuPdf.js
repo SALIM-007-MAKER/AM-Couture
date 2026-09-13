@@ -1,15 +1,18 @@
 import PDFDocument from "pdfkit";
 
-// Génération du PDF d'un Reçu — pdfkit uniquement (pur JavaScript, aucun
-// binaire/navigateur headless), généré à la volée à chaque téléchargement et
-// jamais persisté (pas de Vercel Blob configuré à ce stade du projet).
+// Génération des PDF (Reçu, Fiche commande) — pdfkit uniquement (pur
+// JavaScript, aucun binaire/navigateur headless), générés à la volée à
+// chaque téléchargement et jamais persistés (pas de Vercel Blob configuré à
+// ce stade du projet).
 //
-// Volontairement minimal : seules les données réellement stockées sur le
-// Reçu (et les enregistrements qu'il référence) sont affichées. Aucune
-// valeur "recalculée en direct" qui pourrait diverger de ce qui était vrai
-// au moment de l'émission du reçu (ex : pas de "solde restant" live sur un
-// reçu lié à un paiement précis — ce chiffre n'est pas stocké sur le Reçu et
-// pourrait avoir changé depuis).
+// Habillage visuel commun aux deux documents (voir demande explicite d'un
+// rendu "carte de visite haut de gamme") : coins ornementaux dorés, titre en
+// serif doré, encadrés pour chaque section, QR code de renvoi vers l'app en
+// pied de page — volontairement des constantes fixes (identité visuelle du
+// document, pas un réglage métier configurable).
+const OR = "#B8912F";
+const SOMBRE = "#1A1A1A";
+const GRIS = "#4A4A4A";
 
 function formatDate(date) {
   return new Date(date).toLocaleDateString("fr-FR", {
@@ -17,6 +20,24 @@ function formatDate(date) {
     month: "long",
     day: "numeric",
   });
+}
+
+function formatDateHeure(date) {
+  const d = new Date(date);
+  const jour = formatDate(d);
+  const heure = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  return `${jour} à ${heure}`;
+}
+
+// Mention "Émis à <lieu> le <date> à <heure>" — lieu = Atelier.adresse (pas
+// de champ "ville" dédié, voir Phase 2/6 : l'adresse le contient déjà, ex.
+// "niamey 2000"). Sans adresse configurée, dégrade proprement en omettant
+// le lieu plutôt que d'afficher "Émis à  le...".
+function formatEmission(date, atelier, { feminin = false } = {}) {
+  const verbe = feminin ? "Émise" : "Émis";
+  const dateHeure = formatDateHeure(date);
+  const lieu = atelier?.adresse ? sanitizeForPdf(atelier.adresse) : null;
+  return lieu ? `${verbe} à ${lieu} le ${dateHeure}` : `${verbe} le ${dateHeure}`;
 }
 
 function formatMontant(montant, devise) {
@@ -102,24 +123,169 @@ function decodeEmbeddableLogo(dataUrl) {
 }
 
 /**
- * Logo atelier, centré, en haut du document — partagé entre le Reçu et la
- * Fiche commande. `doc.image(buf, x, y, ...)` avec x/y explicites ne fait
- * PAS avancer le curseur `doc.y` comme le ferait du texte : on le repositionne
- * nous-mêmes après coup pour que le contenu suivant ne chevauche pas le logo.
+ * Logo atelier, centré, en haut du document. `doc.image(buf, x, y, ...)`
+ * avec x/y explicites ne fait PAS avancer le curseur `doc.y` comme le
+ * ferait du texte : on le repositionne nous-mêmes après coup pour que le
+ * contenu suivant ne chevauche pas le logo.
  */
 function drawLogo(doc, atelier) {
   const buffer = decodeEmbeddableLogo(atelier?.logoUrl);
   if (!buffer) return;
   try {
-    const size = 50;
+    const size = 64;
     const x = (doc.page.width - size) / 2;
     const y = doc.y;
     doc.image(buffer, x, y, { fit: [size, size], align: "center" });
-    doc.y = y + size + 8;
+    doc.y = y + size + 10;
   } catch {
     // Data URL valide mais contenu image corrompu/non décodable par pdfkit
     // malgré le sniff mime ci-dessus — on continue sans logo.
   }
+}
+
+// Coins ornementaux dorés — purs traits vectoriels (aucune image), dessinés
+// dans la marge de page hors de la zone de contenu (voir `margin` du
+// PDFDocument). Décoratif uniquement : n'affecte jamais le positionnement du
+// contenu (doc.y).
+function drawCornerOrnaments(doc) {
+  const m = 16;
+  const grand = 28;
+  const petit = 8;
+  const decalage = 7;
+  const { width, height } = doc.page;
+  const coins = [
+    { x: m, y: m, dx: 1, dy: 1 },
+    { x: width - m, y: m, dx: -1, dy: 1 },
+    { x: m, y: height - m, dx: 1, dy: -1 },
+    { x: width - m, y: height - m, dx: -1, dy: -1 },
+  ];
+  doc.lineWidth(1.1).strokeColor(OR);
+  for (const c of coins) {
+    doc
+      .moveTo(c.x, c.y + c.dy * grand)
+      .lineTo(c.x, c.y)
+      .lineTo(c.x + c.dx * grand, c.y)
+      .stroke();
+    const sx = c.dx > 0 ? c.x + c.dx * decalage : c.x + c.dx * decalage - petit;
+    const sy = c.dy > 0 ? c.y + c.dy * decalage : c.y + c.dy * decalage - petit;
+    doc.rect(sx, sy, petit, petit).stroke();
+  }
+  doc.strokeColor("black").lineWidth(1);
+}
+
+// Barre pleine dorée (pas un simple filet) — sépare l'en-tête atelier du
+// corps du document, reprise entre les sections principales.
+function drawBarreOr(doc, { hauteur = 2.5, marge = 1 } = {}) {
+  const x = doc.page.margins.left + marge;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right - marge * 2;
+  doc.rect(x, doc.y, width, hauteur).fill(OR);
+  doc.fillColor(SOMBRE);
+  doc.y += hauteur + 10;
+}
+
+/**
+ * En-tête commun (logo, nom en doré, slogan, coordonnées, barre dorée) —
+ * partagé entre Reçu et Fiche commande.
+ */
+function drawEnTete(doc, atelier) {
+  // `atelier.nom` est un champ requis en base (jamais vide pour un atelier
+  // réel, voir schema.prisma) — ce repli générique ne sert qu'à ne jamais
+  // afficher un nom de tenant à la place d'un autre (Phase 8, multi-atelier).
+  const nomAtelier = sanitizeForPdf(atelier?.nom || "Atelier");
+  drawLogo(doc, atelier);
+  doc.font("Times-Bold").fontSize(24).fillColor(OR).text(nomAtelier, { align: "center" });
+  doc.fillColor(SOMBRE).font("Helvetica").fontSize(9.5);
+  doc.moveDown(0.3);
+  if (atelier?.slogan) doc.text(sanitizeForPdf(atelier.slogan), { align: "center" });
+  const coordonnees = [atelier?.adresse, atelier?.telephone].filter(Boolean).map(sanitizeForPdf).join(" — ");
+  if (coordonnees) doc.text(coordonnees, { align: "center" });
+  doc.moveDown(0.8);
+  drawBarreOr(doc);
+}
+
+/**
+ * Section encadrée simple (bordure fine) — titre en gras optionnel suivi de
+ * lignes de texte. Utilisée pour "Client".
+ */
+function drawSectionEncadree(doc, title, lignes) {
+  const x = doc.page.margins.left;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const padding = 8;
+  const startY = doc.y;
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(SOMBRE).text(title, x + padding, startY + padding, {
+    width: width - padding * 2,
+  });
+  doc.font("Helvetica").fontSize(10);
+  for (const ligne of lignes) {
+    doc.text(ligne, x + padding, doc.y + 1, { width: width - padding * 2 });
+  }
+  const endY = doc.y + padding;
+  doc.lineWidth(0.75).strokeColor("#333333").rect(x, startY, width, endY - startY).stroke();
+  doc.strokeColor("black").lineWidth(1);
+  doc.y = endY + 10;
+}
+
+// Lignes tabulaires encadrées, empilées (bordures partagées) — "Détails".
+function drawLignesTableau(doc, lignes) {
+  const x = doc.page.margins.left;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const padding = 8;
+  const hauteurLigne = 24;
+  doc.font("Helvetica").fontSize(10).fillColor(SOMBRE);
+  let y = doc.y;
+  for (const ligne of lignes) {
+    doc.lineWidth(0.75).strokeColor("#333333").rect(x, y, width, hauteurLigne).stroke();
+    doc.text(ligne, x + padding, y + hauteurLigne / 2 - 5, { width: width - padding * 2 });
+    y += hauteurLigne;
+  }
+  doc.strokeColor("black").lineWidth(1);
+  doc.y = y + 10;
+}
+
+/**
+ * Encadré double bordure (externe sombre, interne dorée) mettant en avant
+ * les montants — dernière ligne en plus gros/gras (solde restant, ou
+ * montant payé si une seule ligne).
+ */
+function drawEncadreMontants(doc, lignes) {
+  const x = doc.page.margins.left;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const padding = 12;
+  const startY = doc.y;
+  let y = startY + padding;
+  lignes.forEach(({ label, valeur, taille = 11, gras = true }, i) => {
+    if (i > 0) y += 4;
+    doc.font(gras ? "Helvetica-Bold" : "Helvetica").fontSize(taille).fillColor(SOMBRE);
+    doc.text(`${label} : `, x + padding, y, { continued: true, width: width - padding * 2 });
+    doc.text(valeur);
+    y = doc.y;
+  });
+  const endY = y + padding;
+  const hauteur = endY - startY;
+  doc.lineWidth(1.5).strokeColor(SOMBRE).rect(x, startY, width, hauteur).stroke();
+  const inset = 4;
+  doc.lineWidth(1).strokeColor(OR).rect(x + inset, startY + inset, width - inset * 2, hauteur - inset * 2).stroke();
+  doc.strokeColor("black").lineWidth(1);
+  doc.y = endY + 12;
+}
+
+/**
+ * Pied de page commun : simple mention, positionnée près du bas de page
+ * (position absolue) plutôt qu'à la suite du contenu, pour un rendu
+ * constant quelle que soit la longueur du corps du document.
+ *
+ * Un QR code + URL de renvoi vers l'app avait été ajouté puis retiré : en
+ * environnement de développement il affichait l'adresse locale
+ * ("localhost:4000"), inutilisable et déroutante sur un document destiné à
+ * une cliente — et en production il ne pointait de toute façon que vers
+ * l'accueil générique de l'app (aucune page publique par commande/reçu
+ * n'existe), donc peu de valeur réelle pour la complexité ajoutée.
+ */
+function drawPiedDePage(doc, { mention }) {
+  const yCible = doc.page.height - doc.page.margins.bottom - 40;
+  doc.y = Math.max(doc.y + 12, yCible);
+  doc.fontSize(8).font("Helvetica-Oblique").fillColor(GRIS).text(mention, { align: "center" });
+  doc.fillColor("black");
 }
 
 /**
@@ -129,7 +295,6 @@ function drawLogo(doc, atelier) {
  * possible de répondre avec une erreur JSON classique.
  */
 export function streamRecuPdf(res, { recu, atelier }) {
-  const nomAtelier = sanitizeForPdf(atelier?.nom || "AM Couture");
   const devise = sanitizeForPdf(atelier?.devise || "FCFA");
 
   res.setHeader("Content-Type", "application/pdf");
@@ -138,73 +303,43 @@ export function streamRecuPdf(res, { recu, atelier }) {
   const doc = new PDFDocument({ size: "A5", margin: 40 });
   doc.pipe(res);
 
-  // En-tête atelier
-  drawLogo(doc, atelier);
-  doc.fontSize(18).font("Helvetica-Bold").text(nomAtelier, { align: "center" });
-  doc.moveDown(0.2);
-  doc.fontSize(9).font("Helvetica");
-  if (atelier?.slogan) doc.text(sanitizeForPdf(atelier.slogan), { align: "center" });
-  const coordonnees = [atelier?.adresse, atelier?.telephone].filter(Boolean).map(sanitizeForPdf).join(" — ");
-  if (coordonnees) doc.text(coordonnees, { align: "center" });
+  drawCornerOrnaments(doc);
+  drawEnTete(doc, atelier);
 
-  doc.moveDown(1);
-  doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
-  doc.moveDown(1);
-
-  // Titre + numéro
-  doc.fontSize(14).font("Helvetica-Bold").text(`REÇU N° ${recu.numero}`, { align: "center" });
+  doc.font("Helvetica-Bold").fontSize(14).text(`REÇU N° ${sanitizeForPdf(recu.numero)}`, { align: "center" });
   doc.moveDown(0.3);
-  doc.fontSize(10).font("Helvetica").text(`Émis le ${formatDate(recu.createdAt)}`, { align: "center" });
-  doc.moveDown(1.5);
-
-  // Cliente / commande
-  const cliente = recu.commande?.cliente;
-  doc.fontSize(11).font("Helvetica-Bold").text("Client");
-  doc.font("Helvetica").fontSize(10);
-  doc.text(cliente ? sanitizeForPdf(`${cliente.prenom} ${cliente.nom}`) : "—");
-  if (cliente?.telephone) doc.text(sanitizeForPdf(cliente.telephone));
-  doc.moveDown(0.8);
-
-  doc.font("Helvetica-Bold").fontSize(11).text("Commande");
-  doc.font("Helvetica").fontSize(10);
-  doc.text(`N° ${sanitizeForPdf(recu.commande?.numero ?? "—")}`);
+  doc.font("Helvetica").fontSize(10).text(formatEmission(recu.createdAt, atelier), { align: "center" });
   doc.moveDown(1.2);
 
-  // Détail du paiement lié, si ce reçu concerne un paiement précis
+  const cliente = recu.commande?.cliente;
+  const ligneClient = [
+    cliente ? sanitizeForPdf(`${cliente.prenom} ${cliente.nom}`) : "—",
+    cliente?.telephone ? sanitizeForPdf(cliente.telephone) : null,
+  ].filter(Boolean);
+  drawSectionEncadree(doc, "Client", ligneClient);
+
+  const lignesDetails = [`Commande N° ${sanitizeForPdf(recu.commande?.numero ?? "—")}`];
   if (recu.paiement) {
-    doc.font("Helvetica-Bold").fontSize(11).text("Paiement");
-    doc.font("Helvetica").fontSize(10);
-    doc.text(`Date : ${formatDate(recu.paiement.date)}`);
-    doc.text(`Mode : ${sanitizeForPdf(recu.paiement.mode)}`);
-    if (recu.paiement.reference) doc.text(`Référence : ${sanitizeForPdf(recu.paiement.reference)}`);
-    doc.moveDown(1.2);
+    lignesDetails.push(`Date paiement : ${formatDate(recu.paiement.date)}`);
+    lignesDetails.push(`Mode : ${sanitizeForPdf(recu.paiement.mode)}`);
+    if (recu.paiement.reference) lignesDetails.push(`Référence : ${sanitizeForPdf(recu.paiement.reference)}`);
   }
+  drawLignesTableau(doc, lignesDetails);
 
-  // Montant — mis en avant
-  doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
-  doc.moveDown(0.6);
   const libelleMontant = recu.paiement ? "Montant payé" : "Total encaissé à ce jour";
-  doc.fontSize(11).font("Helvetica-Bold").text(libelleMontant, { continued: false });
-  doc.fontSize(16).text(formatMontant(recu.montantPaye, devise));
+  drawEncadreMontants(doc, [{ label: libelleMontant, valeur: formatMontant(recu.montantPaye, devise), taille: 14 }]);
 
-  // Informations complémentaires de l'atelier (recuConfig) — affichées juste
-  // avant la mention finale, uniquement si l'atelier en a saisi.
   if (isNonEmptyRecuConfig(atelier?.recuConfig)) {
-    doc.moveDown(1.2);
-    doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
-    doc.moveDown(0.6);
-    doc.fontSize(9).font("Helvetica");
+    doc.font("Helvetica").fontSize(9);
     for (const [cle, valeur] of Object.entries(atelier.recuConfig)) {
       if (valeur === null || valeur === "") continue;
       doc.font("Helvetica-Bold").text(sanitizeForPdf(cle), { continued: true });
       doc.font("Helvetica").text(` : ${sanitizeForPdf(valeur)}`);
     }
+    doc.moveDown(0.4);
   }
 
-  doc.moveDown(1.5);
-  doc.fontSize(8).font("Helvetica-Oblique").text("Document généré automatiquement — conserver comme preuve de paiement.", {
-    align: "center",
-  });
+  drawPiedDePage(doc, { mention: "Document généré automatiquement — conserver comme preuve de paiement." });
 
   doc.end();
 }
@@ -239,13 +374,6 @@ const TYPE_VETEMENT_LABELS = {
   AUTRE: "Autre",
 };
 
-function formatDateHeure(date) {
-  const d = new Date(date);
-  const jour = d.toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
-  const heure = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-  return `${jour} à ${heure}`;
-}
-
 /**
  * Fiche commande — document DISTINCT du Reçu ci-dessus (voir décision Phase
  * 3) : pas un justificatif de paiement figé, mais un instantané de l'état
@@ -255,7 +383,6 @@ function formatDateHeure(date) {
  * commandes.routes.js) : jamais persisté, comme le Reçu.
  */
 export function streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde }) {
-  const nomAtelier = sanitizeForPdf(atelier?.nom || "AM Couture");
   const devise = sanitizeForPdf(atelier?.devise || "FCFA");
 
   res.setHeader("Content-Type", "application/pdf");
@@ -264,54 +391,37 @@ export function streamFicheCommandePdf(res, { commande, atelier, totalPaye, sold
   const doc = new PDFDocument({ size: "A5", margin: 40 });
   doc.pipe(res);
 
-  // En-tête atelier — identique au Reçu (logo, nom, slogan, coordonnées).
-  drawLogo(doc, atelier);
-  doc.fontSize(18).font("Helvetica-Bold").text(nomAtelier, { align: "center" });
-  doc.moveDown(0.2);
-  doc.fontSize(9).font("Helvetica");
-  if (atelier?.slogan) doc.text(sanitizeForPdf(atelier.slogan), { align: "center" });
-  const coordonnees = [atelier?.adresse, atelier?.telephone].filter(Boolean).map(sanitizeForPdf).join(" — ");
-  if (coordonnees) doc.text(coordonnees, { align: "center" });
+  drawCornerOrnaments(doc);
+  drawEnTete(doc, atelier);
 
-  doc.moveDown(1);
-  doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
-  doc.moveDown(1);
-
-  doc.fontSize(14).font("Helvetica-Bold").text(`COMMANDE N° ${sanitizeForPdf(commande.numero)}`, { align: "center" });
+  doc.font("Helvetica-Bold").fontSize(14).text(`COMMANDE N° ${sanitizeForPdf(commande.numero)}`, { align: "center" });
   doc.moveDown(0.3);
-  doc.fontSize(10).font("Helvetica").text(`Émise le ${formatDateHeure(commande.createdAt)}`, { align: "center" });
-  doc.moveDown(1.5);
-
-  const cliente = commande.cliente;
-  doc.fontSize(11).font("Helvetica-Bold").text("Client");
-  doc.font("Helvetica").fontSize(10);
-  doc.text(cliente ? sanitizeForPdf(`${cliente.prenom} ${cliente.nom}`) : "—");
-  if (cliente?.telephone) doc.text(sanitizeForPdf(cliente.telephone));
-  doc.moveDown(0.8);
-
-  doc.font("Helvetica-Bold").fontSize(11).text("Détails");
-  doc.font("Helvetica").fontSize(10);
-  const modeleLabel = commande.modele?.nom || TYPE_VETEMENT_LABELS[commande.typeVetement] || commande.typeVetement;
-  doc.text(`Modèle : ${sanitizeForPdf(modeleLabel)}`);
-  doc.text(`Statut : ${sanitizeForPdf(STATUT_LABELS[commande.statut] || commande.statut)}`);
-  doc.text(`Livraison prévue : ${formatDate(commande.dateLivraisonPrevue)}`);
+  doc.font("Helvetica").fontSize(10).text(formatEmission(commande.createdAt, atelier, { feminin: true }), { align: "center" });
   doc.moveDown(1.2);
 
-  doc.moveTo(doc.page.margins.left, doc.y).lineTo(doc.page.width - doc.page.margins.right, doc.y).stroke();
-  doc.moveDown(0.6);
+  const cliente = commande.cliente;
+  const ligneClient = [
+    cliente ? sanitizeForPdf(`${cliente.prenom} ${cliente.nom}`) : "—",
+    cliente?.telephone ? sanitizeForPdf(cliente.telephone) : null,
+  ].filter(Boolean);
+  drawSectionEncadree(doc, "Client", ligneClient);
 
-  doc.fontSize(10).font("Helvetica-Bold").text("Montant total", { continued: true });
-  doc.font("Helvetica").text(`   ${formatMontant(commande.prixTotal, devise)}`);
-  doc.font("Helvetica-Bold").text("Montant payé", { continued: true });
-  doc.font("Helvetica").text(`   ${formatMontant(totalPaye, devise)}`);
-  doc.moveDown(0.4);
-  doc.fontSize(11).font("Helvetica-Bold").text("Solde restant", { continued: false });
-  doc.fontSize(16).text(formatMontant(solde, devise));
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(SOMBRE).text("Détails");
+  doc.moveDown(0.3);
+  const modeleLabel = commande.modele?.nom || TYPE_VETEMENT_LABELS[commande.typeVetement] || commande.typeVetement;
+  drawLignesTableau(doc, [
+    `Modèle : ${sanitizeForPdf(modeleLabel)}`,
+    `Statut : ${sanitizeForPdf(STATUT_LABELS[commande.statut] || commande.statut)}`,
+    `Livraison prévue : ${formatDate(commande.dateLivraisonPrevue)}`,
+  ]);
 
-  doc.moveDown(1.5);
-  doc.fontSize(8).font("Helvetica-Oblique").text("Document généré automatiquement — montants à jour au moment de l'émission.", {
-    align: "center",
-  });
+  drawEncadreMontants(doc, [
+    { label: "Montant total", valeur: formatMontant(commande.prixTotal, devise), taille: 11 },
+    { label: "Montant payé", valeur: formatMontant(totalPaye, devise), taille: 11 },
+    { label: "Solde restant", valeur: formatMontant(solde, devise), taille: 15 },
+  ]);
+
+  drawPiedDePage(doc, { mention: "Document généré automatiquement — montants à jour au moment de l'émission." });
 
   doc.end();
 }

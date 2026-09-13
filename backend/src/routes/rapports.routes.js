@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import {
   resolvePeriod,
@@ -23,7 +23,7 @@ import { CATEGORIES_VETEMENT } from "../schemas/modele.schema.js";
 
 // Module PUREMENT consultatif : aucune écriture en base dans ce fichier.
 const router = Router();
-router.use(requireAuth);
+router.use(requireAuth, requireAtelier);
 
 const D0 = new Prisma.Decimal(0);
 const dec = (v) => (v == null ? D0 : new Prisma.Decimal(v));
@@ -39,21 +39,23 @@ router.get("/finances", async (req, res) => {
   if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
   const { from, to } = resolvePeriod(parsed.data);
   const range = dateRangeWhere(from, to);
+  const { atelierId } = req.user;
 
   const [commandesAgg, paiementsAgg, depensesAgg] = await Promise.all([
     prisma.commande.aggregate({
-      where: range ? { dateCommande: range } : {},
+      where: { atelierId, ...(range ? { dateCommande: range } : {}) },
       _count: true,
       _sum: { prixTotal: true },
     }),
-    // annuleAt: null — un paiement/une dépense annulé ne compte dans aucun rapport.
+    // annuleAt: null — un paiement/une dépense annulé ne compte dans aucun
+    // rapport. Paiement scopé via sa commande (pas de colonne atelierId propre).
     prisma.paiement.aggregate({
-      where: { annuleAt: null, ...(range ? { date: range } : {}) },
+      where: { annuleAt: null, commande: { atelierId }, ...(range ? { date: range } : {}) },
       _count: true,
       _sum: { montant: true },
     }),
     prisma.depense.aggregate({
-      where: { annuleAt: null, ...(range ? { date: range } : {}) },
+      where: { atelierId, annuleAt: null, ...(range ? { date: range } : {}) },
       _count: true,
       _sum: { montant: true },
     }),
@@ -118,21 +120,27 @@ router.get("/evolution", async (req, res) => {
     });
   }
 
+  const { atelierId } = req.user;
+
+  // Paiement n'a pas de colonne atelierId propre (scopé via Commande) — JOIN
+  // nécessaire ici, contrairement à Commande/Depense qui ont directement la
+  // colonne (Phase 8 — multi-tenant).
   const [commandesParMois, paiementsParMois, depensesParMois] = await Promise.all([
     prisma.$queryRaw`
       SELECT to_char(date_trunc('month', "dateCommande"), 'YYYY-MM') AS mois,
              COUNT(*)::int AS nombre,
              COALESCE(SUM("prixTotal"), 0)::text AS montant
       FROM "Commande"
-      WHERE "dateCommande" >= ${from} AND "dateCommande" < ${to}
+      WHERE "dateCommande" >= ${from} AND "dateCommande" < ${to} AND "atelierId" = ${atelierId}
       GROUP BY 1
     `,
     prisma.$queryRaw`
-      SELECT to_char(date_trunc('month', "date"), 'YYYY-MM') AS mois,
+      SELECT to_char(date_trunc('month', p."date"), 'YYYY-MM') AS mois,
              COUNT(*)::int AS nombre,
-             COALESCE(SUM("montant"), 0)::text AS montant
-      FROM "Paiement"
-      WHERE "date" >= ${from} AND "date" < ${to} AND "annuleAt" IS NULL
+             COALESCE(SUM(p."montant"), 0)::text AS montant
+      FROM "Paiement" p
+      JOIN "Commande" c ON c.id = p."commandeId"
+      WHERE p."date" >= ${from} AND p."date" < ${to} AND p."annuleAt" IS NULL AND c."atelierId" = ${atelierId}
       GROUP BY 1
     `,
     prisma.$queryRaw`
@@ -140,7 +148,7 @@ router.get("/evolution", async (req, res) => {
              COUNT(*)::int AS nombre,
              COALESCE(SUM("montant"), 0)::text AS montant
       FROM "Depense"
-      WHERE "date" >= ${from} AND "date" < ${to} AND "annuleAt" IS NULL
+      WHERE "date" >= ${from} AND "date" < ${to} AND "annuleAt" IS NULL AND "atelierId" = ${atelierId}
       GROUP BY 1
     `,
   ]);
@@ -187,7 +195,7 @@ router.get("/commandes", async (req, res) => {
   if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
   const { from, to } = resolvePeriod(parsed.data);
   const range = dateRangeWhere(from, to);
-  const where = range ? { dateCommande: range } : {};
+  const where = { atelierId: req.user.atelierId, ...(range ? { dateCommande: range } : {}) };
 
   const [creeesAgg, parStatutRaw, parPrioriteRaw, parCategorieRaw] = await Promise.all([
     prisma.commande.aggregate({ where, _count: true, _sum: { prixTotal: true } }),
@@ -237,7 +245,11 @@ router.get("/commandes/en-retard", async (req, res) => {
   const { page, pageSize } = parsed.data;
   const now = new Date();
 
-  const where = { statut: COMMANDES_NON_TERMINALES, dateLivraisonPrevue: { lt: now } };
+  const where = {
+    atelierId: req.user.atelierId,
+    statut: COMMANDES_NON_TERMINALES,
+    dateLivraisonPrevue: { lt: now },
+  };
   const [rows, total] = await Promise.all([
     prisma.commande.findMany({
       where,
@@ -270,7 +282,11 @@ router.get("/commandes/a-livrer", async (req, res) => {
   const now = new Date();
   const horizon = new Date(now.getTime() + horizonJours * 86_400_000);
 
-  const where = { statut: COMMANDES_NON_TERMINALES, dateLivraisonPrevue: { gte: now, lt: horizon } };
+  const where = {
+    atelierId: req.user.atelierId,
+    statut: COMMANDES_NON_TERMINALES,
+    dateLivraisonPrevue: { gte: now, lt: horizon },
+  };
   const [data, total] = await Promise.all([
     prisma.commande.findMany({
       where,
@@ -299,21 +315,22 @@ router.get("/clientes", async (req, res) => {
   if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
   const { from, to } = resolvePeriod(parsed.data);
   const range = dateRangeWhere(from, to);
+  const { atelierId } = req.user;
 
   const [actives, archivees, nouvelles, ayantCommandeRows, topGroup] = await Promise.all([
-    prisma.cliente.count({ where: { archivedAt: null } }),
-    prisma.cliente.count({ where: { archivedAt: { not: null } } }),
-    prisma.cliente.count({ where: range ? { createdAt: range } : {} }),
+    prisma.cliente.count({ where: { atelierId, archivedAt: null } }),
+    prisma.cliente.count({ where: { atelierId, archivedAt: { not: null } } }),
+    prisma.cliente.count({ where: { atelierId, ...(range ? { createdAt: range } : {}) } }),
     range
       ? prisma.$queryRaw`
           SELECT COUNT(DISTINCT "clienteId")::int AS count
           FROM "Commande"
-          WHERE "dateCommande" >= ${from} AND "dateCommande" < ${to}
+          WHERE "dateCommande" >= ${from} AND "dateCommande" < ${to} AND "atelierId" = ${atelierId}
         `
-      : prisma.$queryRaw`SELECT COUNT(DISTINCT "clienteId")::int AS count FROM "Commande"`,
+      : prisma.$queryRaw`SELECT COUNT(DISTINCT "clienteId")::int AS count FROM "Commande" WHERE "atelierId" = ${atelierId}`,
     prisma.commande.groupBy({
       by: ["clienteId"],
-      where: range ? { dateCommande: range } : {},
+      where: { atelierId, ...(range ? { dateCommande: range } : {}) },
       _count: true,
       orderBy: { _count: { clienteId: "desc" } },
       take: 10,
@@ -321,7 +338,7 @@ router.get("/clientes", async (req, res) => {
   ]);
 
   const topClientesInfo = await prisma.cliente.findMany({
-    where: { id: { in: topGroup.map((g) => g.clienteId) } },
+    where: { id: { in: topGroup.map((g) => g.clienteId) }, atelierId },
     select: { id: true, nom: true, prenom: true },
   });
   const infoMap = new Map(topClientesInfo.map((c) => [c.id, c]));
@@ -349,14 +366,15 @@ router.get("/modeles", async (req, res) => {
   if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
   const { from, to } = resolvePeriod(parsed.data);
   const range = dateRangeWhere(from, to);
+  const { atelierId } = req.user;
 
   const [actifs, archives, parCategorieRaw, topGroup] = await Promise.all([
-    prisma.modele.count({ where: { archivedAt: null } }),
-    prisma.modele.count({ where: { archivedAt: { not: null } } }),
-    prisma.modele.groupBy({ by: ["categorie"], where: { archivedAt: null }, _count: true }),
+    prisma.modele.count({ where: { atelierId, archivedAt: null } }),
+    prisma.modele.count({ where: { atelierId, archivedAt: { not: null } } }),
+    prisma.modele.groupBy({ by: ["categorie"], where: { atelierId, archivedAt: null }, _count: true }),
     prisma.commande.groupBy({
       by: ["modeleId"],
-      where: { modeleId: { not: null }, ...(range ? { dateCommande: range } : {}) },
+      where: { atelierId, modeleId: { not: null }, ...(range ? { dateCommande: range } : {}) },
       _count: true,
       orderBy: { _count: { modeleId: "desc" } },
       take: 10,
@@ -367,7 +385,7 @@ router.get("/modeles", async (req, res) => {
   const parCategorie = CATEGORIES_VETEMENT.map((c) => ({ categorie: c, nombre: catMap.get(c) ?? 0 }));
 
   const topModelesInfo = await prisma.modele.findMany({
-    where: { id: { in: topGroup.map((g) => g.modeleId) } },
+    where: { id: { in: topGroup.map((g) => g.modeleId) }, atelierId },
     select: { id: true, nom: true, categorie: true, archivedAt: true },
   });
   const infoMap = new Map(topModelesInfo.map((m) => [m.id, m]));
