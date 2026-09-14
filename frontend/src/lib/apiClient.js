@@ -50,4 +50,8 @@ export const api = {
   post: (path, body, opts) => request(path, { ...opts, method: "POST", body }),
   put: (path, body, opts) => request(path, { ...opts, method: "PUT", body }),
   patch: (path, body, opts) => request(path, { ...opts, method: "PATCH", body }),
+  // Premier usage : suppression DÉFINITIVE d'un atelier vide par le SUPERADMIN
+  // (voir features/ateliers/api.js) — tout le reste de l'app évite les
+  // suppressions dures au profit d'une annulation/archivage logique.
+  delete: (path, opts) => request(path, { ...opts, method: "DELETE" }),
 };

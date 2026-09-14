@@ -7,6 +7,10 @@ import SuperadminLayout from "./layouts/SuperadminLayout.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
 import InscriptionAtelierPage from "./pages/auth/InscriptionAtelierPage.jsx";
 import AteliersPage from "./pages/superadmin/AteliersPage.jsx";
+import AtelierDetailPage from "./pages/superadmin/AtelierDetailPage.jsx";
+import SuperadminDashboardPage from "./pages/superadmin/SuperadminDashboardPage.jsx";
+import GestionAbonnementsPage from "./pages/superadmin/GestionAbonnementsPage.jsx";
+import GestionFormulesPage from "./pages/superadmin/GestionFormulesPage.jsx";
 import DashboardPage from "./pages/DashboardPage.jsx";
 import FinancesPage from "./pages/FinancesPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
@@ -76,7 +80,12 @@ export default function App() {
 
         <Route element={<RequireSuperadmin />}>
           <Route element={<SuperadminLayout />}>
+            <Route path="/vue-ensemble" element={<SuperadminDashboardPage />} />
             <Route path="/ateliers" element={<AteliersPage />} />
+            <Route path="/ateliers/:id" element={<AtelierDetailPage />} />
+            <Route path="/gestion-abonnements" element={<GestionAbonnementsPage />} />
+            <Route path="/tarifs-abonnement" element={<GestionFormulesPage />} />
+            <Route path="/mon-compte" element={<ComptePage />} />
           </Route>
         </Route>
       </Route>

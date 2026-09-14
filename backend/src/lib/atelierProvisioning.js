@@ -59,3 +59,54 @@ export async function creerAtelierEtAdmin({
     return { atelier, admin };
   });
 }
+
+// Réinitialisation de mot de passe par le SUPERADMIN (voir
+// ateliers.routes.js) — dernier recours en l'absence de tout mécanisme de
+// récupération en libre-service (pas d'email vérifié envoyé/à ce stade, voir
+// décision Phase 8). `atelierId` vérifie l'appartenance du compte à CET
+// atelier avant toute écriture (même logique IDOR que les routes imbriquées
+// paiements/livraisons/reçus) — un SUPERADMIN qui se trompe d'URL ne
+// réinitialise jamais le compte d'un autre atelier par erreur.
+export async function reinitialiserMotDePasse({ atelierId, userId, nouveauMotDePasse }) {
+  const compte = await prisma.user.findFirst({ where: { id: userId, atelierId } });
+  if (!compte) {
+    throw new HttpError(404, "Compte introuvable pour cet atelier.");
+  }
+  const passwordHash = await bcrypt.hash(nouveauMotDePasse, 12);
+  await prisma.user.update({ where: { id: compte.id }, data: { passwordHash } });
+}
+
+// Ajoute un compte ("employé") à un atelier EXISTANT — voir
+// ajouterCompteSchema (atelierAdmin.schema.js) pour la décision "mêmes
+// permissions que l'ADMIN".
+export async function ajouterCompteAtelier({ atelierId, identifiant, password, prenom, nom, email }) {
+  const atelier = await prisma.atelier.findUnique({ where: { id: atelierId }, select: { id: true } });
+  if (!atelier) throw new HttpError(404, "Atelier introuvable.");
+
+  const existant = await prisma.user.findUnique({ where: { identifiant } });
+  if (existant) {
+    throw new HttpError(409, "Cet identifiant est déjà utilisé.", {
+      identifiant: ["Cet identifiant est déjà utilisé."],
+    });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  return prisma.user.create({
+    data: { identifiant, passwordHash, role: "ADMIN", atelierId, prenom, nom, email },
+  });
+}
+
+// Supprime un compte d'un atelier — refuse de laisser l'atelier sans AUCUN
+// compte (personne ne pourrait plus jamais s'y connecter, et il n'existe
+// aucune façon d'en recréer un depuis le côté ADMIN — seul le SUPERADMIN le
+// peut, via ce même formulaire "Ajouter un compte").
+export async function supprimerCompteAtelier({ atelierId, userId }) {
+  const compte = await prisma.user.findFirst({ where: { id: userId, atelierId } });
+  if (!compte) throw new HttpError(404, "Compte introuvable pour cet atelier.");
+
+  const nombreComptes = await prisma.user.count({ where: { atelierId } });
+  if (nombreComptes <= 1) {
+    throw new HttpError(409, "Impossible de supprimer le dernier compte de cet atelier.");
+  }
+  await prisma.user.delete({ where: { id: compte.id } });
+}

@@ -118,6 +118,10 @@ model User {
   atelierId    String?
   atelier      Atelier?        @relation(fields: [atelierId], references: [id], onDelete: Restrict)
   createdAt    DateTime        @default(now())
+  // Mis à jour à chaque connexion réussie (voir POST /auth/login) — sert
+  // uniquement à l'affichage (fiche atelier côté SUPERADMIN), jamais à une
+  // décision d'autorisation.
+  derniereConnexionAt DateTime?
 
   @@index([atelierId])
 }
@@ -138,6 +142,12 @@ model Atelier {
   slogan     String?
   devise     String   @default("FCFA")
   recuConfig Json?
+  // Suspension par le SUPERADMIN (ex: impayé, litige) — bloque IMMÉDIATEMENT
+  // les nouvelles requêtes de tout compte de cet atelier (vérifié à chaque
+  // requête via requireAtelier, pas seulement à la connexion : voir
+  // auth.middleware.js), sans supprimer aucune donnée.
+  actif      Boolean  @default(true)
+  suspenduLe DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

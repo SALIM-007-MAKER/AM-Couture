@@ -1,6 +1,7 @@
 import { verifyAuthToken } from "../lib/jwt.js";
 import { COOKIE_NAME } from "../lib/authCookie.js";
 import { HttpError } from "./error.middleware.js";
+import { prisma } from "../lib/prisma.js";
 
 /**
  * Protège une route : exige un cookie de session valide.
@@ -29,8 +30,17 @@ export function requireAuth(req, res, next) {
  * directement sur les données d'un atelier — il gère la plateforme (voir
  * ateliers.routes.js) et se connecterait avec un compte ADMIN pour agir "en
  * tant que" tel ou tel atelier si besoin (non implémenté dans cette phase).
+ *
+ * Vérifie aussi que l'atelier n'est pas suspendu — EN BASE, à CHAQUE requête
+ * (pas seulement à la connexion) : une suspension décidée par le SUPERADMIN
+ * doit prendre effet immédiatement, même pour une session déjà ouverte
+ * (le JWT reste valide jusqu'à 7 jours, voir jwt.js — il ne peut pas à lui
+ * seul refléter un changement d'état survenu après son émission). Coût
+ * accepté : un lookup PK supplémentaire par requête atelier-scopée, sur une
+ * table minuscule (une ligne par atelier) — négligeable face aux requêtes
+ * métier qui suivent de toute façon dans la même route.
  */
-export function requireAtelier(req, res, next) {
+export async function requireAtelier(req, res, next) {
   if (!req.user?.atelierId) {
     return next(
       new HttpError(
@@ -39,7 +49,21 @@ export function requireAtelier(req, res, next) {
       ),
     );
   }
-  next();
+  try {
+    const atelier = await prisma.atelier.findUnique({
+      where: { id: req.user.atelierId },
+      select: { actif: true },
+    });
+    // atelier introuvable : cas théorique (onDelete: Restrict empêche sa
+    // suppression tant qu'un compte y est rattaché) — traité comme suspendu
+    // plutôt que de laisser passer par défaut.
+    if (!atelier || !atelier.actif) {
+      return next(new HttpError(403, "Cet atelier a été suspendu par la plateforme. Contactez le support."));
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
 }
 
 /**

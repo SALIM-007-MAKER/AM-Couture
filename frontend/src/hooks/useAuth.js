@@ -8,7 +8,7 @@ const ME_KEY = ["auth", "me"];
 // Utilisé partout où on redirige un utilisateur déjà connecté (voir
 // PublicOnlyRoute.jsx) — une seule source de vérité pour cette règle.
 export function homePathForUser(user) {
-  return user?.role === "SUPERADMIN" ? "/ateliers" : "/";
+  return user?.role === "SUPERADMIN" ? "/vue-ensemble" : "/";
 }
 
 /**

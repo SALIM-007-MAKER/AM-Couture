@@ -76,3 +76,57 @@ export const inscriptionAtelierSchema = z
     langue: z.enum(LANGUES_DISPONIBLES).optional().default("fr"),
   })
   .strict();
+
+// PATCH /api/ateliers/:id (SUPERADMIN uniquement) — modifie la fiche d'UN
+// atelier existant. Distinct de patchParametresSchema (atelier.schema.js,
+// utilisé par l'ADMIN pour éditer SON PROPRE atelier via /parametres) :
+// même liste de champs éditables, mais jamais le même appelant. `slogan`
+// et `logoUrl` restent la responsabilité de l'ADMIN de l'atelier (marque
+// commerciale) — pas exposés ici.
+export const patchAtelierSchema = z
+  .object({
+    nom: nomAtelierField.optional(),
+    devise: z.string().trim().min(1, "Devise requise.").max(10).transform(normalizeText).optional(),
+    telephone: telephoneField,
+    adresse: optionalTrimmed(255),
+    ville: optionalTrimmed(100),
+    pays: optionalTrimmed(100),
+  })
+  .strict()
+  .refine((data) => Object.keys(data).length > 0, { message: "Aucune donnée à modifier." });
+
+// PATCH /api/ateliers/:id/statut (SUPERADMIN uniquement) — active/suspend.
+export const statutAtelierSchema = z.object({ actif: z.boolean() }).strict();
+
+// PATCH /api/ateliers/:id/comptes/:userId/mot-de-passe (SUPERADMIN
+// uniquement) — remet à zéro le mot de passe d'un compte, en dernier
+// recours (aucune récupération en libre-service n'existe dans cette phase :
+// pas d'email vérifié, pas d'envoi d'email — voir décision Phase 8). Mêmes
+// bornes que passwordField ci-dessus.
+export const reinitialiserMotDePasseSchema = z.object({ nouveauMotDePasse: passwordField }).strict();
+
+// GET /api/ateliers — mêmes bornes que listClientesQuerySchema
+// (cliente.schema.js) : `q` recherche par nom d'atelier, pagination
+// identique dans toute l'app.
+export const listAteliersQuerySchema = z.object({
+  q: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(120).optional()),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
+});
+
+// POST /api/ateliers/:id/comptes (SUPERADMIN uniquement) — ajoute un compte
+// supplémentaire ("employé") à un atelier EXISTANT. Décision Phase 8 :
+// mêmes permissions que l'ADMIN (rôle ADMIN, accès complet à l'atelier) —
+// aucun système de permissions restreintes construit à ce stade faute de
+// spécification précise sur ce que doit voir/faire un "employé" par rapport
+// au propriétaire. Identité (prénom/nom/email) optionnelle ici — contexte
+// interne SUPERADMIN, moins formel que l'inscription en libre-service.
+export const ajouterCompteSchema = z
+  .object({
+    identifiant: identifiantField,
+    password: passwordField,
+    prenom: optionalTrimmed(100),
+    nom: optionalTrimmed(100),
+    email: z.preprocess(emptyToUndefined, emailField.optional()),
+  })
+  .strict();

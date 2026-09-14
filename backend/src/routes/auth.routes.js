@@ -83,6 +83,11 @@ router.post("/login", loginLimiter, async (req, res) => {
     throw new HttpError(401, "Identifiant ou mot de passe incorrect.");
   }
 
+  // Fil d'activité SUPERADMIN (voir GET /api/ateliers/:id/activite) — pas
+  // attendu avant la réponse : une connexion réussie ne doit jamais échouer
+  // ou ralentir à cause de cet horodatage, purement informatif.
+  prisma.user.update({ where: { id: user.id }, data: { derniereConnexionAt: new Date() } }).catch(() => {});
+
   const token = signAuthToken(user);
   setAuthCookie(res, token);
   res.json({ id: user.id, identifiant: user.identifiant, role: user.role, atelierId: user.atelierId });
