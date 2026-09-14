@@ -6,8 +6,8 @@ import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import { loginSchema } from "../schemas/auth.schema.js";
 import { inscriptionAtelierSchema } from "../schemas/atelierAdmin.schema.js";
-import { signAuthToken } from "../lib/jwt.js";
-import { setAuthCookie, clearAuthCookie } from "../lib/authCookie.js";
+import { signAuthToken, verifyAuthToken } from "../lib/jwt.js";
+import { setAuthCookie, clearAuthCookie, COOKIE_NAME } from "../lib/authCookie.js";
 import { formatZodError } from "../lib/validation.js";
 import { creerAtelierEtAdmin } from "../lib/atelierProvisioning.js";
 
@@ -101,6 +101,34 @@ const inscriptionLimiter = rateLimit({
   message: { error: "Trop de tentatives. Réessayez plus tard." },
 });
 
+// Bloque l'inscription si un cookie de session VALIDE est déjà présent —
+// cette route n'exige pas d'authentification (elle doit rester utilisable
+// par un visiteur totalement anonyme), mais ne doit pas non plus permettre à
+// un compte déjà connecté (ADMIN d'un autre atelier, ou même SUPERADMIN) de
+// créer discrètement un atelier supplémentaire sans repasser par la console
+// SUPERADMIN (voir ateliers.routes.js) — la création d'ateliers "hors
+// SUPERADMIN" doit rester réservée à un nouveau venu, jamais à un compte
+// existant. Un token absent/invalide/expiré est traité comme "non connecté"
+// et laisse passer normalement.
+function rejectIfDejaConnecte(req, res, next) {
+  const token = req.cookies?.[COOKIE_NAME];
+  if (token) {
+    try {
+      verifyAuthToken(token);
+      return next(
+        new HttpError(
+          409,
+          "Vous êtes déjà connecté à un compte. Déconnectez-vous avant de créer un nouvel atelier.",
+        ),
+      );
+    } catch {
+      // Token invalide/expiré : rien à bloquer, l'utilisateur n'est pas
+      // réellement connecté du point de vue du serveur.
+    }
+  }
+  next();
+}
+
 // POST /api/auth/inscription-atelier — un propriétaire d'atelier crée LUI-MÊME
 // son atelier + son compte ADMIN, sans intervention du SUPERADMIN (Phase 8 —
 // inscription en libre-service, décision ultérieure à l'audit initial qui
@@ -108,7 +136,7 @@ const inscriptionLimiter = rateLimit({
 // via POST /api/ateliers (SUPERADMIN) — voir ateliers.routes.js. Termine par
 // une connexion immédiate (même cookie que /login) : un nouvel atelier doit
 // pouvoir être utilisé tout de suite, pas demander une seconde étape de login.
-router.post("/inscription-atelier", inscriptionLimiter, async (req, res) => {
+router.post("/inscription-atelier", inscriptionLimiter, rejectIfDejaConnecte, async (req, res) => {
   const parsed = inscriptionAtelierSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
