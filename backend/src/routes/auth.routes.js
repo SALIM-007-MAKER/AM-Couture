@@ -1,5 +1,4 @@
 import { Router } from "express";
-import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
@@ -13,6 +12,7 @@ import { creerAtelierEtAdmin } from "../lib/atelierProvisioning.js";
 import { creerToken, consommerToken } from "../lib/tokenAction.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { emailVerificationTemplate, emailReinitialisationTemplate } from "../lib/emailTemplates.js";
+import { rateLimitPersistant } from "../lib/rateLimiter.js";
 
 const router = Router();
 
@@ -24,23 +24,24 @@ const DUMMY_HASH = "$2b$10$/4y/w0cvEjmIpLaIBO4xNOLAdvUoH3oNwzYFeJ7fUnPvdyqtJ22de
 
 // Rate limiting sur /login uniquement : 10 tentatives / 15 min / IP.
 // Réponse volontairement générique pour ne pas aider un attaquant à calibrer.
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Trop de tentatives. Réessayez dans quelques minutes." },
+// Persistant (Postgres, voir lib/rateLimiter.js) — un store en mémoire ne
+// suffit pas en serverless (plusieurs instances, chacune avec son propre
+// compteur).
+const loginLimiter = rateLimitPersistant({
+  prefixe: "login",
+  limite: 10,
+  fenetreMs: 15 * 60 * 1000,
+  message: "Trop de tentatives. Réessayez dans quelques minutes.",
 });
 
 // Rate limiting sur la recherche de branding par identifiant : plus large
 // que login (usage attendu : quelques requêtes par frappe/debounce), mais
 // borné pour freiner une énumération en masse des identifiants existants.
-const brandingLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Trop de requêtes. Réessayez dans quelques minutes." },
+const brandingLimiter = rateLimitPersistant({
+  prefixe: "branding",
+  limite: 30,
+  fenetreMs: 15 * 60 * 1000,
+  message: "Trop de requêtes. Réessayez dans quelques minutes.",
 });
 
 // GET /api/auth/atelier-pour-identifiant?identifiant=... — utilisé UNIQUEMENT
@@ -101,13 +102,7 @@ router.post("/login", loginLimiter, async (req, res) => {
 // compte), pas juste une vérification. 5 tentatives / heure / IP suffisent à
 // un usage légitime (une poignée d'essais en cas d'identifiant déjà pris)
 // tout en limitant la création en masse d'ateliers factices.
-const inscriptionLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  limit: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Trop de tentatives. Réessayez plus tard." },
-});
+const inscriptionLimiter = rateLimitPersistant({ prefixe: "inscription", limite: 5, fenetreMs: 60 * 60 * 1000 });
 
 // Bloque l'inscription si un cookie de session VALIDE est déjà présent —
 // cette route n'exige pas d'authentification (elle doit rester utilisable
@@ -210,13 +205,7 @@ router.get("/verifier-email", async (req, res) => {
   res.json({ email: user.email });
 });
 
-const renvoyerVerificationLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  limit: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Trop de tentatives. Réessayez plus tard." },
-});
+const renvoyerVerificationLimiter = rateLimitPersistant({ prefixe: "renvoyer-verification", limite: 5, fenetreMs: 60 * 60 * 1000 });
 
 // POST /api/auth/renvoyer-verification-email — authentifié (contrairement à
 // mot-de-passe-oublie, pas de risque d'énumération ici : on agit sur le
@@ -250,13 +239,7 @@ router.post("/renvoyer-verification-email", requireAuth, renvoyerVerificationLim
 // Rate limiting sur la demande de réinitialisation : même ordre de grandeur
 // que l'inscription (crée un jeton + déclenche un envoi d'email à chaque
 // appel réussi) — 5 tentatives / heure / IP.
-const motDePasseOublieLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  limit: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Trop de tentatives. Réessayez plus tard." },
-});
+const motDePasseOublieLimiter = rateLimitPersistant({ prefixe: "mot-de-passe-oublie", limite: 5, fenetreMs: 60 * 60 * 1000 });
 
 // POST /api/auth/mot-de-passe-oublie — réponse TOUJOURS identique, que
 // l'identifiant existe ou non, et qu'il ait un email ou non (ex: le compte

@@ -515,3 +515,19 @@ model Counter {
   id     String @id
   valeur Int    @default(0)
 }
+
+// Rate-limiting persistant (Postgres) — express-rate-limit (mémoire locale
+// du process) ne suffit pas en environnement serverless (Vercel) :
+// plusieurs instances de fonction traitent les requêtes en parallèle,
+// chacune avec son propre compteur en mémoire, ce qui permettrait de
+// dépasser largement la limite annoncée (ex: 10 tentatives/15min sur
+// /login pourrait en réalité en autoriser bien plus, réparties sur
+// plusieurs instances). Une seule ligne par clé (préfixe de route + IP),
+// partagée par toutes les instances via la base — voir lib/rateLimiter.js.
+model LimiteTaux {
+  id           String   @id @default(cuid())
+  cle          String   @unique
+  fenetreDebut DateTime @default(now())
+  compte       Int      @default(1)
+  updatedAt    DateTime @updatedAt
+}
