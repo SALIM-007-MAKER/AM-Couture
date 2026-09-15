@@ -15,9 +15,20 @@ const EXPIRES_IN = "7d";
 // role/atelierId (Phase 8, multi-tenant) embarqués dans le token — évite une
 // requête DB supplémentaire à chaque requête juste pour savoir de quel
 // atelier relève l'utilisateur. atelierId est `null` pour un SUPERADMIN.
+// sessionVersion : revérifié contre la valeur courante en base à chaque
+// requête (voir requireAuth, auth.middleware.js) — permet de révoquer un
+// jeton avant son expiration naturelle (7 jours) en incrémentant cette
+// valeur, sans quoi un JWT reste valide par construction jusqu'à expiration
+// quoi qu'il arrive côté base (voir décision : changement de mot de passe).
 export function signAuthToken(user) {
   return jwt.sign(
-    { sub: user.id, identifiant: user.identifiant, role: user.role, atelierId: user.atelierId },
+    {
+      sub: user.id,
+      identifiant: user.identifiant,
+      role: user.role,
+      atelierId: user.atelierId,
+      sessionVersion: user.sessionVersion,
+    },
     JWT_SECRET,
     { expiresIn: EXPIRES_IN },
   );

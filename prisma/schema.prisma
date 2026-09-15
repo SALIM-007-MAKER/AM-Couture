@@ -127,6 +127,15 @@ model User {
   // utiliser l'application (voir décision : accès immédiat après inscription),
   // juste une information affichée (bannière de rappel côté frontend).
   emailVerifieLe DateTime?
+  // Incrémenté à CHAQUE changement de mot de passe (self-service, mot de
+  // passe oublié, ou réinitialisation par le SUPERADMIN) — embarqué dans le
+  // JWT à sa signature (voir jwt.js) et revérifié à chaque requête (voir
+  // requireAuth, auth.middleware.js) : un jeton signé avec un ancien
+  // sessionVersion est rejeté, même s'il n'est pas encore expiré (7 jours).
+  // Sans ça, changer son mot de passe ne déconnectait aucune AUTRE session
+  // déjà ouverte ailleurs (un JWT reste valide par nature jusqu'à son
+  // expiration, quoi qu'il arrive côté base).
+  sessionVersion Int @default(0)
 
   tokensAction TokenAction[]
 

@@ -73,7 +73,12 @@ export async function reinitialiserMotDePasse({ atelierId, userId, nouveauMotDeP
     throw new HttpError(404, "Compte introuvable pour cet atelier.");
   }
   const passwordHash = await bcrypt.hash(nouveauMotDePasse, 12);
-  await prisma.user.update({ where: { id: compte.id }, data: { passwordHash } });
+  // sessionVersion incrémenté : voir requireAuth (auth.middleware.js) —
+  // invalide immédiatement toute session déjà ouverte avec l'ancien mot de
+  // passe (le SUPERADMIN réinitialise typiquement parce que le compte est
+  // compromis ou son propriétaire enfermé dehors, dans les deux cas les
+  // sessions existantes ne doivent pas survivre).
+  await prisma.user.update({ where: { id: compte.id }, data: { passwordHash, sessionVersion: { increment: 1 } } });
 }
 
 // Ajoute un compte ("employé") à un atelier EXISTANT — voir

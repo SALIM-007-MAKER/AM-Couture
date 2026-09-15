@@ -5,6 +5,8 @@ import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { changePasswordSchema, updateCompteSchema } from "../schemas/compte.schema.js";
+import { signAuthToken } from "../lib/jwt.js";
+import { setAuthCookie } from "../lib/authCookie.js";
 
 // "Mon compte" (Phase 6) — distinct de /api/parametres (profil ATELIER) :
 // ce module concerne uniquement le compte de connexion (identifiant unique
@@ -42,7 +44,18 @@ router.patch("/mot-de-passe", async (req, res) => {
 
   // Coût 12 — identique à prisma/seed.js, seule autre origine d'un hash dans ce projet.
   const passwordHash = await bcrypt.hash(nouveauMotDePasse, 12);
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+  // sessionVersion incrémenté : voir auth.middleware.js (requireAuth) — cela
+  // invalide IMMÉDIATEMENT toute autre session déjà ouverte ailleurs avec
+  // l'ancien mot de passe. On réémet donc aussitôt un nouveau jeton/cookie
+  // pour CETTE session-ci (celle qui vient de faire le changement) : sans
+  // ça, la personne se déconnecterait elle-même en changeant son propre
+  // mot de passe.
+  const userMaj = await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash, sessionVersion: { increment: 1 } },
+  });
+  const token = signAuthToken(userMaj);
+  setAuthCookie(res, token);
   res.status(204).end();
 });
 

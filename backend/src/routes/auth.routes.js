@@ -284,7 +284,12 @@ router.post("/reinitialiser-mot-de-passe-token", async (req, res) => {
   }
   const user = await consommerToken({ token: parsed.data.token, type: "REINITIALISATION_MOT_DE_PASSE" });
   const passwordHash = await bcrypt.hash(parsed.data.nouveauMotDePasse, 12);
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash } });
+  // sessionVersion incrémenté : voir requireAuth (auth.middleware.js) — un
+  // mot de passe oublié suggère souvent un appareil perdu/compromis, invalide
+  // donc aussi toute session déjà ouverte ailleurs. Pas de réémission de
+  // cookie ici : ce flux ne connecte jamais (voir décision d'origine),
+  // la personne se reconnecte ensuite normalement via /login.
+  await prisma.user.update({ where: { id: user.id }, data: { passwordHash, sessionVersion: { increment: 1 } } });
   res.status(204).end();
 });
 

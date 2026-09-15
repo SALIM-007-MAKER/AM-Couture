@@ -7,14 +7,27 @@ import { prisma } from "../lib/prisma.js";
  * Protège une route : exige un cookie de session valide.
  * Attache req.user = { id, identifiant, role, atelierId } (jamais passwordHash).
  * role/atelierId (Phase 8) viennent directement du JWT — voir lib/jwt.js.
+ *
+ * Vérifie aussi `sessionVersion` EN BASE, à chaque requête : un JWT reste
+ * valide par construction jusqu'à son expiration (7 jours) même si le mot
+ * de passe du compte a changé entre-temps — sans cette vérification, changer
+ * son mot de passe ne déconnectait aucune AUTRE session déjà ouverte
+ * ailleurs (perdue/volée, oubliée sur un poste partagé...). Coût accepté :
+ * un lookup PK supplémentaire par requête authentifiée, sur une ligne déjà
+ * quasi systématiquement relue juste après par la route elle-même (voir
+ * même raisonnement pour requireAtelier, ci-dessous).
  */
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const token = req.cookies?.[COOKIE_NAME];
   if (!token) {
     return next(new HttpError(401, "Authentification requise."));
   }
   try {
     const payload = verifyAuthToken(token);
+    const compte = await prisma.user.findUnique({ where: { id: payload.sub }, select: { sessionVersion: true } });
+    if (!compte || compte.sessionVersion !== payload.sessionVersion) {
+      return next(new HttpError(401, "Session expirée — reconnectez-vous."));
+    }
     req.user = { id: payload.sub, identifiant: payload.identifiant, role: payload.role, atelierId: payload.atelierId };
     next();
   } catch (err) {
