@@ -19,6 +19,7 @@ import transactionsRouter from "./routes/transactions.routes.js";
 import formulesAbonnementRouter from "./routes/formulesAbonnement.routes.js";
 import webhooksRouter from "./routes/webhooks.routes.js";
 import ateliersRouter from "./routes/ateliers.routes.js";
+import cronRouter from "./routes/cron.routes.js";
 
 // Pas de app.listen() ici : ce fichier est importé à la fois par
 // backend/src/server.js (dev local) et par api/index.js (Vercel Function).
@@ -74,6 +75,10 @@ app.use("/api/formules-abonnement", formulesAbonnementRouter);
 app.use("/api/webhooks", webhooksRouter);
 // Réservé SUPERADMIN (Phase 8 — multi-tenant) : gestion des ateliers/tenants.
 app.use("/api/ateliers", ateliersRouter);
+// Déclenchée uniquement par Vercel Cron (voir vercel.json) — pas de
+// requireAuth/requireAtelier, authentification par secret partagé (voir
+// cron.routes.js).
+app.use("/api/cron", cronRouter);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "gestion-atelier-api" });

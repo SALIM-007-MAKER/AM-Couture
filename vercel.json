@@ -10,5 +10,8 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/cron/rappels-quotidiens", "schedule": "0 7 * * *" }
   ]
 }

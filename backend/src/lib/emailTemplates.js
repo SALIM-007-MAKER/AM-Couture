@@ -33,3 +33,27 @@ export function emailReinitialisationTemplate({ lienReinitialisation }) {
     </div>
   `;
 }
+
+// Digest quotidien (cron, voir routes/cron.routes.js) — uniquement envoyé
+// s'il y a au moins une ligne à signaler (voir appelant) : jamais un email
+// "tout va bien" quotidien, seulement de vrais rappels actionnables.
+const LIGNE_STYLE = "display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e5e5e5;";
+
+export function rappelsQuotidiensTemplate({ prenom, lignes, lienNotifications }) {
+  const items = lignes
+    .filter((l) => l.nombre > 0)
+    .map((l) => `<div style="${LIGNE_STYLE}"><span>${l.label}</span><strong>${l.nombre}</strong></div>`)
+    .join("");
+
+  return `
+    <div style="${STYLE_CORPS}">
+      <h2>Rappels du jour${prenom ? ` — ${prenom}` : ""}</h2>
+      <p>Voici ce qui mérite votre attention aujourd'hui sur votre atelier :</p>
+      ${items}
+      <a href="${lienNotifications}" style="${STYLE_BOUTON}">Voir le détail</a>
+      <p style="${STYLE_PIED}">
+        Vous recevez ce résumé une fois par jour tant que des éléments restent à traiter.
+      </p>
+    </div>
+  `;
+}
