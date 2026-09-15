@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node --watch --env-file=../.env src/server.js",
     "start": "node src/server.js",
-    "build": "prisma generate"
+    "build": "prisma generate",
+    "test": "node --test src/**/__tests__/**/*.test.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

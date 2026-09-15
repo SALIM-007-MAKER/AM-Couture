@@ -1,0 +1,44 @@
+name: CI
+
+# Vérifie automatiquement chaque push/PR sur main : lint, build frontend,
+# tests backend. Aucun secret nécessaire — `prisma generate` ne se connecte
+# jamais à une base (voir schema, pas d'`url` en dur) et les tests couverts
+# ici sont volontairement des tests UNITAIRES sans base de données (voir
+# backend/src/**/__tests__/) : ce pipeline ne touche donc jamais la base
+# Neon partagée dev/prod, en toute sécurité même sans configuration
+# supplémentaire.
+#
+# Ne couvre PAS (à ce stade) : tests d'intégration multi-tenant contre une
+# vraie base (isolation entre ateliers, IDOR, suspension...) — vérifiés
+# manuellement à chaque changement de cette nature (voir historique de
+# session), pas encore automatisés faute d'une base de test dédiée
+# (nécessiterait une branche Neon éphémère par run, ou un service Postgres
+# de CI — non mis en place ici, décision à revoir si besoin).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Le client Prisma généré n'est jamais commité (voir .gitignore) —
+      # nécessaire ici car backend/src/lib/money.js importe le client généré
+      # (pour Prisma.Decimal), même dans les tests qui ne touchent aucune base.
+      - run: npx prisma generate --schema prisma/schema.prisma
+
+      - run: npm run lint -w frontend
+
+      - run: npm run build -w frontend
+
+      - run: npm test
