@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Users,
   Shirt,
+  Package,
   ClipboardList,
   Truck,
   Wallet,
@@ -39,6 +40,7 @@ const NAV_GROUPS = [
     items: [
       { label: "Clients", to: "/clientes", icon: Users },
       { label: "Modèles", to: "/modeles", icon: Shirt },
+      { label: "Stock", to: "/stock", icon: Package },
       { label: "Commandes", to: "/commandes", icon: ClipboardList },
       { label: "Livraisons", to: "/livraisons", icon: Truck },
     ],
@@ -95,6 +97,7 @@ const MOBILE_DRAWER_GROUPS = [
     key: "secondaire",
     items: [
       { label: "Livraisons", to: "/livraisons", icon: Truck },
+      { label: "Stock", to: "/stock", icon: Package },
       { label: "Reçus", to: "/recus", icon: FileText },
       { label: "Rapports", to: "/rapports", icon: BarChart3 },
       { label: "Calendrier", to: "/calendrier", icon: Calendar },

@@ -192,12 +192,13 @@ model Atelier {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  users       User[]
-  clientes    Cliente[]
-  modeles     Modele[]
-  commandes   Commande[]
-  depenses    Depense[]
-  abonnements Abonnement[]
+  users         User[]
+  clientes      Cliente[]
+  modeles       Modele[]
+  commandes     Commande[]
+  depenses      Depense[]
+  articlesStock ArticleStock[]
+  abonnements   Abonnement[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -325,6 +326,12 @@ model Commande {
   recus         Recu[]
   notifications Notification[]
 
+  // atelierId : index déjà présent en base depuis la migration Phase 8
+  // (20260913051222_multi_tenant_ateliers, ajouté en SQL brut) mais jusqu'ici
+  // non déclaré ici — corrigé au passage pour que `prisma migrate dev` cesse
+  // de vouloir le supprimer (schema.prisma doit refléter l'état réel de la
+  // base, jamais l'inverse).
+  @@index([atelierId])
   @@index([clienteId])
   @@index([statut])
   @@index([dateLivraisonPrevue])
@@ -435,8 +442,70 @@ model Depense {
   annuleAt    DateTime?
   annuleMotif String?
 
+  // atelierId : même correction de drift que Commande ci-dessus (index déjà
+  // en base depuis la Phase 8, non déclaré jusqu'ici).
+  @@index([atelierId])
   @@index([date])
   @@index([categorie])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Stock (matières premières / fournitures — tissus, boutons, fil...)
+// ─────────────────────────────────────────────────────────────────────────
+
+enum UniteStock {
+  METRE
+  PIECE
+  KG
+  LITRE
+  ROULEAU
+  PAQUET
+  AUTRE
+}
+
+enum TypeMouvementStock {
+  ENTREE
+  SORTIE
+}
+
+model ArticleStock {
+  id        String     @id @default(cuid())
+  atelierId String
+  atelier   Atelier    @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  nom       String
+  // Libre (comme Depense.categorie) plutôt qu'un enum : la variété de noms
+  // de tissus/fournitures d'un atelier réel est trop large pour une liste fermée.
+  categorie String?
+  unite     UniteStock @default(PIECE)
+  // Pas de champ "quantite" ici : TOUJOURS dérivée de
+  // SUM(mouvements ENTREE) - SUM(mouvements SORTIE), jamais stockée — même
+  // principe que Commande.solde, dérivé des Paiements (voir
+  // paiements.routes.js). Calculée à la lecture par lib/stock.js.
+  seuilAlerte  Decimal?  @db.Decimal(10, 2)
+  prixUnitaire Decimal?  @db.Decimal(10, 2)
+  notes        String?
+  archivedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  mouvements MouvementStock[]
+
+  @@index([atelierId])
+  @@index([nom])
+}
+
+model MouvementStock {
+  id        String             @id @default(cuid())
+  articleId String
+  article   ArticleStock       @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  type      TypeMouvementStock
+  // Toujours positive : le signe est déterminé par `type`, jamais encodé
+  // dans la valeur (évite un ENTREE négatif ou une SORTIE positive incohérents).
+  quantite  Decimal            @db.Decimal(10, 2)
+  motif     String?
+  createdAt DateTime           @default(now())
+
+  @@index([articleId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────

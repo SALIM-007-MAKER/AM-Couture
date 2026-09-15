@@ -30,6 +30,9 @@ import CommandeDetailPage from "./features/commandes/CommandeDetailPage.jsx";
 import DepensesListPage from "./features/depenses/DepensesListPage.jsx";
 import DepenseFormPage from "./features/depenses/DepenseFormPage.jsx";
 import DepenseDetailPage from "./features/depenses/DepenseDetailPage.jsx";
+import StockListPage from "./features/stock/StockListPage.jsx";
+import StockFormPage from "./features/stock/StockFormPage.jsx";
+import ArticleStockDetailPage from "./features/stock/ArticleStockDetailPage.jsx";
 import LivraisonsListPage from "./features/livraisons/LivraisonsListPage.jsx";
 import PaiementsListPage from "./features/paiements/PaiementsListPage.jsx";
 import RecusListPage from "./features/recus/RecusListPage.jsx";
@@ -78,6 +81,10 @@ export default function App() {
             <Route path="/paiements" element={<PaiementsListPage />} />
             <Route path="/depenses" element={<DepensesListPage />} />
             <Route path="/depenses/nouvelle" element={<DepenseFormPage />} />
+            <Route path="/stock" element={<StockListPage />} />
+            <Route path="/stock/nouveau" element={<StockFormPage mode="create" />} />
+            <Route path="/stock/:id" element={<ArticleStockDetailPage />} />
+            <Route path="/stock/:id/modifier" element={<StockFormPage mode="edit" />} />
             <Route path="/depenses/:id" element={<DepenseDetailPage />} />
             <Route path="/recus" element={<RecusListPage />} />
             <Route path="/rapports" element={<RapportsPage />} />

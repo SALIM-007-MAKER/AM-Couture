@@ -20,6 +20,7 @@ import formulesAbonnementRouter from "./routes/formulesAbonnement.routes.js";
 import webhooksRouter from "./routes/webhooks.routes.js";
 import ateliersRouter from "./routes/ateliers.routes.js";
 import cronRouter from "./routes/cron.routes.js";
+import stockRouter from "./routes/stock.routes.js";
 
 // Pas de app.listen() ici : ce fichier est importé à la fois par
 // backend/src/server.js (dev local) et par api/index.js (Vercel Function).
@@ -70,6 +71,7 @@ app.use("/api/compte", compteRouter);
 app.use("/api/abonnements", abonnementsRouter);
 app.use("/api/transactions", transactionsRouter);
 app.use("/api/formules-abonnement", formulesAbonnementRouter);
+app.use("/api/stock", stockRouter);
 // Pas de requireAuth : Wave appelle cette route directement (voir
 // webhooks.routes.js — confiance basée sur la signature HMAC, pas un cookie).
 app.use("/api/webhooks", webhooksRouter);
