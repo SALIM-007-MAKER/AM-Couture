@@ -8,6 +8,7 @@ import { nextNumero } from "../lib/numero.js";
 import { computeSolde, statutPaiement } from "../lib/money.js";
 import { streamFicheCommandePdf } from "../lib/recuPdf.js";
 import { requireValidIdParam } from "../lib/idParam.js";
+import { buildCsv, envoyerCsv } from "../lib/csv.js";
 import {
   createCommandeSchema,
   updateCommandeSchema,
@@ -103,14 +104,10 @@ router.post("/", async (req, res) => {
 });
 
 // GET /api/commandes — liste, recherche, filtres, pagination (sans N+1 : un seul findMany avec select imbriqué)
-router.get("/", async (req, res) => {
-  const parsed = listCommandesQuerySchema.safeParse(req.query);
-  if (!parsed.success) {
-    throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
-  }
-  const { q, statut, priorite, clienteId, livraisonDu, livraisonAu, page, pageSize } = parsed.data;
-
-  const where = { atelierId: req.user.atelierId };
+// Filtre partagé entre GET / (paginé) et GET /export (tout en un CSV) —
+// même principe que buildClientesWhere (clientes.routes.js).
+function buildCommandesWhere(atelierId, { q, statut, priorite, clienteId, livraisonDu, livraisonAu }) {
+  const where = { atelierId };
   if (statut) where.statut = statut;
   if (priorite) where.priorite = priorite;
   if (clienteId) where.clienteId = clienteId;
@@ -129,6 +126,16 @@ router.get("/", async (req, res) => {
       ...(digitsOnly.length > 0 ? [{ cliente: { telephone: { contains: digitsOnly } } }] : []),
     ];
   }
+  return where;
+}
+
+router.get("/", async (req, res) => {
+  const parsed = listCommandesQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
+  }
+  const { page, pageSize } = parsed.data;
+  const where = buildCommandesWhere(req.user.atelierId, parsed.data);
 
   const [rows, total] = await Promise.all([
     prisma.commande.findMany({
@@ -172,6 +179,54 @@ router.get("/", async (req, res) => {
     data,
     meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
   });
+});
+
+// GET /api/commandes/export — export CSV, MÊMES filtres que GET / mais sans
+// pagination. Défini AVANT /:id (même raison que /export sur Clientes —
+// sinon Express matcherait "export" comme une valeur de :id).
+const LIMITE_EXPORT = 20_000;
+router.get("/export", async (req, res) => {
+  const parsed = listCommandesQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
+  }
+  const where = buildCommandesWhere(req.user.atelierId, parsed.data);
+
+  const rows = await prisma.commande.findMany({
+    where,
+    orderBy: [{ dateCommande: "desc" }, { id: "desc" }],
+    take: LIMITE_EXPORT,
+    select: {
+      numero: true,
+      typeVetement: true,
+      description: true,
+      quantite: true,
+      prixTotal: true,
+      statut: true,
+      priorite: true,
+      dateCommande: true,
+      dateLivraisonPrevue: true,
+      cliente: { select: { nom: true, prenom: true, telephone: true } },
+      paiements: { where: { annuleAt: null }, select: { montant: true } },
+    },
+  });
+
+  const csv = buildCsv(rows, [
+    { header: "Numéro", accessor: "numero" },
+    { header: "Client", accessor: (c) => `${c.cliente.prenom} ${c.cliente.nom}` },
+    { header: "Téléphone client", accessor: (c) => c.cliente.telephone },
+    { header: "Type de vêtement", accessor: "typeVetement" },
+    { header: "Description", accessor: "description" },
+    { header: "Quantité", accessor: "quantite" },
+    { header: "Prix total", accessor: "prixTotal" },
+    { header: "Payé", accessor: (c) => computeSolde(c.prixTotal, c.paiements).totalPaye },
+    { header: "Solde", accessor: (c) => computeSolde(c.prixTotal, c.paiements).solde },
+    { header: "Statut", accessor: "statut" },
+    { header: "Priorité", accessor: "priorite" },
+    { header: "Date de commande", accessor: (c) => c.dateCommande.toISOString().slice(0, 10) },
+    { header: "Livraison prévue", accessor: (c) => c.dateLivraisonPrevue.toISOString().slice(0, 10) },
+  ]);
+  envoyerCsv(res, `commandes-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 });
 
 // GET /api/commandes/:id — détail : commande + cliente + modèle + paiements + livraisons + totaux calculés

@@ -13,3 +13,9 @@ export const depensesApi = {
   stats: (params) => api.get(`/depenses/stats${buildQuery(params)}`),
   annuler: (id, motif) => api.post(`/depenses/${id}/annuler`, { motif }),
 };
+
+// Chemin direct (flux CSV, pas du JSON) — même origine, le cookie de
+// session part automatiquement (voir clientesExportUrl, features/clientes/api.js).
+export function depensesExportUrl(params) {
+  return `/api/depenses/export${buildQuery(params)}`;
+}

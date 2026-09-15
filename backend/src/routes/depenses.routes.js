@@ -11,6 +11,7 @@ import {
   statsDepensesQuerySchema,
 } from "../schemas/depense.schema.js";
 import { annulerSchema } from "../schemas/annulation.schema.js";
+import { buildCsv, envoyerCsv } from "../lib/csv.js";
 
 const router = Router();
 
@@ -81,6 +82,37 @@ router.get("/stats", async (req, res) => {
   }));
 
   res.json({ total: total.toString(), nombre: global._count, parCategorie });
+});
+
+// GET /api/depenses/export — export CSV, MÊMES filtres que GET / (et
+// /stats) mais sans pagination — annulées comprises (voir GET / : l'export
+// reflète la liste, pas les stats, qui elles excluent les annulées).
+// Déclarée AVANT /:id pour ne pas être capturée comme un identifiant.
+const LIMITE_EXPORT = 20_000;
+router.get("/export", async (req, res) => {
+  const parsed = listDepensesQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
+  }
+  const { page, pageSize, ...filtres } = parsed.data;
+  const where = buildWhere(req.user.atelierId, filtres);
+
+  const rows = await prisma.depense.findMany({
+    where,
+    orderBy: [{ date: "desc" }, { id: "desc" }],
+    take: LIMITE_EXPORT,
+  });
+
+  const csv = buildCsv(rows, [
+    { header: "Catégorie", accessor: "categorie" },
+    { header: "Description", accessor: "description" },
+    { header: "Montant", accessor: "montant" },
+    { header: "Date", accessor: (d) => d.date.toISOString().slice(0, 10) },
+    { header: "Justificatif", accessor: "justificatifUrl" },
+    { header: "Statut", accessor: (d) => (d.annuleAt ? "Annulée" : "Active") },
+    { header: "Motif d'annulation", accessor: "annuleMotif" },
+  ]);
+  envoyerCsv(res, `depenses-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 });
 
 // GET /api/depenses — liste, recherche, filtres, pagination

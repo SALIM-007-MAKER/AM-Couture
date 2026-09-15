@@ -11,6 +11,7 @@ import {
   listClientesQuerySchema,
 } from "../schemas/cliente.schema.js";
 import mesuresRouter from "./mesures.routes.js";
+import { buildCsv, envoyerCsv } from "../lib/csv.js";
 
 const router = Router();
 
@@ -68,15 +69,11 @@ router.post("/", async (req, res) => {
   res.status(201).json(cliente);
 });
 
-// GET /api/clientes — liste, recherche (nom/prénom/téléphone), filtre archivage, pagination
-router.get("/", async (req, res) => {
-  const parsed = listClientesQuerySchema.safeParse(req.query);
-  if (!parsed.success) {
-    throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
-  }
-  const { q, archived, page, pageSize } = parsed.data;
-
-  const where = { atelierId: req.user.atelierId };
+// Filtre partagé entre GET / (paginé) et GET /export (tout en un CSV) — une
+// seule définition, jamais deux logiques de recherche qui pourraient dériver
+// l'une de l'autre au fil du temps.
+function buildClientesWhere(atelierId, { q, archived }) {
+  const where = { atelierId };
   // Par défaut : uniquement les clientes actives. "archived=true" isole les
   // archivées, "archived=all" retire le filtre pour tout voir.
   if (archived === "false") where.archivedAt = null;
@@ -97,6 +94,17 @@ router.get("/", async (req, res) => {
     }
     where.OR = or;
   }
+  return where;
+}
+
+// GET /api/clientes — liste, recherche (nom/prénom/téléphone), filtre archivage, pagination
+router.get("/", async (req, res) => {
+  const parsed = listClientesQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
+  }
+  const { q, archived, page, pageSize } = parsed.data;
+  const where = buildClientesWhere(req.user.atelierId, { q, archived });
 
   const [rows, total] = await Promise.all([
     prisma.cliente.findMany({
@@ -124,6 +132,42 @@ router.get("/", async (req, res) => {
     data,
     meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
   });
+});
+
+// GET /api/clientes/export — export CSV, MÊMES filtres que GET / (q,
+// archived) mais sans pagination : toutes les lignes correspondantes en un
+// seul fichier. Défini AVANT /:id : sinon Express matcherait "export" comme
+// une valeur de :id (routes enregistrées dans l'ordre, la première qui
+// correspond gagne — même piège que /resume, /alertes... voir
+// ateliers.routes.js).
+const LIMITE_EXPORT = 20_000; // garde-fou anti-requête-démesurée, jamais une vraie limite attendue à cette échelle
+router.get("/export", async (req, res) => {
+  const parsed = listClientesQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
+  }
+  const where = buildClientesWhere(req.user.atelierId, parsed.data);
+
+  const clientes = await prisma.cliente.findMany({
+    where,
+    orderBy: [{ nom: "asc" }, { prenom: "asc" }],
+    take: LIMITE_EXPORT,
+    include: { _count: { select: { commandes: true } } },
+  });
+
+  const csv = buildCsv(clientes, [
+    { header: "Nom", accessor: "nom" },
+    { header: "Prénom", accessor: "prenom" },
+    { header: "Téléphone", accessor: "telephone" },
+    { header: "Téléphone 2", accessor: "telephone2" },
+    { header: "Adresse", accessor: "adresse" },
+    { header: "Sexe", accessor: "sexe" },
+    { header: "Notes", accessor: "notes" },
+    { header: "Nombre de commandes", accessor: (c) => c._count.commandes },
+    { header: "Statut", accessor: (c) => (c.archivedAt ? "Archivée" : "Active") },
+    { header: "Créée le", accessor: (c) => c.createdAt.toISOString().slice(0, 10) },
+  ]);
+  envoyerCsv(res, `clientes-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 });
 
 // GET /api/clientes/:id — consultation (y compris archivée : la fiche reste consultable)

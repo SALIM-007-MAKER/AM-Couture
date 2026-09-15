@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Receipt, Plus, Search, Eye, PieChart } from "lucide-react";
+import { Receipt, Plus, Search, Eye, PieChart, Download } from "lucide-react";
 import { useDepensesQuery, useDepensesStatsQuery } from "./hooks.js";
+import { depensesExportUrl } from "./api.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
 import Pagination from "../../components/Pagination.jsx";
@@ -90,9 +91,20 @@ export default function DepensesListPage() {
         title="Dépenses"
         subtitle="Suivi des dépenses de l'atelier (achats de tissu, fournitures, charges...)."
         actions={
-          <Button as={Link} to="/depenses/nouvelle" variant="primary" icon={Plus}>
-            Nouvelle dépense
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              as="a"
+              href={depensesExportUrl(filters)}
+              variant="secondary"
+              icon={Download}
+              title="Exporte les dépenses correspondant aux filtres actuels"
+            >
+              Exporter (CSV)
+            </Button>
+            <Button as={Link} to="/depenses/nouvelle" variant="primary" icon={Plus}>
+              Nouvelle dépense
+            </Button>
+          </div>
         }
       />
 

@@ -30,3 +30,8 @@ export const commandesApi = {
 export function fichePdfUrl(commandeId) {
   return `/api/commandes/${commandeId}/fiche-pdf`;
 }
+
+// Idem pour l'export CSV (voir clientesExportUrl, features/clientes/api.js).
+export function commandesExportUrl(params) {
+  return `/api/commandes/export${buildQuery(params)}`;
+}

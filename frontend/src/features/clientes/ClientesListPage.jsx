@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Users, Plus, Search, Eye } from "lucide-react";
+import { Users, Plus, Search, Eye, Download } from "lucide-react";
 import { useClientesQuery } from "./hooks.js";
+import { clientesExportUrl } from "./api.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
 import Pagination from "../../components/Pagination.jsx";
@@ -61,9 +62,20 @@ export default function ClientesListPage() {
         title="Clients"
         subtitle="Fichier des clients de l'atelier, actifs et archivés."
         actions={
-          <Button as={Link} to="/clientes/nouvelle" variant="primary" icon={Plus}>
-            Nouveau client
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              as="a"
+              href={clientesExportUrl({ q: q || undefined, archived })}
+              variant="secondary"
+              icon={Download}
+              title="Exporte les clients correspondant aux filtres actuels"
+            >
+              Exporter (CSV)
+            </Button>
+            <Button as={Link} to="/clientes/nouvelle" variant="primary" icon={Plus}>
+              Nouveau client
+            </Button>
+          </div>
         }
       />
 

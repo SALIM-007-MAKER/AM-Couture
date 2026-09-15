@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ClipboardList, Plus, Search, Eye } from "lucide-react";
+import { ClipboardList, Plus, Search, Eye, Download } from "lucide-react";
 import { useCommandesQuery } from "./hooks.js";
+import { commandesExportUrl } from "./api.js";
 import { STATUTS_COMMANDE, PRIORITES, prioriteLabel } from "./constants.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
@@ -51,9 +52,20 @@ export default function CommandesListPage() {
         title="Commandes"
         subtitle="Suivi de toutes les commandes de l'atelier."
         actions={
-          <Button as={Link} to="/commandes/nouvelle" variant="primary" icon={Plus}>
-            Nouvelle commande
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              as="a"
+              href={commandesExportUrl({ q, statut: statut || undefined, priorite: priorite || undefined })}
+              variant="secondary"
+              icon={Download}
+              title="Exporte les commandes correspondant aux filtres actuels"
+            >
+              Exporter (CSV)
+            </Button>
+            <Button as={Link} to="/commandes/nouvelle" variant="primary" icon={Plus}>
+              Nouvelle commande
+            </Button>
+          </div>
         }
       />
 
