@@ -122,8 +122,40 @@ model User {
   // uniquement à l'affichage (fiche atelier côté SUPERADMIN), jamais à une
   // décision d'autorisation.
   derniereConnexionAt DateTime?
+  // null tant que le lien envoyé par email (voir POST /auth/inscription-atelier)
+  // n'a pas été cliqué — jamais une condition bloquante pour se connecter ou
+  // utiliser l'application (voir décision : accès immédiat après inscription),
+  // juste une information affichée (bannière de rappel côté frontend).
+  emailVerifieLe DateTime?
+
+  tokensAction TokenAction[]
 
   @@index([atelierId])
+}
+
+enum TypeTokenAction {
+  VERIFICATION_EMAIL
+  REINITIALISATION_MOT_DE_PASSE
+}
+
+// Jetons à usage unique envoyés par email (Resend, voir lib/resend.js) —
+// vérification d'email à l'inscription et réinitialisation de mot de passe
+// en libre-service. onDelete: Cascade (SEUL endroit du schéma à utiliser
+// Cascade plutôt que Restrict) : un jeton est une donnée strictement
+// éphémère et dérivée, sans valeur propre une fois l'utilisateur supprimé —
+// contrairement aux données métier (Commande, Paiement...) qu'on protège
+// délibérément d'une suppression en cascade silencieuse.
+model TokenAction {
+  id        String           @id @default(cuid())
+  token     String           @unique
+  type      TypeTokenAction
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expireLe  DateTime
+  utiliseLe DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
 }
 
 /// Un atelier = un tenant de la plateforme. Chaque atelier a son propre nom,

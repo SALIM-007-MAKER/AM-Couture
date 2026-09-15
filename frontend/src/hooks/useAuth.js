@@ -68,6 +68,49 @@ export function useInscriptionAtelierMutation() {
   });
 }
 
+// Réponse backend TOUJOURS générique (voir motDePasseOublieSchema,
+// auth.routes.js) : jamais de setQueryData ici, cette route ne change rien
+// à l'état "connecté" du visiteur qui l'appelle.
+export function useMotDePasseOublieMutation() {
+  return useMutation({
+    mutationFn: ({ identifiant }) => api.post("/auth/mot-de-passe-oublie", { identifiant }),
+  });
+}
+
+export function useReinitialiserMotDePasseTokenMutation() {
+  return useMutation({
+    mutationFn: ({ token, nouveauMotDePasse }) =>
+      api.post("/auth/reinitialiser-mot-de-passe-token", { token, nouveauMotDePasse }),
+  });
+}
+
+// GET (pas POST) côté backend, mais une action à usage unique déclenchée par
+// un clic explicite (voir VerifierEmailPage.jsx) — useMutation reste le bon
+// outil ici (pas de cache à tenir à jour, juste une action ponctuelle),
+// malgré le verbe HTTP.
+export function useVerifierEmailMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ token }) => api.get(`/auth/verifier-email?token=${encodeURIComponent(token)}`),
+    onSuccess: () => {
+      // Rafraîchit `emailVerifieLe` si la personne est déjà connectée dans
+      // cet onglet (cas fréquent : elle vient de s'inscrire puis clique le
+      // lien reçu par email dans un nouvel onglet du même navigateur).
+      queryClient.invalidateQueries({ queryKey: ME_KEY });
+    },
+  });
+}
+
+// Contrairement à l'email envoyé automatiquement à l'inscription (best
+// effort, jamais remonté à l'utilisateur), une demande explicite de renvoi
+// doit informer clairement d'un échec (502 si Resend n'est pas configuré,
+// par exemple) — voir POST /renvoyer-verification-email, auth.routes.js.
+export function useRenvoyerVerificationEmailMutation() {
+  return useMutation({
+    mutationFn: () => api.post("/auth/renvoyer-verification-email", {}),
+  });
+}
+
 export function useLogoutMutation() {
   const queryClient = useQueryClient();
   return useMutation({

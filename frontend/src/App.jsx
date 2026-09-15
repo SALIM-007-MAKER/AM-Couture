@@ -6,6 +6,9 @@ import AppLayout from "./layouts/AppLayout.jsx";
 import SuperadminLayout from "./layouts/SuperadminLayout.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
 import InscriptionAtelierPage from "./pages/auth/InscriptionAtelierPage.jsx";
+import MotDePasseOublieePage from "./pages/auth/MotDePasseOublieePage.jsx";
+import ReinitialiserMotDePasseTokenPage from "./pages/auth/ReinitialiserMotDePasseTokenPage.jsx";
+import VerifierEmailPage from "./pages/auth/VerifierEmailPage.jsx";
 import AteliersPage from "./pages/superadmin/AteliersPage.jsx";
 import AtelierDetailPage from "./pages/superadmin/AtelierDetailPage.jsx";
 import SuperadminDashboardPage from "./pages/superadmin/SuperadminDashboardPage.jsx";
@@ -43,7 +46,15 @@ export default function App() {
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/inscription" element={<InscriptionAtelierPage />} />
+        <Route path="/mot-de-passe-oublie" element={<MotDePasseOublieePage />} />
       </Route>
+
+      {/* Atteintes depuis un lien envoyé par email — jamais sous
+          PublicOnlyRoute/ProtectedRoute : le jeton dans l'URL authentifie
+          l'action à lui seul, indépendamment de toute session active dans
+          ce navigateur (voir commentaires de chaque page). */}
+      <Route path="/reinitialiser-mot-de-passe" element={<ReinitialiserMotDePasseTokenPage />} />
+      <Route path="/verifier-email" element={<VerifierEmailPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<RequireAtelier />}>

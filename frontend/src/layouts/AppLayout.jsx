@@ -24,6 +24,7 @@ import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { useParametresQuery } from "../features/parametres/hooks.js";
 import { useNombreNonLuesQuery } from "../features/notifications/hooks.js";
 import { useUiStore } from "../stores/uiStore.js";
+import EmailVerificationBanner from "../components/EmailVerificationBanner.jsx";
 
 // Sidebar groupée par domaine métier — reflète l'organisation réelle de
 // l'application, pas une simple liste plate. Tous les modules listés ici
@@ -361,6 +362,8 @@ export default function AppLayout() {
             </button>
           </div>
         </header>
+
+        <EmailVerificationBanner />
 
         <main className="flex-1 p-4 sm:p-6 pb-24 md:pb-6 overflow-x-hidden">
           <Outlet />
