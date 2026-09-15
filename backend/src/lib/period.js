@@ -103,3 +103,53 @@ export function monthsInRange(from, to) {
   }
   return months;
 }
+
+// ── Comparaison à la période précédente (§ stats comparatives) ────────────
+
+function estDebutDeMoisUtc(d) {
+  return (
+    d.getUTCDate() === 1 && d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0
+  );
+}
+
+/**
+ * Bornes [from, to[ de la période immédiatement précédente.
+ *
+ * Deux stratégies selon la forme de [from, to[ :
+ * - les DEUX bornes tombent le 1er d'un mois (cas des préréglages
+ *   "month"/"quarter"/"year", ou d'une plage personnalisée qui coïncide
+ *   avec des mois calendaires pleins) : décalage d'autant de MOIS CIVILS
+ *   que la période en couvre (1, 3, 12...) — nécessaire car les mois n'ont
+ *   pas tous la même durée (un décalage par durée fixe donnerait "1er août"
+ *   -> "2 août" pour le mois précédent de septembre, faux d'un jour).
+ * - sinon (préréglages "today"/"week", ou plage personnalisée quelconque) :
+ *   décalage par la DURÉE exacte de la période, seule notion qui ait un
+ *   sens hors alignement calendaire.
+ *
+ * `null` si la période n'est pas bornée des deux côtés (ex: "from seul" —
+ * une comparaison n'a de sens que pour un intervalle fini).
+ */
+export function previousPeriodBounds(from, to) {
+  if (!from || !to) return null;
+  if (estDebutDeMoisUtc(from) && estDebutDeMoisUtc(to)) {
+    const nombreDeMois = monthsInRange(from, to).length;
+    return { from: startOfUtcMonth(from, -nombreDeMois), to: from };
+  }
+  const duree = to.getTime() - from.getTime();
+  return { from: new Date(from.getTime() - duree), to: from };
+}
+
+/**
+ * Variation en % entre deux valeurs (Decimal, string ou number — converties
+ * via Number, une imprécision négligeable pour un indicateur d'affichage,
+ * jamais une valeur financière stockée). `null` quand non calculable
+ * (précédent = 0 et actuel ≠ 0 : la notion de "% depuis zéro" n'a pas de
+ * sens, le frontend affiche alors "Nouveau" plutôt qu'un pourcentage
+ * trompeur). précédent = actuel = 0 -> 0 (pas de changement), jamais null.
+ */
+export function variationPct(actuel, precedent) {
+  const a = Number(actuel);
+  const p = Number(precedent);
+  if (p === 0) return a === 0 ? 0 : null;
+  return Math.round(((a - p) / p) * 1000) / 10;
+}

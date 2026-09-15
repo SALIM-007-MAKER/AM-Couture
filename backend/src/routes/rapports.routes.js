@@ -7,6 +7,8 @@ import { formatZodError } from "../lib/validation.js";
 import {
   resolvePeriod,
   dateRangeWhere,
+  previousPeriodBounds,
+  variationPct,
   defaultEvolutionRange,
   monthsInRange,
   monthKey,
@@ -29,26 +31,16 @@ const D0 = new Prisma.Decimal(0);
 const dec = (v) => (v == null ? D0 : new Prisma.Decimal(v));
 const COMMANDES_NON_TERMINALES = { notIn: ["LIVREE", "ANNULEE"] };
 
-// ───────────────────────────────────────────────────────────────────────
-// GET /api/rapports/finances?period=|from=&to=
-// §6 : total commandes (valeur), total encaissé, total dépenses, solde,
-// nombre de paiements, nombre de dépenses.
-// ───────────────────────────────────────────────────────────────────────
-router.get("/finances", async (req, res) => {
-  const parsed = periodQuerySchema.safeParse(req.query);
-  if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
-  const { from, to } = resolvePeriod(parsed.data);
-  const range = dateRangeWhere(from, to);
-  const { atelierId } = req.user;
-
+// Agrégats finances pour UNE plage donnée — factorisé pour être appelé deux
+// fois par GET /finances (période demandée + période précédente, § stats
+// comparatives) sans dupliquer les 3 requêtes.
+async function agregatsFinances(atelierId, range) {
   const [commandesAgg, paiementsAgg, depensesAgg] = await Promise.all([
     prisma.commande.aggregate({
       where: { atelierId, ...(range ? { dateCommande: range } : {}) },
       _count: true,
       _sum: { prixTotal: true },
     }),
-    // annuleAt: null — un paiement/une dépense annulé ne compte dans aucun
-    // rapport. Paiement scopé via sa commande (pas de colonne atelierId propre).
     prisma.paiement.aggregate({
       where: { annuleAt: null, commande: { atelierId }, ...(range ? { date: range } : {}) },
       _count: true,
@@ -65,6 +57,58 @@ router.get("/finances", async (req, res) => {
   const totalEncaisse = dec(paiementsAgg._sum.montant);
   const totalDepenses = dec(depensesAgg._sum.montant);
 
+  return {
+    totalCommandes,
+    nombreCommandes: commandesAgg._count,
+    totalEncaisse,
+    nombrePaiements: paiementsAgg._count,
+    totalDepenses,
+    nombreDepenses: depensesAgg._count,
+    solde: totalEncaisse.minus(totalDepenses),
+  };
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// GET /api/rapports/finances?period=|from=&to=
+// §6 : total commandes (valeur), total encaissé, total dépenses, solde,
+// nombre de paiements, nombre de dépenses.
+// ───────────────────────────────────────────────────────────────────────
+router.get("/finances", async (req, res) => {
+  const parsed = periodQuerySchema.safeParse(req.query);
+  if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
+  const { from, to } = resolvePeriod(parsed.data);
+  const range = dateRangeWhere(from, to);
+  const { atelierId } = req.user;
+
+  const actuel = await agregatsFinances(atelierId, range);
+
+  // Comparaison à la période précédente de MÊME DURÉE (§ stats comparatives)
+  // — calculable uniquement pour une période bornée des deux côtés (un
+  // préréglage, ou une plage personnalisée from+to complète) ; `null` sinon
+  // (portée globale, ou "depuis"/"jusqu'à" seul — voir previousPeriodBounds).
+  const bornesPrecedentes = previousPeriodBounds(from, to);
+  const comparaison = bornesPrecedentes
+    ? await (async () => {
+        const precedent = await agregatsFinances(atelierId, dateRangeWhere(bornesPrecedentes.from, bornesPrecedentes.to));
+        return {
+          periode: { from: bornesPrecedentes.from.toISOString(), to: bornesPrecedentes.to.toISOString() },
+          totalCommandes: precedent.totalCommandes.toString(),
+          nombreCommandes: precedent.nombreCommandes,
+          totalEncaisse: precedent.totalEncaisse.toString(),
+          nombrePaiements: precedent.nombrePaiements,
+          totalDepenses: precedent.totalDepenses.toString(),
+          nombreDepenses: precedent.nombreDepenses,
+          solde: precedent.solde.toString(),
+          variation: {
+            totalCommandes: variationPct(actuel.totalCommandes, precedent.totalCommandes),
+            totalEncaisse: variationPct(actuel.totalEncaisse, precedent.totalEncaisse),
+            totalDepenses: variationPct(actuel.totalDepenses, precedent.totalDepenses),
+            solde: variationPct(actuel.solde, precedent.solde),
+          },
+        };
+      })()
+    : null;
+
   res.json({
     periode: from || to ? { from: from?.toISOString() ?? null, to: to?.toISOString() ?? null } : null,
     // Attention : totalCommandes (commandes CRÉÉES pendant la période) et
@@ -74,15 +118,16 @@ router.get("/finances", async (req, res) => {
     // inversement une commande de cette période peut n'être payée que plus
     // tard. C'est un rapport "par activité de la période", pas un
     // rapprochement facture-par-facture.
-    totalCommandes: totalCommandes.toString(),
-    nombreCommandes: commandesAgg._count,
-    totalEncaisse: totalEncaisse.toString(),
-    nombrePaiements: paiementsAgg._count,
-    totalDepenses: totalDepenses.toString(),
-    nombreDepenses: depensesAgg._count,
+    totalCommandes: actuel.totalCommandes.toString(),
+    nombreCommandes: actuel.nombreCommandes,
+    totalEncaisse: actuel.totalEncaisse.toString(),
+    nombrePaiements: actuel.nombrePaiements,
+    totalDepenses: actuel.totalDepenses.toString(),
+    nombreDepenses: actuel.nombreDepenses,
     // Voir dashboard.routes.js : "résultat de trésorerie", pas un bénéfice
     // comptable (aucune donnée de coût de revient dans le schéma actuel).
-    solde: totalEncaisse.minus(totalDepenses).toString(),
+    solde: actuel.solde.toString(),
+    comparaison,
   });
 });
 

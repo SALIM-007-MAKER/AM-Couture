@@ -9,6 +9,8 @@ import {
   Truck,
   Users,
   Shirt,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import {
   useFinancesQuery,
@@ -39,10 +41,41 @@ const STAT_TONES = {
   danger: "text-red-600 dark:text-red-400",
 };
 
+/**
+ * Variation vs période précédente (§ stats comparatives, GET /rapports/finances).
+ * `value` undefined = aucune comparaison disponible pour la période affichée
+ * (portée globale, ou "depuis"/"jusqu'à" seul) -> rien n'est rendu. `null` =
+ * comparaison demandée mais non calculable (précédent à 0) -> "Nouveau".
+ * `invert` : pour une grandeur où une HAUSSE est défavorable (les dépenses),
+ * inverse la couleur (hausse en rouge, baisse en vert).
+ */
+function VariationBadge({ value, invert = false }) {
+  if (value === undefined) return null;
+  if (value === null) {
+    return <span className="text-xs text-neutral-400">Nouveau (rien sur la période précédente)</span>;
+  }
+  if (value === 0) {
+    return <span className="text-xs text-neutral-500">= vs période précédente</span>;
+  }
+  const positif = value > 0;
+  const favorable = invert ? !positif : positif;
+  const Icon = positif ? ArrowUp : ArrowDown;
+  return (
+    <span
+      className={`inline-flex items-center gap-0.5 text-xs font-medium ${
+        favorable ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+      }`}
+    >
+      <Icon className="size-3" aria-hidden="true" />
+      {Math.abs(value)}% vs période précédente
+    </span>
+  );
+}
+
 /** Une carte de statistique — `emphasize` agrandit la valeur pour les
  * chiffres qui doivent ressortir (ex: solde de trésorerie), évitant que
  * toutes les cartes d'une section aient exactement le même poids visuel. */
-function Stat({ label, value, sub, tone = "neutral", emphasize = false }) {
+function Stat({ label, value, sub, tone = "neutral", emphasize = false, variation, variationInvert = false }) {
   return (
     <Card>
       <p className="text-neutral-500 text-xs">{label}</p>
@@ -50,6 +83,11 @@ function Stat({ label, value, sub, tone = "neutral", emphasize = false }) {
         {value}
       </p>
       {sub && <p className="text-xs text-neutral-500 mt-0.5">{sub}</p>}
+      {variation !== undefined && (
+        <p className="mt-1">
+          <VariationBadge value={variation} invert={variationInvert} />
+        </p>
+      )}
     </Card>
   );
 }
@@ -59,17 +97,39 @@ function FinancesSection({ period }) {
   if (query.isPending) return <LoadingState label="Chargement des finances…" />;
   if (query.isError) return <ErrorState error={query.error} onRetry={query.refetch} />;
   const d = query.data;
+  // comparaison est `null` quand la période affichée n'est pas bornée (voir
+  // GET /rapports/finances) — v reste alors undefined, VariationBadge
+  // n'affiche rien plutôt qu'un "Nouveau" trompeur.
+  const v = d.comparaison?.variation;
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-      <Stat label="Valeur des commandes créées" value={d.totalCommandes} sub={`${d.nombreCommandes} commande(s)`} />
-      <Stat label="Encaissé" value={d.totalEncaisse} sub={`${d.nombrePaiements} paiement(s)`} tone="success" />
-      <Stat label="Dépenses" value={d.totalDepenses} sub={`${d.nombreDepenses} dépense(s)`} />
+      <Stat
+        label="Valeur des commandes créées"
+        value={d.totalCommandes}
+        sub={`${d.nombreCommandes} commande(s)`}
+        variation={v?.totalCommandes}
+      />
+      <Stat
+        label="Encaissé"
+        value={d.totalEncaisse}
+        sub={`${d.nombrePaiements} paiement(s)`}
+        tone="success"
+        variation={v?.totalEncaisse}
+      />
+      <Stat
+        label="Dépenses"
+        value={d.totalDepenses}
+        sub={`${d.nombreDepenses} dépense(s)`}
+        variation={v?.totalDepenses}
+        variationInvert
+      />
       {/* Chiffre le plus important de la section — mis en avant, jamais présenté comme un "bénéfice". */}
       <Stat
         label="Solde de trésorerie"
         value={d.solde}
         sub="Encaissé − dépenses (pas un bénéfice comptable)"
         emphasize
+        variation={v?.solde}
       />
     </div>
   );
