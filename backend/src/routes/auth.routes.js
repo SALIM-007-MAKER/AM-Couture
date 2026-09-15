@@ -298,6 +298,27 @@ router.post("/logout", (req, res) => {
   res.status(204).end();
 });
 
+// POST /api/auth/quitter-impersonation — restaure la session du SUPERADMIN
+// à l'origine de l'impersonation en cours (voir
+// ateliers.routes.js:POST .../impersonation et lib/jwt.js). Le compte
+// SUPERADMIN est REVÉRIFIÉ en base (existence + rôle), jamais restauré sur
+// la seule foi de la revendication `impersonatedBy` du jeton courant — un
+// jeton d'impersonation ne suffit pas à lui seul à ressusciter un accès
+// SUPERADMIN si ce compte a depuis été supprimé ou rétrogradé.
+router.post("/quitter-impersonation", requireAuth, async (req, res) => {
+  if (!req.user.impersonatedBy) {
+    throw new HttpError(409, "Aucune impersonation en cours sur cette session.");
+  }
+  const superadmin = await prisma.user.findUnique({ where: { id: req.user.impersonatedBy } });
+  if (!superadmin || superadmin.role !== "SUPERADMIN") {
+    clearAuthCookie(res);
+    throw new HttpError(401, "Le compte SUPERADMIN d'origine est introuvable — session terminée.");
+  }
+  const token = signAuthToken(superadmin);
+  setAuthCookie(res, token);
+  res.json({ id: superadmin.id, identifiant: superadmin.identifiant, role: superadmin.role, atelierId: superadmin.atelierId });
+});
+
 router.get("/me", requireAuth, async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.user.id } });
   if (!user) {
@@ -305,6 +326,19 @@ router.get("/me", requireAuth, async (req, res) => {
     clearAuthCookie(res);
     throw new HttpError(401, "Session invalide.");
   }
+
+  // impersonation : non-null uniquement pendant une session d'impersonation
+  // SUPERADMIN en cours (voir requireAuth) — pilote la bannière de retour
+  // côté frontend (voir components/ImpersonationBanner.jsx).
+  let impersonation = null;
+  if (req.user.impersonatedBy) {
+    const superadmin = await prisma.user.findUnique({
+      where: { id: req.user.impersonatedBy },
+      select: { identifiant: true },
+    });
+    impersonation = { superadminIdentifiant: superadmin?.identifiant ?? "SUPERADMIN" };
+  }
+
   res.json({
     id: user.id,
     identifiant: user.identifiant,
@@ -314,6 +348,7 @@ router.get("/me", requireAuth, async (req, res) => {
     createdAt: user.createdAt,
     email: user.email,
     emailVerifieLe: user.emailVerifieLe,
+    impersonation,
   });
 });
 

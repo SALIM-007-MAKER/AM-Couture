@@ -26,6 +26,7 @@ import { useParametresQuery } from "../features/parametres/hooks.js";
 import { useNombreNonLuesQuery } from "../features/notifications/hooks.js";
 import { useUiStore } from "../stores/uiStore.js";
 import EmailVerificationBanner from "../components/EmailVerificationBanner.jsx";
+import ImpersonationBanner from "../components/ImpersonationBanner.jsx";
 
 // Sidebar groupée par domaine métier — reflète l'organisation réelle de
 // l'application, pas une simple liste plate. Tous les modules listés ici
@@ -323,6 +324,7 @@ export default function AppLayout() {
       </div>
 
       <div className="flex-1 flex flex-col min-w-0">
+        <ImpersonationBanner />
         <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-4 py-3">
           <div className="flex items-center gap-3 min-w-0">
             <button

@@ -609,3 +609,31 @@ model LimiteTaux {
   compte       Int      @default(1)
   updatedAt    DateTime @updatedAt
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Journal d'impersonation (§ SUPERADMIN "se connecter en tant que")
+// ─────────────────────────────────────────────────────────────────────────
+
+// Trace chaque impersonation déclenchée par un SUPERADMIN (voir
+// atelierProvisioning.js:demarrerImpersonation). DÉLIBÉRÉMENT sans relation
+// Prisma vers User/Atelier (contrairement à la convention onDelete: Restrict
+// du reste du schéma) : un journal d'audit doit rester lisible et complet
+// même après suppression du compte concerné (voir DELETE
+// /:id/comptes/:userId, ateliers.routes.js — un compte PEUT être supprimé),
+// ce qu'un onDelete: Restrict interdirait à vie et qu'un onDelete: Cascade/
+// SetNull corromprait (perte de la trace). Les libellés sont donc capturés
+// en instantané au moment de l'action, comme Abonnement.prix pour
+// FormuleAbonnement.
+model JournalImpersonation {
+  id                     String   @id @default(cuid())
+  superadminId           String
+  superadminIdentifiant  String
+  atelierId              String
+  atelierNom             String
+  adminUserId            String
+  adminIdentifiant       String
+  demarreLe              DateTime @default(now())
+
+  @@index([atelierId])
+  @@index([superadminId])
+}

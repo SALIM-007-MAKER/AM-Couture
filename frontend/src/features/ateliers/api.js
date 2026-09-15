@@ -21,4 +21,6 @@ export const ateliersApi = {
   remove: (id) => api.delete(`/ateliers/${id}`),
   ajouterCompte: (atelierId, data) => api.post(`/ateliers/${atelierId}/comptes`, data),
   supprimerCompte: (atelierId, userId) => api.delete(`/ateliers/${atelierId}/comptes/${userId}`),
+  impersoner: (atelierId, userId) => api.post(`/ateliers/${atelierId}/comptes/${userId}/impersonation`),
+  impersonations: (atelierId) => api.get(`/ateliers/${atelierId}/impersonations`),
 };

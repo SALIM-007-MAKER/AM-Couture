@@ -101,6 +101,47 @@ export async function ajouterCompteAtelier({ atelierId, identifiant, password, p
   });
 }
 
+// Démarre une impersonation : le SUPERADMIN `superadminId` va agir avec le
+// jeton du compte ADMIN `userId` de l'atelier `atelierId` (voir
+// ateliers.routes.js, POST .../impersonation). Journalise l'événement AVANT
+// tout (voir JournalImpersonation, schema.prisma) : si la journalisation
+// échoue, l'impersonation entière échoue plutôt que de laisser un accès non
+// tracé — jamais l'inverse (accès d'abord, log en best-effort ensuite).
+export async function demarrerImpersonation({ atelierId, userId, superadminId }) {
+  const atelier = await prisma.atelier.findUnique({ where: { id: atelierId }, select: { nom: true, actif: true } });
+  if (!atelier) throw new HttpError(404, "Atelier introuvable.");
+  // Un atelier suspendu refuse déjà toute requête via requireAtelier — issue
+  // un jeton pour ce compte serait un accès qui ne mènerait qu'à des 403,
+  // trompeur pour le SUPERADMIN qui croirait "voir" l'atelier.
+  if (!atelier.actif) {
+    throw new HttpError(409, "Cet atelier est suspendu : l'impersonation est désactivée tant qu'il l'est.");
+  }
+
+  const compte = await prisma.user.findFirst({
+    where: { id: userId, atelierId },
+    select: { id: true, identifiant: true, role: true, atelierId: true, sessionVersion: true },
+  });
+  if (!compte) throw new HttpError(404, "Compte introuvable pour cet atelier.");
+  if (compte.role !== "ADMIN") {
+    throw new HttpError(409, "Seul un compte ADMIN d'atelier peut faire l'objet d'une impersonation.");
+  }
+
+  const superadmin = await prisma.user.findUnique({ where: { id: superadminId }, select: { identifiant: true } });
+
+  await prisma.journalImpersonation.create({
+    data: {
+      superadminId,
+      superadminIdentifiant: superadmin?.identifiant ?? "?",
+      atelierId,
+      atelierNom: atelier.nom,
+      adminUserId: compte.id,
+      adminIdentifiant: compte.identifiant,
+    },
+  });
+
+  return compte;
+}
+
 // Supprime un compte d'un atelier — refuse de laisser l'atelier sans AUCUN
 // compte (personne ne pourrait plus jamais s'y connecter, et il n'existe
 // aucune façon d'en recréer un depuis le côté ADMIN — seul le SUPERADMIN le

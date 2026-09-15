@@ -17,7 +17,10 @@ import {
   reinitialiserMotDePasse,
   ajouterCompteAtelier,
   supprimerCompteAtelier,
+  demarrerImpersonation,
 } from "../lib/atelierProvisioning.js";
+import { signAuthToken } from "../lib/jwt.js";
+import { setAuthCookie } from "../lib/authCookie.js";
 
 // Réservé au SUPERADMIN de la plateforme (Phase 8 — multi-tenant) : gestion
 // des ateliers (tenants). Un ADMIN n'accède jamais à ces routes — il gère
@@ -334,6 +337,23 @@ router.get("/:id/activite", async (req, res) => {
   res.json(evenements);
 });
 
+// GET /api/ateliers/:id/impersonations — historique des impersonations
+// déclenchées sur cet atelier (voir JournalImpersonation, schema.prisma) —
+// distinct de /activite (activité MÉTIER du client) : ceci est un journal de
+// sécurité, qui répond à "qui, côté plateforme, a accédé aux données de cet
+// atelier, et quand".
+router.get("/:id/impersonations", async (req, res) => {
+  const existant = await prisma.atelier.findUnique({ where: { id: req.params.id }, select: { id: true } });
+  if (!existant) throw new HttpError(404, "Atelier introuvable.");
+
+  const data = await prisma.journalImpersonation.findMany({
+    where: { atelierId: req.params.id },
+    orderBy: { demarreLe: "desc" },
+    take: 20,
+  });
+  res.json({ data });
+});
+
 // PATCH /api/ateliers/:id/comptes/:userId/mot-de-passe — réinitialise le mot
 // de passe d'un compte de cet atelier. Dernier recours en l'absence de tout
 // mécanisme de récupération en libre-service (voir reinitialiserMotDePasse,
@@ -378,6 +398,24 @@ router.post("/:id/comptes", async (req, res) => {
 router.delete("/:id/comptes/:userId", async (req, res) => {
   await supprimerCompteAtelier({ atelierId: req.params.id, userId: req.params.userId });
   res.status(204).end();
+});
+
+// POST /api/ateliers/:id/comptes/:userId/impersonation — le SUPERADMIN
+// authentifié REMPLACE son propre cookie de session par un jeton pour ce
+// compte ADMIN (voir demarrerImpersonation, atelierProvisioning.js) : à
+// partir de la réponse, cette session EST le compte ADMIN dans le reste de
+// l'app (le rôle SUPERADMIN n'est plus actif tant que
+// POST /auth/quitter-impersonation n'a pas été appelé — voir auth.routes.js).
+// Journalisée avant tout changement de cookie (voir JournalImpersonation).
+router.post("/:id/comptes/:userId/impersonation", async (req, res) => {
+  const compte = await demarrerImpersonation({
+    atelierId: req.params.id,
+    userId: req.params.userId,
+    superadminId: req.user.id,
+  });
+  const token = signAuthToken(compte, { impersonatedBy: req.user.id });
+  setAuthCookie(res, token);
+  res.json({ id: compte.id, identifiant: compte.identifiant, role: compte.role, atelierId: compte.atelierId });
 });
 
 // DELETE /api/ateliers/:id — supprime DÉFINITIVEMENT un atelier, réservé aux

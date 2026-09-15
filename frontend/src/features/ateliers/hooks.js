@@ -117,3 +117,24 @@ export function useSupprimerCompteMutation(atelierId) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: detailKey(atelierId) }),
   });
 }
+
+// Démarre une impersonation (voir POST .../impersonation, ateliers.routes.js)
+// — le cookie de session devient celui du compte ADMIN ciblé. `clear()` :
+// même raisonnement que useQuitterImpersonationMutation (useAuth.js), on
+// quitte entièrement le contexte SUPERADMIN (Ateliers, Abonnements...) qui
+// n'a plus lieu d'être en cache tant que l'impersonation dure.
+export function useImpersonerMutation(atelierId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId) => ateliersApi.impersoner(atelierId, userId),
+    onSuccess: () => queryClient.clear(),
+  });
+}
+
+export function useImpersonationsQuery(atelierId) {
+  return useQuery({
+    queryKey: ["ateliers", atelierId, "impersonations"],
+    queryFn: () => ateliersApi.impersonations(atelierId),
+    enabled: Boolean(atelierId),
+  });
+}

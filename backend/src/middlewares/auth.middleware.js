@@ -5,8 +5,10 @@ import { prisma } from "../lib/prisma.js";
 
 /**
  * Protège une route : exige un cookie de session valide.
- * Attache req.user = { id, identifiant, role, atelierId } (jamais passwordHash).
- * role/atelierId (Phase 8) viennent directement du JWT — voir lib/jwt.js.
+ * Attache req.user = { id, identifiant, role, atelierId, impersonatedBy }
+ * (jamais passwordHash). role/atelierId (Phase 8) et impersonatedBy (§
+ * SUPERADMIN "se connecter en tant que") viennent directement du JWT — voir
+ * lib/jwt.js.
  *
  * Vérifie aussi `sessionVersion` EN BASE, à chaque requête : un JWT reste
  * valide par construction jusqu'à son expiration (7 jours) même si le mot
@@ -28,7 +30,16 @@ export async function requireAuth(req, res, next) {
     if (!compte || compte.sessionVersion !== payload.sessionVersion) {
       return next(new HttpError(401, "Session expirée — reconnectez-vous."));
     }
-    req.user = { id: payload.sub, identifiant: payload.identifiant, role: payload.role, atelierId: payload.atelierId };
+    req.user = {
+      id: payload.sub,
+      identifiant: payload.identifiant,
+      role: payload.role,
+      atelierId: payload.atelierId,
+      // Présent uniquement pour une session d'impersonation SUPERADMIN (voir
+      // lib/jwt.js) — permet à /auth/quitter-impersonation de retrouver le
+      // compte SUPERADMIN d'origine.
+      impersonatedBy: payload.impersonatedBy ?? null,
+    };
     next();
   } catch (err) {
     next(err);
@@ -40,9 +51,10 @@ export async function requireAuth(req, res, next) {
  * atelier (Clientes, Commandes, Modèles, Paiements, Dépenses, Reçus,
  * Dashboard, Rapports, Notifications, Paramètres, Abonnement...) : exige un
  * compte ADMIN rattaché à un atelier. Un SUPERADMIN n'opère jamais
- * directement sur les données d'un atelier — il gère la plateforme (voir
- * ateliers.routes.js) et se connecterait avec un compte ADMIN pour agir "en
- * tant que" tel ou tel atelier si besoin (non implémenté dans cette phase).
+ * directement sur les données d'un atelier avec SON PROPRE jeton — il gère
+ * la plateforme (voir ateliers.routes.js) et peut démarrer une impersonation
+ * (POST /ateliers/:id/comptes/:userId/impersonation) pour agir "en tant que"
+ * le compte ADMIN de tel ou tel atelier, avec le jeton de CE compte.
  *
  * Vérifie aussi que l'atelier n'est pas suspendu — EN BASE, à CHAQUE requête
  * (pas seulement à la connexion) : une suspension décidée par le SUPERADMIN

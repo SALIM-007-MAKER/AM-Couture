@@ -19,6 +19,8 @@ import {
   Trash2,
   AlertTriangle,
   UserPlus,
+  UserCog,
+  History,
   X,
 } from "lucide-react";
 import {
@@ -30,6 +32,8 @@ import {
   useDeleteAtelierMutation,
   useAjouterCompteMutation,
   useSupprimerCompteMutation,
+  useImpersonerMutation,
+  useImpersonationsQuery,
 } from "../../features/ateliers/hooks.js";
 import { LoadingState, ErrorState, EmptyState, FieldError, GlobalFormError } from "../../components/QueryState.jsx";
 import { Field, inputClass } from "../../components/FormField.jsx";
@@ -304,6 +308,42 @@ function SupprimerCompteBouton({ atelierId, compte }) {
   );
 }
 
+// "Se connecter en tant que" (§ impersonation) — remplace le cookie de
+// session du SUPERADMIN par celui de ce compte ADMIN (voir
+// useImpersonerMutation, features/ateliers/hooks.js). Confirmation requise :
+// action sensible et immédiate (pas de "annuler" possible une fois lancée,
+// à part POST /auth/quitter-impersonation depuis la bannière qui apparaît
+// alors sur toutes les pages — voir components/ImpersonationBanner.jsx).
+function ImpersonerBouton({ atelierId, compte }) {
+  const navigate = useNavigate();
+  const mutation = useImpersonerMutation(atelierId);
+  const [confirm, setConfirm] = useState(false);
+
+  if (confirm) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-neutral-500">Se connecter en tant que {compte.identifiant} ?</span>
+        <Button
+          variant="primary"
+          size="sm"
+          loading={mutation.isPending}
+          onClick={() => mutation.mutate(compte.id, { onSuccess: () => navigate("/") })}
+        >
+          Oui
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => setConfirm(false)}>
+          Non
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <Button variant="ghost" size="sm" icon={UserCog} onClick={() => setConfirm(true)}>
+      Se connecter en tant que
+    </Button>
+  );
+}
+
 function ComptesSection({ atelierId, comptes }) {
   const [openId, setOpenId] = useState(null);
   const [showAjouter, setShowAjouter] = useState(false);
@@ -329,9 +369,12 @@ function ComptesSection({ atelierId, comptes }) {
                     Dernière connexion : {formatDate(compte.derniereConnexionAt)}
                   </p>
                   {openId !== compte.id && (
-                    <Button variant="ghost" size="sm" icon={KeyRound} onClick={() => setOpenId(compte.id)}>
-                      Réinitialiser le mot de passe
-                    </Button>
+                    <>
+                      <ImpersonerBouton atelierId={atelierId} compte={compte} />
+                      <Button variant="ghost" size="sm" icon={KeyRound} onClick={() => setOpenId(compte.id)}>
+                        Réinitialiser le mot de passe
+                      </Button>
+                    </>
                   )}
                   {/* Retrait masqué si c'est le seul compte — le backend le
                       refuserait de toute façon (409, voir supprimerCompteAtelier)
@@ -381,6 +424,34 @@ function ActiviteSection({ id }) {
           </li>
         );
       })}
+    </ul>
+  );
+}
+
+// Historique de sécurité : QUI (côté plateforme) a accédé aux données de cet
+// atelier via impersonation, et QUAND — distinct de ActiviteSection
+// (activité MÉTIER du client) ci-dessus. Voir GET
+// /ateliers/:id/impersonations et JournalImpersonation (schema.prisma).
+function ImpersonationsSection({ id }) {
+  const { data, isPending, isError, error, refetch } = useImpersonationsQuery(id);
+  if (isPending) return <LoadingState label="Chargement de l'historique…" />;
+  if (isError) return <ErrorState error={error} onRetry={refetch} />;
+  if (data.data.length === 0) return <EmptyState icon={UserCog}>Aucune impersonation enregistrée.</EmptyState>;
+  return (
+    <ul className="space-y-2">
+      {data.data.map((j) => (
+        <li key={j.id} className="flex items-start gap-3 text-sm">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-500 mt-0.5">
+            <UserCog className="size-3.5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-neutral-900 dark:text-neutral-100">
+              {j.superadminIdentifiant} connecté en tant que {j.adminIdentifiant}
+            </p>
+            <p className="text-xs text-neutral-500">{formatDate(j.demarreLe)}</p>
+          </div>
+        </li>
+      ))}
     </ul>
   );
 }
@@ -520,6 +591,13 @@ function AtelierDetailPageInner({ id }) {
         <SectionTitle icon={Clock}>Activité récente</SectionTitle>
         <Card variant="outlined">
           <ActiviteSection id={id} />
+        </Card>
+      </div>
+
+      <div className="space-y-3">
+        <SectionTitle icon={History}>Historique d'impersonation</SectionTitle>
+        <Card variant="outlined">
+          <ImpersonationsSection id={id} />
         </Card>
       </div>
 

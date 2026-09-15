@@ -20,7 +20,14 @@ const EXPIRES_IN = "7d";
 // jeton avant son expiration naturelle (7 jours) en incrémentant cette
 // valeur, sans quoi un JWT reste valide par construction jusqu'à expiration
 // quoi qu'il arrive côté base (voir décision : changement de mot de passe).
-export function signAuthToken(user) {
+// impersonatedBy (§ SUPERADMIN "se connecter en tant que", voir
+// atelierProvisioning.js:demarrerImpersonation) : id du SUPERADMIN à
+// l'origine du jeton quand il s'agit d'une session d'impersonation, absent
+// sinon. Permet à POST /auth/quitter-impersonation de retrouver et
+// re-signer un jeton pour le SUPERADMIN d'origine sans jamais avoir eu
+// besoin de conserver son ancien cookie (le jeton d'impersonation porte
+// lui-même la trace du retour).
+export function signAuthToken(user, { impersonatedBy } = {}) {
   return jwt.sign(
     {
       sub: user.id,
@@ -28,6 +35,7 @@ export function signAuthToken(user) {
       role: user.role,
       atelierId: user.atelierId,
       sessionVersion: user.sessionVersion,
+      ...(impersonatedBy ? { impersonatedBy } : {}),
     },
     JWT_SECRET,
     { expiresIn: EXPIRES_IN },

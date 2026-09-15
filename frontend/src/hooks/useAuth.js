@@ -123,3 +123,21 @@ export function useLogoutMutation() {
     },
   });
 }
+
+// Restaure la session SUPERADMIN d'origine (voir POST
+// /auth/quitter-impersonation, auth.routes.js) — l'inverse de
+// useImpersonerMutation (features/ateliers/hooks.js). `clear()` plutôt
+// qu'un simple `invalidateQueries` : on quitte entièrement le contexte "vu
+// depuis l'atelier" (Clientes, Commandes, Dashboard...), qui n'a plus aucune
+// raison de rester en cache une fois revenu SUPERADMIN.
+export function useQuitterImpersonationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post("/auth/quitter-impersonation"),
+    // Pas de setQueryData avec la réponse : elle ne porte que
+    // {id, identifiant, role, atelierId}, pas la forme complète de GET /me
+    // (langue, email, impersonation...) — clear() force un GET /me frais au
+    // prochain rendu plutôt que de repeupler le cache avec un objet partiel.
+    onSuccess: () => queryClient.clear(),
+  });
+}
