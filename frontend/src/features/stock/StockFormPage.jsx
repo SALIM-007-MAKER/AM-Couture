@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Package, Save, X } from "lucide-react";
 import { useArticleStockQuery, useCreateArticleStockMutation, useUpdateArticleStockMutation } from "./hooks.js";
 import { UNITES_STOCK } from "./constants.js";
+import { useTranslation } from "../../i18n/index.js";
 import { LoadingState, ErrorState, FieldError, GlobalFormError } from "../../components/QueryState.jsx";
 import { Field, inputClass } from "../../components/FormField.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
@@ -40,6 +41,7 @@ export default function StockFormPage({ mode }) {
 }
 
 function StockForm({ mode, initial }) {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = mode === "edit";
@@ -73,7 +75,7 @@ function StockForm({ mode, initial }) {
 
   return (
     <div className="max-w-xl space-y-5">
-      <PageHeader icon={Package} title={isEdit ? "Modifier l'article" : "Nouvel article"} />
+      <PageHeader icon={Package} title={isEdit ? t("stock.editArticle") : t("stock.newArticle")} />
 
       <Card as="form" onSubmit={handleSubmit} className="space-y-4">
         <GlobalFormError error={mutation.error} />

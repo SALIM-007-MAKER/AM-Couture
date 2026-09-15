@@ -16,6 +16,7 @@ import { useDashboardSummaryQuery } from "../features/dashboard/hooks.js";
 import { useCommandesQuery } from "../features/commandes/hooks.js";
 import { useCommandesEnRetardQuery, useCommandesALivrerQuery } from "../features/rapports/hooks.js";
 import CommandeStatutBadge from "../features/commandes/components/CommandeStatutBadge.jsx";
+import { useTranslation } from "../i18n/index.js";
 import PageHeader from "../components/PageHeader.jsx";
 import PeriodSelector from "../components/PeriodSelector.jsx";
 import Card from "../components/Card.jsx";
@@ -70,6 +71,7 @@ function Kpi({ icon: Icon, label, value, sub, tone = "neutral" }) {
  * rassurant, particulièrement trompeur ici (section d'alerte) — bug réel
  * trouvé en testant avec des données réelles. */
 function WatchList({ icon: Icon, tone, title, items, isPending, isError, error, onRetry, renderMeta, emptyLabel, viewAllTo }) {
+  const { t } = useTranslation();
   const toneText = tone === "danger" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400";
   return (
     <Card variant="outlined" padded={false}>
@@ -80,13 +82,13 @@ function WatchList({ icon: Icon, tone, title, items, isPending, isError, error, 
         </h3>
         {!isPending && !isError && items.length > 0 && (
           <Link to={viewAllTo} className="text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 inline-flex items-center gap-0.5">
-            Tout voir <ArrowRight className="size-3" aria-hidden="true" />
+            {t("common.viewAll")} <ArrowRight className="size-3" aria-hidden="true" />
           </Link>
         )}
       </div>
       {isPending ? (
         <div className="px-4 py-4">
-          <LoadingState label="Chargement…" />
+          <LoadingState label={t("common.loading")} />
         </div>
       ) : isError ? (
         <div className="p-4">
@@ -111,6 +113,7 @@ function WatchList({ icon: Icon, tone, title, items, isPending, isError, error, 
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const periodValue = {
     period: searchParams.get("from") || searchParams.get("to") ? undefined : (searchParams.get("period") ?? "month"),
@@ -145,60 +148,60 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         icon={LayoutDashboard}
-        title="Tableau de bord"
-        subtitle="Vue d'ensemble de l'activité de l'atelier."
+        title={t("dashboard.title")}
+        subtitle={t("dashboard.subtitle")}
         actions={<PeriodSelector value={periodValue} onChange={handlePeriodChange} />}
       />
 
-      {summaryQuery.isPending && <LoadingState label="Chargement du résumé…" />}
+      {summaryQuery.isPending && <LoadingState label={t("common.loading")} />}
       {summaryQuery.isError && <ErrorState error={summaryQuery.error} onRetry={summaryQuery.refetch} />}
 
       {summaryQuery.data && (
         <section className="space-y-3">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-600">
-            Vue d'ensemble
+            {t("dashboard.overview")}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            <Kpi icon={Clock} label="En cours" value={summaryQuery.data.commandes.enCours} tone="neutral" />
+            <Kpi icon={Clock} label={t("dashboard.kpiEnCours")} value={summaryQuery.data.commandes.enCours} tone="neutral" />
             <Kpi
               icon={CheckCircle2}
-              label="Prêtes"
+              label={t("dashboard.kpiPretes")}
               value={summaryQuery.data.commandes.terminees}
-              sub="à récupérer"
+              sub={t("dashboard.kpiPretesSub")}
               tone={summaryQuery.data.commandes.terminees > 0 ? "warning" : "neutral"}
             />
             <Kpi
               icon={Truck}
-              label={`Livraison ≤ ${HORIZON_JOURS} j`}
+              label={t("dashboard.kpiLivraison", { jours: HORIZON_JOURS })}
               value={aLivrerQuery.data?.meta.total ?? "—"}
-              sub={aLivrerAujourdhui > 0 ? `dont ${aLivrerAujourdhui} aujourd'hui` : undefined}
+              sub={aLivrerAujourdhui > 0 ? t("dashboard.kpiLivraisonSub", { nombre: aLivrerAujourdhui }) : undefined}
               tone={aLivrerAujourdhui > 0 ? "warning" : "neutral"}
             />
             <Kpi
               icon={nombreEnRetard > 0 ? AlertTriangle : CheckCircle2}
-              label="En retard"
+              label={t("dashboard.kpiEnRetard")}
               value={nombreEnRetard}
               tone={nombreEnRetard > 0 ? "danger" : "success"}
             />
             <Kpi
               icon={CircleOff}
-              label="Non payées"
+              label={t("dashboard.kpiNonPayees")}
               value={summaryQuery.data.commandes.nonPayees}
-              sub="0 encaissé"
+              sub={t("dashboard.kpiNonPayeesSub")}
               tone={summaryQuery.data.commandes.nonPayees > 0 ? "warning" : "neutral"}
             />
             <Kpi
               icon={Wallet}
-              label="Encaissé"
+              label={t("dashboard.kpiEncaisse")}
               value={summaryQuery.data.finances.totalEncaisse}
-              sub={`${summaryQuery.data.finances.nombrePaiements} paiement(s)`}
+              sub={t("dashboard.paiementsSub", { nombre: summaryQuery.data.finances.nombrePaiements })}
               tone="success"
             />
             <Kpi
               icon={Receipt}
-              label="Dépenses"
+              label={t("dashboard.kpiDepenses")}
               value={summaryQuery.data.finances.totalDepenses}
-              sub={`${summaryQuery.data.finances.nombreDepenses} dépense(s)`}
+              sub={t("dashboard.depensesSub", { nombre: summaryQuery.data.finances.nombreDepenses })}
               tone="neutral"
             />
           </div>
@@ -207,33 +210,33 @@ export default function DashboardPage() {
 
       <section className="space-y-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-600">
-          À faire / à surveiller
+          {t("dashboard.todo")}
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <WatchList
             icon={AlertTriangle}
             tone="danger"
-            title="Commandes en retard"
+            title={t("dashboard.lateOrders")}
             items={enRetardQuery.data?.data ?? []}
             isPending={enRetardQuery.isPending}
             isError={enRetardQuery.isError}
             error={enRetardQuery.error}
             onRetry={enRetardQuery.refetch}
-            renderMeta={(c) => `${c.joursDeRetard} j de retard`}
-            emptyLabel="Aucune commande en retard — tout est à jour."
+            renderMeta={(c) => t("dashboard.lateOrdersMeta", { jours: c.joursDeRetard })}
+            emptyLabel={t("dashboard.lateOrdersEmpty")}
             viewAllTo="/rapports"
           />
           <WatchList
             icon={Truck}
             tone="warning"
-            title={`Livraison dans ${HORIZON_JOURS} jours`}
+            title={t("dashboard.upcomingDeliveries", { jours: HORIZON_JOURS })}
             items={aLivrerQuery.data?.data ?? []}
             isPending={aLivrerQuery.isPending}
             isError={aLivrerQuery.isError}
             error={aLivrerQuery.error}
             onRetry={aLivrerQuery.refetch}
-            renderMeta={(c) => (isToday(c.dateLivraisonPrevue) ? "Aujourd'hui" : formatDate(c.dateLivraisonPrevue))}
-            emptyLabel={`Aucune livraison prévue dans les ${HORIZON_JOURS} prochains jours.`}
+            renderMeta={(c) => (isToday(c.dateLivraisonPrevue) ? t("common.today") : formatDate(c.dateLivraisonPrevue))}
+            emptyLabel={t("dashboard.upcomingDeliveriesEmpty", { jours: HORIZON_JOURS })}
             viewAllTo="/rapports"
           />
         </div>
@@ -243,29 +246,29 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-600">
             <ClipboardList className="size-3.5" aria-hidden="true" />
-            Commandes récentes
+            {t("dashboard.recentOrders")}
           </h2>
           <Link to="/commandes" className="text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 inline-flex items-center gap-0.5">
-            Tout voir <ArrowRight className="size-3" aria-hidden="true" />
+            {t("common.viewAll")} <ArrowRight className="size-3" aria-hidden="true" />
           </Link>
         </div>
-        {recentesQuery.isPending && <LoadingState label="Chargement…" />}
+        {recentesQuery.isPending && <LoadingState label={t("common.loading")} />}
         {recentesQuery.isError && <ErrorState error={recentesQuery.error} onRetry={recentesQuery.refetch} />}
         {recentesQuery.data && recentesQuery.data.data.length === 0 && (
-          <EmptyState icon={ClipboardList}>Aucune commande pour l'instant.</EmptyState>
+          <EmptyState icon={ClipboardList}>{t("dashboard.recentOrdersEmpty")}</EmptyState>
         )}
         {recentesQuery.data && recentesQuery.data.data.length > 0 && (
           <Card variant="outlined" padded={false} className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">N°</th>
-                  <th className="px-4 py-3 font-medium">Client</th>
-                  <th className="px-4 py-3 font-medium hidden md:table-cell">Modèle</th>
-                  <th className="px-4 py-3 font-medium">Statut</th>
-                  <th className="px-4 py-3 font-medium hidden sm:table-cell">Livraison</th>
-                  <th className="px-4 py-3 font-medium text-right">Montant</th>
-                  <th className="px-4 py-3 font-medium text-right hidden sm:table-cell">Reste</th>
+                  <th className="px-4 py-3 font-medium">{t("dashboard.colNumero")}</th>
+                  <th className="px-4 py-3 font-medium">{t("dashboard.colClient")}</th>
+                  <th className="px-4 py-3 font-medium hidden md:table-cell">{t("dashboard.colModele")}</th>
+                  <th className="px-4 py-3 font-medium">{t("dashboard.colStatut")}</th>
+                  <th className="px-4 py-3 font-medium hidden sm:table-cell">{t("dashboard.colLivraison")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("dashboard.colMontant")}</th>
+                  <th className="px-4 py-3 font-medium text-right hidden sm:table-cell">{t("dashboard.colReste")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -297,22 +300,22 @@ export default function DashboardPage() {
       {summaryQuery.data && (
         <section className="space-y-3">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-600">
-            Finances (période sélectionnée)
+            {t("dashboard.financesPeriode")}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Kpi
               icon={ClipboardList}
-              label="Valeur des commandes"
+              label={t("dashboard.valeurCommandes")}
               value={summaryQuery.data.commandes.valeurTotale}
-              sub={`${summaryQuery.data.commandes.nombre} commande(s) créée(s)`}
+              sub={t("dashboard.commandesCreees", { nombre: summaryQuery.data.commandes.nombre })}
             />
-            <Kpi icon={Wallet} label="Encaissé" value={summaryQuery.data.finances.totalEncaisse} tone="success" />
-            <Kpi icon={Receipt} label="Dépenses" value={summaryQuery.data.finances.totalDepenses} />
+            <Kpi icon={Wallet} label={t("dashboard.kpiEncaisse")} value={summaryQuery.data.finances.totalEncaisse} tone="success" />
+            <Kpi icon={Receipt} label={t("dashboard.kpiDepenses")} value={summaryQuery.data.finances.totalDepenses} />
             <Kpi
               icon={TrendingUp}
-              label="Résultat de trésorerie"
+              label={t("dashboard.resultatTresorerie")}
               value={summaryQuery.data.finances.resultatTresorerie}
-              sub="Encaissé − dépenses (pas un bénéfice comptable)"
+              sub={t("dashboard.resultatTresorerieSub")}
             />
           </div>
         </section>

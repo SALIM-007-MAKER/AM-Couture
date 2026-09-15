@@ -5,6 +5,7 @@ import { useArticlesStockQuery, useAlertesStockQuery } from "./hooks.js";
 import { stockExportUrl } from "./api.js";
 import { uniteLabel } from "./constants.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
+import { useTranslation } from "../../i18n/index.js";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
 import Pagination from "../../components/Pagination.jsx";
 import StatutBadge from "../../components/StatutBadge.jsx";
@@ -15,12 +16,6 @@ import { inputClass } from "../../components/FormField.jsx";
 
 const PAGE_SIZE = 20;
 
-const ARCHIVED_OPTIONS = [
-  { value: "false", label: "Actifs" },
-  { value: "true", label: "Archivés" },
-  { value: "all", label: "Tous" },
-];
-
 // Rouge dès que la quantité descend au niveau du seuil d'alerte (ou en
 // dessous) — même condition que GET /api/stock/alertes côté backend
 // (quantite <= seuilAlerte), jamais recalculée différemment ici.
@@ -29,20 +24,26 @@ function enAlerte(article) {
 }
 
 function AlertesBanner() {
+  const { t } = useTranslation();
   const query = useAlertesStockQuery();
   if (!query.data || query.data.data.length === 0) return null;
   return (
     <Card variant="outlined" className="flex items-start gap-2 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
       <AlertTriangle className="size-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" aria-hidden="true" />
       <p className="text-sm text-amber-800 dark:text-amber-300">
-        {query.data.data.length} article{query.data.data.length > 1 ? "s" : ""} au niveau ou en dessous du seuil
-        d'alerte : {query.data.data.map((a) => a.nom).join(", ")}.
+        {t("stock.alertBanner", { nombre: query.data.data.length, noms: query.data.data.map((a) => a.nom).join(", ") })}
       </p>
     </Card>
   );
 }
 
 export default function StockListPage() {
+  const { t } = useTranslation();
+  const ARCHIVED_OPTIONS = [
+    { value: "false", label: t("common.activeFilter") },
+    { value: "true", label: t("common.archivedFilter") },
+    { value: "all", label: t("common.all") },
+  ];
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page") ?? "1");
   const archived = searchParams.get("archived") ?? "false";
@@ -72,8 +73,8 @@ export default function StockListPage() {
     <div className="space-y-5">
       <PageHeader
         icon={Package}
-        title="Stock"
-        subtitle="Matières premières et fournitures (tissus, boutons, fil...)."
+        title={t("stock.title")}
+        subtitle={t("stock.subtitle")}
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -81,12 +82,12 @@ export default function StockListPage() {
               href={stockExportUrl(filters)}
               variant="secondary"
               icon={Download}
-              title="Exporte les articles correspondant aux filtres actuels"
+              title={t("stock.exportTitle")}
             >
-              Exporter (CSV)
+              {t("common.exportCsv")}
             </Button>
             <Button as={Link} to="/stock/nouveau" variant="primary" icon={Plus}>
-              Nouvel article
+              {t("stock.newArticle")}
             </Button>
           </div>
         }
@@ -99,7 +100,7 @@ export default function StockListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-neutral-400" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Rechercher (nom, catégorie)…"
+            placeholder={t("stock.searchPlaceholder")}
             value={qInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className={`${inputClass} pl-9`}
@@ -118,12 +119,12 @@ export default function StockListPage() {
         </select>
       </div>
 
-      {isPending && <LoadingState label="Chargement du stock…" />}
+      {isPending && <LoadingState label={t("common.loading")} />}
       {isError && <ErrorState error={error} onRetry={refetch} />}
 
       {data && data.data.length === 0 && (
         <EmptyState icon={Package}>
-          {q || categorie ? "Aucun article ne correspond à ces critères." : "Aucun article pour l'instant."}
+          {q || categorie ? t("stock.emptyFiltered") : t("stock.emptyAll")}
         </EmptyState>
       )}
 
@@ -134,10 +135,10 @@ export default function StockListPage() {
             <table className="w-full text-sm">
               <thead className="text-left text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Nom</th>
-                  <th className="px-4 py-3 font-medium">Catégorie</th>
-                  <th className="px-4 py-3 font-medium text-right">Quantité</th>
-                  <th className="px-4 py-3 font-medium">Statut</th>
+                  <th className="px-4 py-3 font-medium">{t("stock.colNom")}</th>
+                  <th className="px-4 py-3 font-medium">{t("stock.colCategorie")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("stock.colQuantite")}</th>
+                  <th className="px-4 py-3 font-medium">{t("stock.colStatut")}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -159,11 +160,11 @@ export default function StockListPage() {
                       {article.quantite} {uniteLabel(article.unite)}
                     </td>
                     <td className="px-4 py-3">
-                      <StatutBadge archivedAt={article.archivedAt} activeLabel="Actif" archivedLabel="Archivé" />
+                      <StatutBadge archivedAt={article.archivedAt} activeLabel={t("common.active")} archivedLabel={t("common.archived")} />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button as={Link} to={`/stock/${article.id}`} variant="ghost" size="sm" icon={Eye}>
-                        Voir
+                        {t("common.view")}
                       </Button>
                     </td>
                   </tr>
@@ -180,7 +181,7 @@ export default function StockListPage() {
                   <Card variant="outlined" className="space-y-1 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-neutral-900 dark:text-neutral-100">{article.nom}</span>
-                      <StatutBadge archivedAt={article.archivedAt} activeLabel="Actif" archivedLabel="Archivé" />
+                      <StatutBadge archivedAt={article.archivedAt} activeLabel={t("common.active")} archivedLabel={t("common.archived")} />
                     </div>
                     <p className="text-neutral-600 dark:text-neutral-400 text-sm">
                       {article.categorie || "—"} —{" "}

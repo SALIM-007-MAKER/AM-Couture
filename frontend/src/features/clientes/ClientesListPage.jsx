@@ -4,6 +4,7 @@ import { Users, Plus, Search, Eye, Download } from "lucide-react";
 import { useClientesQuery } from "./hooks.js";
 import { clientesExportUrl } from "./api.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
+import { useTranslation } from "../../i18n/index.js";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
 import Pagination from "../../components/Pagination.jsx";
 import StatutBadge from "../../components/StatutBadge.jsx";
@@ -14,18 +15,18 @@ import { inputClass } from "../../components/FormField.jsx";
 
 const PAGE_SIZE = 20;
 
-const ARCHIVED_OPTIONS = [
-  { value: "false", label: "Actifs" },
-  { value: "true", label: "Archivés" },
-  { value: "all", label: "Tous" },
-];
-
 function formatDate(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" });
 }
 
 export default function ClientesListPage() {
+  const { t } = useTranslation();
+  const ARCHIVED_OPTIONS = [
+    { value: "false", label: t("common.activeFilter") },
+    { value: "true", label: t("common.archivedFilter") },
+    { value: "all", label: t("common.all") },
+  ];
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page") ?? "1");
   const archived = searchParams.get("archived") ?? "false";
@@ -59,8 +60,8 @@ export default function ClientesListPage() {
     <div className="space-y-5">
       <PageHeader
         icon={Users}
-        title="Clients"
-        subtitle="Fichier des clients de l'atelier, actifs et archivés."
+        title={t("clientes.title")}
+        subtitle={t("clientes.subtitle")}
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -68,12 +69,12 @@ export default function ClientesListPage() {
               href={clientesExportUrl({ q: q || undefined, archived })}
               variant="secondary"
               icon={Download}
-              title="Exporte les clients correspondant aux filtres actuels"
+              title={t("clientes.exportTitle")}
             >
-              Exporter (CSV)
+              {t("common.exportCsv")}
             </Button>
             <Button as={Link} to="/clientes/nouvelle" variant="primary" icon={Plus}>
-              Nouveau client
+              {t("clientes.newCliente")}
             </Button>
           </div>
         }
@@ -84,7 +85,7 @@ export default function ClientesListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-neutral-400" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Rechercher (nom, prénom, téléphone)…"
+            placeholder={t("clientes.searchPlaceholder")}
             value={qInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className={`${inputClass} pl-9`}
@@ -103,12 +104,12 @@ export default function ClientesListPage() {
         </select>
       </div>
 
-      {isPending && <LoadingState label="Chargement des clients…" />}
+      {isPending && <LoadingState label={t("common.loading")} />}
       {isError && <ErrorState error={error} onRetry={refetch} />}
 
       {data && data.data.length === 0 && (
         <EmptyState icon={Users}>
-          {q ? "Aucun client ne correspond à cette recherche." : "Aucun client pour l'instant."}
+          {q ? t("clientes.emptyFiltered") : t("clientes.emptyAll")}
         </EmptyState>
       )}
 
@@ -119,11 +120,11 @@ export default function ClientesListPage() {
             <table className="w-full text-sm">
               <thead className="text-left text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Client</th>
-                  <th className="px-4 py-3 font-medium">Téléphone</th>
-                  <th className="px-4 py-3 font-medium text-right">Commandes</th>
-                  <th className="px-4 py-3 font-medium">Dernière activité</th>
-                  <th className="px-4 py-3 font-medium">Statut</th>
+                  <th className="px-4 py-3 font-medium">{t("clientes.colClient")}</th>
+                  <th className="px-4 py-3 font-medium">{t("clientes.colTelephone")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("clientes.colCommandes")}</th>
+                  <th className="px-4 py-3 font-medium">{t("clientes.colDerniereActivite")}</th>
+                  <th className="px-4 py-3 font-medium">{t("clientes.colStatut")}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -142,11 +143,11 @@ export default function ClientesListPage() {
                     </td>
                     <td className="px-4 py-3 text-neutral-500">{formatDate(cliente.derniereActivite)}</td>
                     <td className="px-4 py-3">
-                      <StatutBadge archivedAt={cliente.archivedAt} activeLabel="Actif" archivedLabel="Archivé" />
+                      <StatutBadge archivedAt={cliente.archivedAt} activeLabel={t("common.active")} archivedLabel={t("common.archived")} />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button as={Link} to={`/clientes/${cliente.id}`} variant="ghost" size="sm" icon={Eye}>
-                        Voir
+                        {t("common.view")}
                       </Button>
                     </td>
                   </tr>
@@ -165,11 +166,11 @@ export default function ClientesListPage() {
                       <span className="font-medium text-neutral-900 dark:text-neutral-100">
                         {cliente.nom} {cliente.prenom}
                       </span>
-                      <StatutBadge archivedAt={cliente.archivedAt} activeLabel="Actif" archivedLabel="Archivé" />
+                      <StatutBadge archivedAt={cliente.archivedAt} activeLabel={t("common.active")} archivedLabel={t("common.archived")} />
                     </div>
                     <p className="text-neutral-600 dark:text-neutral-400 text-sm">{cliente.telephone}</p>
                     <p className="text-neutral-500 text-xs">
-                      {cliente.nombreCommandes} commande(s) — dernière activité : {formatDate(cliente.derniereActivite)}
+                      {t("clientes.mobileMeta", { nombre: cliente.nombreCommandes, date: formatDate(cliente.derniereActivite) })}
                     </p>
                   </Card>
                 </Link>

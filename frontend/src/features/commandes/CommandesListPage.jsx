@@ -5,6 +5,7 @@ import { useCommandesQuery } from "./hooks.js";
 import { commandesExportUrl } from "./api.js";
 import { STATUTS_COMMANDE, PRIORITES, prioriteLabel } from "./constants.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
+import { useTranslation } from "../../i18n/index.js";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
 import Pagination from "../../components/Pagination.jsx";
 import CommandeStatutBadge from "./components/CommandeStatutBadge.jsx";
@@ -21,6 +22,7 @@ function formatDate(iso) {
 }
 
 export default function CommandesListPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page") ?? "1");
   const statut = searchParams.get("statut") ?? "";
@@ -49,8 +51,8 @@ export default function CommandesListPage() {
     <div className="space-y-5">
       <PageHeader
         icon={ClipboardList}
-        title="Commandes"
-        subtitle="Suivi de toutes les commandes de l'atelier."
+        title={t("commandes.title")}
+        subtitle={t("commandes.subtitle")}
         actions={
           <div className="flex items-center gap-2">
             <Button
@@ -58,12 +60,12 @@ export default function CommandesListPage() {
               href={commandesExportUrl({ q, statut: statut || undefined, priorite: priorite || undefined })}
               variant="secondary"
               icon={Download}
-              title="Exporte les commandes correspondant aux filtres actuels"
+              title={t("commandes.exportTitle")}
             >
-              Exporter (CSV)
+              {t("common.exportCsv")}
             </Button>
             <Button as={Link} to="/commandes/nouvelle" variant="primary" icon={Plus}>
-              Nouvelle commande
+              {t("commandes.newCommande")}
             </Button>
           </div>
         }
@@ -74,7 +76,7 @@ export default function CommandesListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-neutral-400" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Rechercher (numéro, client, téléphone)…"
+            placeholder={t("commandes.searchPlaceholder")}
             value={qInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className={`${inputClass} pl-9`}
@@ -85,7 +87,7 @@ export default function CommandesListPage() {
           onChange={(e) => updateParams({ statut: e.target.value, page: undefined })}
           className={`${inputClass} w-auto`}
         >
-          <option value="">Tous statuts</option>
+          <option value="">{t("commandes.allStatuts")}</option>
           {STATUTS_COMMANDE.map((s) => (
             <option key={s.value} value={s.value}>
               {s.label}
@@ -97,7 +99,7 @@ export default function CommandesListPage() {
           onChange={(e) => updateParams({ priorite: e.target.value, page: undefined })}
           className={`${inputClass} w-auto`}
         >
-          <option value="">Toutes priorités</option>
+          <option value="">{t("commandes.allPriorites")}</option>
           {PRIORITES.map((p) => (
             <option key={p.value} value={p.value}>
               {p.label}
@@ -106,12 +108,12 @@ export default function CommandesListPage() {
         </select>
       </div>
 
-      {isPending && <LoadingState label="Chargement des commandes…" />}
+      {isPending && <LoadingState label={t("common.loading")} />}
       {isError && <ErrorState error={error} onRetry={refetch} />}
 
       {data && data.data.length === 0 && (
         <EmptyState icon={ClipboardList}>
-          {q || statut || priorite ? "Aucune commande ne correspond à ces critères." : "Aucune commande pour l'instant."}
+          {q || statut || priorite ? t("commandes.emptyFiltered") : t("commandes.emptyAll")}
         </EmptyState>
       )}
 
@@ -122,14 +124,14 @@ export default function CommandesListPage() {
             <table className="w-full text-sm">
               <thead className="text-left text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">N°</th>
-                  <th className="px-4 py-3 font-medium">Client</th>
-                  <th className="px-4 py-3 font-medium hidden lg:table-cell">Modèle</th>
-                  <th className="px-4 py-3 font-medium hidden sm:table-cell">Livraison prévue</th>
-                  <th className="px-4 py-3 font-medium hidden md:table-cell">Priorité</th>
-                  <th className="px-4 py-3 font-medium text-right">Solde</th>
-                  <th className="px-4 py-3 font-medium">Paiement</th>
-                  <th className="px-4 py-3 font-medium">Statut</th>
+                  <th className="px-4 py-3 font-medium">{t("commandes.colNumero")}</th>
+                  <th className="px-4 py-3 font-medium">{t("commandes.colClient")}</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell">{t("commandes.colModele")}</th>
+                  <th className="px-4 py-3 font-medium hidden sm:table-cell">{t("commandes.colLivraisonPrevue")}</th>
+                  <th className="px-4 py-3 font-medium hidden md:table-cell">{t("commandes.colPriorite")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("commandes.colSolde")}</th>
+                  <th className="px-4 py-3 font-medium">{t("commandes.colPaiement")}</th>
+                  <th className="px-4 py-3 font-medium">{t("commandes.colStatut")}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -159,7 +161,7 @@ export default function CommandesListPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button as={Link} to={`/commandes/${commande.id}`} variant="ghost" size="sm" icon={Eye}>
-                        Voir
+                        {t("common.view")}
                       </Button>
                     </td>
                   </tr>
@@ -182,7 +184,9 @@ export default function CommandesListPage() {
                       {commande.cliente.nom} {commande.cliente.prenom} — {formatDate(commande.dateLivraisonPrevue)}
                     </p>
                     <div className="flex items-center justify-between">
-                      <p className="text-neutral-600 dark:text-neutral-400 text-sm">Solde : {commande.solde}</p>
+                      <p className="text-neutral-600 dark:text-neutral-400 text-sm">
+                        {t("commandes.mobileSolde", { solde: commande.solde })}
+                      </p>
                       <PaiementStatutBadge statut={commande.statutPaiement} />
                     </div>
                   </Card>

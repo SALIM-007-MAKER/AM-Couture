@@ -3,8 +3,10 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { Scissors, User, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { useLoginMutation, useAtelierPourIdentifiantQuery } from "../../hooks/useAuth.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
+import { useTranslation } from "../../i18n/index.js";
 import { ApiError } from "../../lib/apiClient.js";
 import { GlobalFormError, FieldError } from "../../components/QueryState.jsx";
+import LanguageSwitcher from "../../components/LanguageSwitcher.jsx";
 
 // Écran de connexion volontairement à part du reste de l'app (voir demande —
 // esthétique sombre/dorée dédiée, indépendante du thème clair/sombre choisi
@@ -28,6 +30,7 @@ import { GlobalFormError, FieldError } from "../../components/QueryState.jsx";
 const NOM_PLATEFORME = "Gestion d'Atelier";
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -62,6 +65,7 @@ export default function LoginPage() {
       </div>
 
       <div className="relative w-full max-w-sm flex flex-col items-center">
+        <LanguageSwitcher className="mb-5" />
         <div className="mb-7">
           {logoUrl ? (
             <img
@@ -82,16 +86,16 @@ export default function LoginPage() {
         >
           <div className="text-center space-y-1.5">
             <h1 className="text-2xl font-semibold tracking-tight text-white">
-              Bon retour <span className="text-amber-400">parmi nous</span>
+              {t("login.heading")} <span className="text-amber-400">{t("login.headingHighlight")}</span>
             </h1>
-            <p className="text-sm text-neutral-400">Connectez-vous à {NOM_PLATEFORME}</p>
+            <p className="text-sm text-neutral-400">{t("login.subtitle", { plateforme: NOM_PLATEFORME })}</p>
           </div>
 
           <GlobalFormError error={loginMutation.error} />
 
           <div className="space-y-1.5">
             <label htmlFor="identifiant" className="text-sm font-medium text-neutral-300">
-              Identifiant
+              {t("login.identifiant")}
             </label>
             <div className="relative">
               <User className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -104,7 +108,7 @@ export default function LoginPage() {
                 value={identifiant}
                 onChange={(e) => setIdentifiant(e.target.value)}
                 className={darkInputClass}
-                placeholder="Votre identifiant"
+                placeholder={t("login.identifiantPlaceholder")}
               />
             </div>
             <FieldError messages={details?.identifiant} />
@@ -113,10 +117,10 @@ export default function LoginPage() {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label htmlFor="password" className="text-sm font-medium text-neutral-300">
-                Mot de passe
+                {t("login.password")}
               </label>
               <Link to="/mot-de-passe-oublie" className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
-                Mot de passe oublié ?
+                {t("login.forgotPassword")}
               </Link>
             </div>
             <div className="relative">
@@ -130,13 +134,13 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={`${darkInputClass} pr-10`}
-                placeholder="Votre mot de passe"
+                placeholder={t("login.passwordPlaceholder")}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((s) => !s)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors"
-                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
               >
                 {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
               </button>
@@ -149,14 +153,14 @@ export default function LoginPage() {
             disabled={loginMutation.isPending}
             className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 text-sm font-semibold py-2.5 shadow-lg shadow-amber-900/30 transition disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]"
           >
-            {loginMutation.isPending ? "Connexion…" : "Se connecter"}
+            {loginMutation.isPending ? t("login.submitting") : t("login.submit")}
             {!loginMutation.isPending && <ArrowRight className="size-4" aria-hidden="true" />}
           </button>
 
           <p className="text-center text-sm text-neutral-400">
-            Propriétaire d'un atelier ?{" "}
+            {t("login.ownerQuestion")}{" "}
             <Link to="/inscription" className="text-amber-400 hover:text-amber-300 font-medium transition-colors">
-              Créer votre atelier
+              {t("login.createWorkshop")}
             </Link>
           </p>
         </form>

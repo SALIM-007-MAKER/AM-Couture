@@ -21,6 +21,7 @@ import {
   useClientesStatsQuery,
   useModelesStatsQuery,
 } from "./hooks.js";
+import { useTranslation } from "../../i18n/index.js";
 import PeriodSelector from "../../components/PeriodSelector.jsx";
 import Pagination from "../../components/Pagination.jsx";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
@@ -50,12 +51,13 @@ const STAT_TONES = {
  * inverse la couleur (hausse en rouge, baisse en vert).
  */
 function VariationBadge({ value, invert = false }) {
+  const { t } = useTranslation();
   if (value === undefined) return null;
   if (value === null) {
-    return <span className="text-xs text-neutral-400">Nouveau (rien sur la période précédente)</span>;
+    return <span className="text-xs text-neutral-400">{t("rapports.variationNouveau")}</span>;
   }
   if (value === 0) {
-    return <span className="text-xs text-neutral-500">= vs période précédente</span>;
+    return <span className="text-xs text-neutral-500">{t("rapports.variationEgal")}</span>;
   }
   const positif = value > 0;
   const favorable = invert ? !positif : positif;
@@ -67,7 +69,7 @@ function VariationBadge({ value, invert = false }) {
       }`}
     >
       <Icon className="size-3" aria-hidden="true" />
-      {Math.abs(value)}% vs période précédente
+      {Math.abs(value)}% {t("rapports.variationVs")}
     </span>
   );
 }
@@ -93,8 +95,9 @@ function Stat({ label, value, sub, tone = "neutral", emphasize = false, variatio
 }
 
 function FinancesSection({ period }) {
+  const { t } = useTranslation();
   const query = useFinancesQuery(period);
-  if (query.isPending) return <LoadingState label="Chargement des finances…" />;
+  if (query.isPending) return <LoadingState label={t("common.loading")} />;
   if (query.isError) return <ErrorState error={query.error} onRetry={query.refetch} />;
   const d = query.data;
   // comparaison est `null` quand la période affichée n'est pas bornée (voir
@@ -104,30 +107,30 @@ function FinancesSection({ period }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
       <Stat
-        label="Valeur des commandes créées"
+        label={t("rapports.valeurCommandes")}
         value={d.totalCommandes}
-        sub={`${d.nombreCommandes} commande(s)`}
+        sub={t("rapports.nombreCommandes", { nombre: d.nombreCommandes })}
         variation={v?.totalCommandes}
       />
       <Stat
-        label="Encaissé"
+        label={t("rapports.encaisse")}
         value={d.totalEncaisse}
-        sub={`${d.nombrePaiements} paiement(s)`}
+        sub={t("rapports.nombrePaiements", { nombre: d.nombrePaiements })}
         tone="success"
         variation={v?.totalEncaisse}
       />
       <Stat
-        label="Dépenses"
+        label={t("rapports.depenses")}
         value={d.totalDepenses}
-        sub={`${d.nombreDepenses} dépense(s)`}
+        sub={t("rapports.nombreDepenses", { nombre: d.nombreDepenses })}
         variation={v?.totalDepenses}
         variationInvert
       />
       {/* Chiffre le plus important de la section — mis en avant, jamais présenté comme un "bénéfice". */}
       <Stat
-        label="Solde de trésorerie"
+        label={t("rapports.soldeTresorerie")}
         value={d.solde}
-        sub="Encaissé − dépenses (pas un bénéfice comptable)"
+        sub={t("rapports.soldeTresorerieSub")}
         emphasize
         variation={v?.solde}
       />
@@ -356,6 +359,7 @@ function ModelesStatsSection({ period }) {
 }
 
 export default function RapportsPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const period = {
     period: searchParams.get("from") || searchParams.get("to") ? undefined : (searchParams.get("period") ?? "month"),
@@ -375,48 +379,43 @@ export default function RapportsPage() {
     <div className="space-y-8 max-w-4xl">
       <PageHeader
         icon={BarChart3}
-        title="Rapports"
-        subtitle={
-          <>
-            Finances, Commandes, Clients et Modèles suivent la période choisie. "En retard" et "à livrer" reflètent
-            toujours l'état actuel.
-          </>
-        }
+        title={t("rapports.title")}
+        subtitle={t("rapports.subtitle")}
         actions={<PeriodSelector value={period} onChange={handlePeriodChange} />}
       />
 
       <div className="space-y-3">
-        <SectionTitle icon={Wallet}>Finances</SectionTitle>
+        <SectionTitle icon={Wallet}>{t("rapports.finances")}</SectionTitle>
         <FinancesSection period={period} />
       </div>
 
       <div className="space-y-3">
-        <SectionTitle icon={TrendingUp}>Évolution mensuelle</SectionTitle>
+        <SectionTitle icon={TrendingUp}>{t("rapports.evolution")}</SectionTitle>
         <EvolutionSection />
       </div>
 
       <div className="space-y-3">
-        <SectionTitle icon={ClipboardList}>Commandes</SectionTitle>
+        <SectionTitle icon={ClipboardList}>{t("rapports.commandes")}</SectionTitle>
         <CommandesStatsSection period={period} />
       </div>
 
       <div className="space-y-3">
-        <SectionTitle icon={AlertTriangle}>Commandes en retard</SectionTitle>
+        <SectionTitle icon={AlertTriangle}>{t("rapports.lateOrders")}</SectionTitle>
         <EnRetardSection />
       </div>
 
       <div className="space-y-3">
-        <SectionTitle icon={Truck}>Commandes à livrer prochainement</SectionTitle>
+        <SectionTitle icon={Truck}>{t("rapports.upcomingOrders")}</SectionTitle>
         <ALivrerSection />
       </div>
 
       <div className="space-y-3">
-        <SectionTitle icon={Users}>Clients</SectionTitle>
+        <SectionTitle icon={Users}>{t("rapports.clients")}</SectionTitle>
         <ClientesStatsSection period={period} />
       </div>
 
       <div className="space-y-3">
-        <SectionTitle icon={Shirt}>Modèles</SectionTitle>
+        <SectionTitle icon={Shirt}>{t("rapports.models")}</SectionTitle>
         <ModelesStatsSection period={period} />
       </div>
     </div>

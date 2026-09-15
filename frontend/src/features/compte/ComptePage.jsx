@@ -3,6 +3,7 @@ import { UserCircle, Languages, KeyRound, Save, CheckCircle2 } from "lucide-reac
 import { useMeQuery } from "../../hooks/useAuth.js";
 import { useUpdatePreferencesMutation, useChangerMotDePasseMutation } from "./hooks.js";
 import { LANGUES_DISPONIBLES } from "./constants.js";
+import { useTranslation } from "../../i18n/index.js";
 import { LoadingState, ErrorState, FieldError, GlobalFormError } from "../../components/QueryState.jsx";
 import { Field, inputClass } from "../../components/FormField.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
@@ -33,16 +34,14 @@ function ComptePageContent({ user }) {
 // "Langue" — application immédiate au changement (comme ThemeSwitcher,
 // ParametresPage.jsx), pas un formulaire à valider séparément : un seul champ.
 function LangueSection({ user }) {
+  const { t } = useTranslation();
   const mutation = useUpdatePreferencesMutation();
 
   return (
     <div className="space-y-3">
       <SectionTitle icon={Languages}>Langue</SectionTitle>
       <Card className="space-y-3">
-        <p className="text-xs text-neutral-500">
-          Préférence enregistrée sur votre compte. L'interface reste en français pour toutes les langues pour
-          l'instant — les autres traductions ne sont pas encore disponibles.
-        </p>
+        <p className="text-xs text-neutral-500">{t("compte.langueNote")}</p>
         <div className="flex items-center gap-3">
           <select
             value={user.langue}

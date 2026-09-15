@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ArrowDownCircle, ArrowUpCircle, History } from "lucide-react";
 import { useMouvementsQuery, useCreateMouvementMutation } from "../hooks.js";
 import { uniteLabel } from "../constants.js";
+import { useTranslation } from "../../../i18n/index.js";
 import { LoadingState, ErrorState, EmptyState, FieldError, GlobalFormError } from "../../../components/QueryState.jsx";
 import { inputClass } from "../../../components/FormField.jsx";
 import Pagination from "../../../components/Pagination.jsx";
@@ -73,13 +74,14 @@ function MouvementForm({ articleId, unite }) {
 // Sans en-tête propre : englobé par une SectionTitle "Mouvements" fournie par
 // ArticleStockDetailPage.jsx — même convention que PaiementsSection.jsx.
 export default function MouvementsSection({ articleId, unite, archived }) {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const query = useMouvementsQuery(articleId, { page, pageSize: 10 });
 
   return (
     <div className="space-y-3">
       {archived ? (
-        <p className="text-sm text-neutral-500">Article archivé : restaurez-le avant d'enregistrer un mouvement.</p>
+        <p className="text-sm text-neutral-500">{t("stock.archivedNotice")}</p>
       ) : (
         <MouvementForm articleId={articleId} unite={unite} />
       )}

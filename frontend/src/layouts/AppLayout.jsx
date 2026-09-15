@@ -25,48 +25,54 @@ import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { useParametresQuery } from "../features/parametres/hooks.js";
 import { useNombreNonLuesQuery } from "../features/notifications/hooks.js";
 import { useUiStore } from "../stores/uiStore.js";
+import { useTranslation } from "../i18n/index.js";
 import EmailVerificationBanner from "../components/EmailVerificationBanner.jsx";
 import ImpersonationBanner from "../components/ImpersonationBanner.jsx";
+import LanguageSwitcher from "../components/LanguageSwitcher.jsx";
+import LocaleSync from "../components/LocaleSync.jsx";
 
 // Sidebar groupée par domaine métier — reflète l'organisation réelle de
 // l'application, pas une simple liste plate. Tous les modules listés ici
 // sont pleinement fonctionnels (plus d'indicateur "bientôt").
+// `labelKey` (clé i18n, voir i18n/index.js) plutôt qu'un libellé en dur —
+// résolu à l'affichage via t() dans NavContent/BottomNav/le titre d'en-tête,
+// jamais ici (ces constantes sont hors composant, donc hors contexte React).
 const NAV_GROUPS = [
   {
-    label: "Principal",
-    items: [{ label: "Tableau de bord", to: "/", icon: LayoutDashboard, end: true }],
+    labelKey: "nav.groupMain",
+    items: [{ labelKey: "nav.dashboard", to: "/", icon: LayoutDashboard, end: true }],
   },
   {
-    label: "Atelier",
+    labelKey: "nav.groupWorkshop",
     items: [
-      { label: "Clients", to: "/clientes", icon: Users },
-      { label: "Modèles", to: "/modeles", icon: Shirt },
-      { label: "Stock", to: "/stock", icon: Package },
-      { label: "Commandes", to: "/commandes", icon: ClipboardList },
-      { label: "Livraisons", to: "/livraisons", icon: Truck },
+      { labelKey: "nav.clients", to: "/clientes", icon: Users },
+      { labelKey: "nav.models", to: "/modeles", icon: Shirt },
+      { labelKey: "nav.stock", to: "/stock", icon: Package },
+      { labelKey: "nav.orders", to: "/commandes", icon: ClipboardList },
+      { labelKey: "nav.deliveries", to: "/livraisons", icon: Truck },
     ],
   },
   {
-    label: "Finances",
+    labelKey: "nav.groupFinances",
     items: [
-      { label: "Paiements", to: "/paiements", icon: Wallet },
-      { label: "Dépenses", to: "/depenses", icon: Receipt },
-      { label: "Reçus", to: "/recus", icon: FileText },
+      { labelKey: "nav.payments", to: "/paiements", icon: Wallet },
+      { labelKey: "nav.expenses", to: "/depenses", icon: Receipt },
+      { labelKey: "nav.receipts", to: "/recus", icon: FileText },
     ],
   },
   {
-    label: "Analyse",
+    labelKey: "nav.groupAnalysis",
     items: [
-      { label: "Rapports", to: "/rapports", icon: BarChart3 },
-      { label: "Calendrier", to: "/calendrier", icon: Calendar },
+      { labelKey: "nav.reports", to: "/rapports", icon: BarChart3 },
+      { labelKey: "nav.calendar", to: "/calendrier", icon: Calendar },
     ],
   },
   {
-    label: "Configuration",
+    labelKey: "nav.groupSettings",
     items: [
-      { label: "Paramètres", to: "/parametres", icon: Settings },
-      { label: "Mon compte", to: "/compte", icon: UserCircle },
-      { label: "Abonnement", to: "/abonnement", icon: CreditCard },
+      { labelKey: "nav.settings", to: "/parametres", icon: Settings },
+      { labelKey: "nav.myAccount", to: "/compte", icon: UserCircle },
+      { labelKey: "nav.subscription", to: "/abonnement", icon: CreditCard },
     ],
   },
 ];
@@ -75,11 +81,11 @@ const NAV_GROUPS = [
 // "Finances" de la bottom navigation mobile une destination unique en un
 // clic (voir BottomNav plus bas et pages/FinancesPage.jsx). Ajoutée ici,
 // séparément, uniquement pour que l'en-tête affiche le bon titre de page.
-const FINANCES_HUB_ITEM = { label: "Finances", to: "/finances", icon: Wallet };
+const FINANCES_HUB_ITEM = { labelKey: "nav.finances", to: "/finances", icon: Wallet };
 // Notifications : pas dans la sidebar desktop (accès direct via la cloche de
 // l'en-tête, voir plus bas) mais garde un titre de page cohérent — même
 // logique que FINANCES_HUB_ITEM ci-dessus.
-const NOTIFICATIONS_HUB_ITEM = { label: "Notifications", to: "/notifications", icon: Bell };
+const NOTIFICATIONS_HUB_ITEM = { labelKey: "nav.notifications", to: "/notifications", icon: Bell };
 const ALL_NAV_ITEMS = [...NAV_GROUPS.flatMap((g) => g.items), FINANCES_HUB_ITEM, NOTIFICATIONS_HUB_ITEM];
 
 function useCurrentNavItem(pathname) {
@@ -97,36 +103,37 @@ const MOBILE_DRAWER_GROUPS = [
   {
     key: "secondaire",
     items: [
-      { label: "Livraisons", to: "/livraisons", icon: Truck },
-      { label: "Stock", to: "/stock", icon: Package },
-      { label: "Reçus", to: "/recus", icon: FileText },
-      { label: "Rapports", to: "/rapports", icon: BarChart3 },
-      { label: "Calendrier", to: "/calendrier", icon: Calendar },
-      { label: "Notifications", to: "/notifications", icon: Bell },
-      { label: "Paramètres", to: "/parametres", icon: Settings },
-      { label: "Mon compte", to: "/compte", icon: UserCircle },
-      { label: "Abonnement", to: "/abonnement", icon: CreditCard },
+      { labelKey: "nav.deliveries", to: "/livraisons", icon: Truck },
+      { labelKey: "nav.stock", to: "/stock", icon: Package },
+      { labelKey: "nav.receipts", to: "/recus", icon: FileText },
+      { labelKey: "nav.reports", to: "/rapports", icon: BarChart3 },
+      { labelKey: "nav.calendar", to: "/calendrier", icon: Calendar },
+      { labelKey: "nav.notifications", to: "/notifications", icon: Bell },
+      { labelKey: "nav.settings", to: "/parametres", icon: Settings },
+      { labelKey: "nav.myAccount", to: "/compte", icon: UserCircle },
+      { labelKey: "nav.subscription", to: "/abonnement", icon: CreditCard },
     ],
   },
 ];
 
 function NavContent({ collapsed, onNavigate, groups = NAV_GROUPS }) {
+  const { t } = useTranslation();
   return (
     <nav className="flex flex-col gap-4 p-3">
       {groups.map((group) => (
-        <div key={group.key ?? group.label} className="space-y-0.5">
-          {!collapsed && group.label && (
+        <div key={group.key ?? group.labelKey} className="space-y-0.5">
+          {!collapsed && group.labelKey && (
             <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-600">
-              {group.label}
+              {t(group.labelKey)}
             </p>
           )}
           {group.items.map((item) => (
             <NavLink
-              key={item.label}
+              key={item.labelKey}
               to={item.to}
               end={item.end}
               onClick={onNavigate}
-              title={collapsed ? item.label : undefined}
+              title={collapsed ? t(item.labelKey) : undefined}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 rounded-lg border-l-2 pl-2.5 pr-3 py-2 text-sm font-medium transition-colors ${
                   collapsed ? "justify-center border-l-0 pl-3" : ""
@@ -138,7 +145,7 @@ function NavContent({ collapsed, onNavigate, groups = NAV_GROUPS }) {
               }
             >
               <item.icon className="size-4 shrink-0" aria-hidden="true" />
-              {!collapsed && item.label}
+              {!collapsed && t(item.labelKey)}
             </NavLink>
           ))}
         </div>
@@ -155,14 +162,15 @@ function NavContent({ collapsed, onNavigate, groups = NAV_GROUPS }) {
 // un onglet étroit ; le titre affiché dans l'en-tête reste "Tableau de bord"
 // (voir ALL_NAV_ITEMS, resté inchangé pour ce chemin).
 const BOTTOM_NAV_ITEMS = [
-  { label: "Accueil", to: "/", icon: LayoutDashboard, end: true },
-  { label: "Clients", to: "/clientes", icon: Users },
-  { label: "Modèles", to: "/modeles", icon: Shirt },
-  { label: "Commandes", to: "/commandes", icon: ClipboardList },
+  { labelKey: "nav.home", to: "/", icon: LayoutDashboard, end: true },
+  { labelKey: "nav.clients", to: "/clientes", icon: Users },
+  { labelKey: "nav.models", to: "/modeles", icon: Shirt },
+  { labelKey: "nav.orders", to: "/commandes", icon: ClipboardList },
   FINANCES_HUB_ITEM,
 ];
 
 function BottomNav() {
+  const { t } = useTranslation();
   return (
     <nav
       aria-label="Navigation principale"
@@ -190,7 +198,7 @@ function BottomNav() {
               >
                 <item.icon className="size-5" aria-hidden="true" />
               </span>
-              {item.label}
+              {t(item.labelKey)}
             </>
           )}
         </NavLink>
@@ -234,13 +242,14 @@ function Logo({ collapsed, logoUrl, nom }) {
 // isError ignorés volontairement : un compteur absent/en erreur reste un
 // détail décoratif, jamais bloquant (même logique que le logo ci-dessus).
 function NotificationBell() {
+  const { t } = useTranslation();
   const { data } = useNombreNonLuesQuery();
   const count = data?.count ?? 0;
   return (
     <NavLink
       to="/notifications"
       className="relative rounded-lg p-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-      aria-label={count > 0 ? `${count} notification(s) non lue(s)` : "Notifications"}
+      aria-label={count > 0 ? t("nav.unreadNotifications", { count }) : t("nav.notifications")}
     >
       <Bell className="size-4" aria-hidden="true" />
       {count > 0 && (
@@ -253,6 +262,7 @@ function NotificationBell() {
 }
 
 export default function AppLayout() {
+  const { t } = useTranslation();
   const { data: user } = useMeQuery();
   const logoutMutation = useLogoutMutation();
   const { sidebarOpen, closeSidebar, toggleSidebar, sidebarCollapsed, toggleSidebarCollapsed } = useUiStore();
@@ -286,14 +296,14 @@ export default function AppLayout() {
           type="button"
           onClick={toggleSidebarCollapsed}
           className="flex items-center gap-2 border-t border-neutral-200 dark:border-neutral-800 px-3 py-3 text-xs font-medium text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
-          title={sidebarCollapsed ? "Développer" : "Réduire"}
+          title={sidebarCollapsed ? t("nav.expand") : t("nav.collapse")}
         >
           {sidebarCollapsed ? (
             <ChevronsRight className="size-4 mx-auto" aria-hidden="true" />
           ) : (
             <>
               <ChevronsLeft className="size-4" aria-hidden="true" />
-              Réduire
+              {t("nav.collapse")}
             </>
           )}
         </button>
@@ -304,7 +314,7 @@ export default function AppLayout() {
           pour pouvoir animer l'ouverture/fermeture via transform/opacity. */}
       <button
         type="button"
-        aria-label="Fermer le menu"
+        aria-label={t("nav.closeMenu")}
         tabIndex={sidebarOpen ? 0 : -1}
         onClick={closeSidebar}
         className={`md:hidden fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 ${
@@ -331,7 +341,7 @@ export default function AppLayout() {
               type="button"
               onClick={toggleSidebar}
               className="md:hidden rounded-lg p-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
-              aria-label="Ouvrir le menu"
+              aria-label={t("nav.openMenu")}
             >
               <Menu className="size-4" aria-hidden="true" />
             </button>
@@ -339,13 +349,14 @@ export default function AppLayout() {
               <div className="flex items-center gap-2 min-w-0 text-sm text-neutral-500">
                 <currentNavItem.icon className="size-4 shrink-0 hidden sm:block" aria-hidden="true" />
                 <span className="truncate font-medium text-neutral-900 dark:text-neutral-100">
-                  {currentNavItem.label}
+                  {t(currentNavItem.labelKey)}
                 </span>
               </div>
             )}
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            <LanguageSwitcher className="hidden sm:inline-flex" />
             <NotificationBell />
             {user && (
               <div className="hidden sm:flex items-center gap-2">
@@ -360,13 +371,15 @@ export default function AppLayout() {
               onClick={() => logoutMutation.mutate()}
               disabled={logoutMutation.isPending}
               className="inline-flex items-center gap-1.5 text-sm rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
-              title="Déconnexion"
+              title={t("nav.logout")}
             >
               <LogOut className="size-3.5" aria-hidden="true" />
-              <span className="hidden sm:inline">Déconnexion</span>
+              <span className="hidden sm:inline">{t("nav.logout")}</span>
             </button>
           </div>
         </header>
+
+        <LocaleSync />
 
         <EmailVerificationBanner />
 
