@@ -45,7 +45,12 @@ export default function ClientesListPage() {
       if (value === undefined || value === "" || value === null) next.delete(key);
       else next.set(key, String(value));
     }
-    setSearchParams(next);
+    // replace: true — sans ça, chaque frappe dans le champ de recherche
+    // (voir handleSearchChange) empilait une entrée d'historique navigateur
+    // PAR CARACTÈRE : "retour" ramenait alors à l'état précédent lettre par
+    // lettre, et sur mobile les pushState en rafale pendant la saisie
+    // (clavier ouvert) provoquaient une instabilité visible de l'écran.
+    setSearchParams(next, { replace: true });
   }
 
   // La recherche (debounce) déclenche une nouvelle requête dès que `q`

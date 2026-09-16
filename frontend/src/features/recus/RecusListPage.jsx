@@ -36,7 +36,9 @@ export default function RecusListPage() {
       if (value === undefined || value === "" || value === null) next.delete(key);
       else next.set(key, String(value));
     }
-    setSearchParams(next);
+    // replace: true — évite d'empiler une entrée d'historique par frappe
+    // (voir ClientesListPage.jsx pour l'explication complète).
+    setSearchParams(next, { replace: true });
   }
 
   function handleSearchChange(value) {
