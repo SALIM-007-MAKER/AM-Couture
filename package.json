@@ -15,7 +15,8 @@
     "prisma:seed": "node --experimental-strip-types --env-file=.env prisma/seed.js",
     "prisma:seed:superadmin": "node --experimental-strip-types --env-file=.env prisma/seedSuperadmin.js",
     "build": "npm run build -w frontend",
-    "test": "npm run test -w backend"
+    "test": "npm run test -w backend",
+    "test:integration": "npm run test:integration -w backend"
   },
   "devDependencies": {
     "prisma": "^7.10.0",

@@ -1,25 +1,17 @@
 name: CI
 
 # Vérifie automatiquement chaque push/PR sur main : lint, build frontend,
-# tests backend. Aucun secret nécessaire — `prisma generate` ne se connecte
-# jamais à une base (voir schema, pas d'`url` en dur) et les tests couverts
-# ici sont volontairement des tests UNITAIRES sans base de données (voir
-# backend/src/**/__tests__/) : ce pipeline ne touche donc jamais la base
-# Neon partagée dev/prod, en toute sécurité même sans configuration
-# supplémentaire.
-#
-# Ne couvre PAS (à ce stade) : tests d'intégration multi-tenant contre une
-# vraie base (isolation entre ateliers, IDOR, suspension...) — vérifiés
-# manuellement à chaque changement de cette nature (voir historique de
-# session), pas encore automatisés faute d'une base de test dédiée
-# (nécessiterait une branche Neon éphémère par run, ou un service Postgres
-# de CI — non mis en place ici, décision à revoir si besoin).
+# tests unitaires backend, tests d'intégration multi-tenant. Aucun secret
+# nécessaire nulle part dans ce workflow.
 on:
   push:
     branches: [main]
   pull_request:
 
 jobs:
+  # Lint + build + tests UNITAIRES (sans base de données, voir
+  # backend/src/**/__tests__/) — jamais connecté à une base, ne touche donc
+  # jamais la base Neon partagée dev/prod.
   verifier:
     runs-on: ubuntu-latest
     steps:
@@ -42,3 +34,47 @@ jobs:
       - run: npm run build -w frontend
 
       - run: npm test
+
+  # Tests d'INTÉGRATION multi-tenant (isolation entre ateliers, IDOR, essai
+  # gratuit, abonnement, impersonation — voir backend/src/integration-tests/)
+  # contre une vraie base Postgres, mais TOUJOURS le service jetable ci-dessous
+  # (créé et détruit avec le job), jamais Neon — voir preload.js, qui refuse
+  # de démarrer si TEST_DATABASE_URL ne pointe pas explicitement vers une base
+  # dédiée aux tests.
+  tests-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: gestion_atelier_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd=pg_isready
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma generate --schema prisma/schema.prisma
+
+      - name: Applique les migrations sur la base Postgres jetable du service CI
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/gestion_atelier_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/gestion_atelier_test
+
+      - run: npm run test:integration
+        env:
+          TEST_DATABASE_URL: postgresql://test:test@localhost:5432/gestion_atelier_test
