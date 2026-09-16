@@ -4,7 +4,20 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon-512.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!--
+      interactive-widget=resizes-content : sans ce réglage, l'ouverture du
+      clavier mobile ne redimensionne QUE le "visual viewport" (ce qui est
+      visible à l'écran) tout en laissant le "layout viewport" (celui dans
+      lequel `position: fixed`/`sticky` se calculent) inchangé — la barre de
+      navigation basse (fixed bottom-0, voir AppLayout.jsx BottomNav) reste
+      alors ancrée à un "bas de page" désormais caché sous le clavier,
+      pendant que le navigateur fait défiler le visual viewport pour garder
+      le champ focalisé visible : les deux mécanismes se disputent l'écran,
+      d'où l'instabilité pendant la saisie. `resizes-content` fait
+      redimensionner le layout viewport lui-même avec le clavier, la barre
+      basse reste alors correctement juste au-dessus du clavier.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#fafafa" />
     <title>Gestion d'Atelier</title>
     <!--
