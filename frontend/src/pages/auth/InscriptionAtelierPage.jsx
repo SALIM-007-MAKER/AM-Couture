@@ -122,7 +122,7 @@ export default function InscriptionAtelierPage() {
             <FieldError messages={details?.nom} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="prenom" className="text-sm font-medium text-neutral-300">
                 Prénom *
@@ -182,7 +182,7 @@ export default function InscriptionAtelierPage() {
             <p className="text-xs text-neutral-500">Sert aussi d'identifiant de connexion.</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="adminPassword" className="text-sm font-medium text-neutral-300">
                 Mot de passe *
@@ -250,7 +250,7 @@ export default function InscriptionAtelierPage() {
             <FieldError messages={details?.telephone} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="ville" className="text-sm font-medium text-neutral-300">
                 Ville <span className="text-neutral-500 font-normal">(optionnel)</span>
@@ -285,7 +285,7 @@ export default function InscriptionAtelierPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="devise" className="text-sm font-medium text-neutral-300">
                 Devise *

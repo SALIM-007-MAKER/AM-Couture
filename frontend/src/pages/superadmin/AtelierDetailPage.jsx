@@ -290,7 +290,7 @@ function SupprimerCompteBouton({ atelierId, compte }) {
 
   if (confirm) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-red-600 dark:text-red-400">Retirer {compte.identifiant} ?</span>
         <Button variant="danger" size="sm" loading={mutation.isPending} onClick={() => mutation.mutate(compte.id)}>
           Oui
@@ -321,7 +321,7 @@ function ImpersonerBouton({ atelierId, compte }) {
 
   if (confirm) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-neutral-500">Se connecter en tant que {compte.identifiant} ?</span>
         <Button
           variant="primary"
@@ -533,10 +533,10 @@ function AtelierDetailPageInner({ id }) {
         title={atelier.nom}
         subtitle={`${atelier.nombreComptes} compte(s) · ${atelier.nombreClientes} cliente(s) · ${atelier.nombreCommandes} commande(s)`}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <StatutBadge actif={atelier.actif} />
             {confirmSuspend ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs text-neutral-500">Confirmer ?</span>
                 <Button
                   variant="danger"

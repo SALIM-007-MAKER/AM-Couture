@@ -54,7 +54,7 @@ export default function CommandesListPage() {
         title={t("commandes.title")}
         subtitle={t("commandes.subtitle")}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               as="a"
               href={commandesExportUrl({ q, statut: statut || undefined, priorite: priorite || undefined })}

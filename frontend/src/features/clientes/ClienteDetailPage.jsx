@@ -110,7 +110,7 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
           Commandes
         </SectionTitle>
         {totauxQuery.data && (
-          <Card className="grid grid-cols-3 gap-3 text-sm text-center">
+          <Card className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-center">
             <div>
               <p className="text-neutral-500 text-xs">Total commandes</p>
               <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">

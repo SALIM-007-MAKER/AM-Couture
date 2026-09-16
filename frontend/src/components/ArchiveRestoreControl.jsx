@@ -24,7 +24,7 @@ export default function ArchiveRestoreControl({
   if (confirming) {
     return (
       <div className="space-y-1.5">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm text-neutral-600 dark:text-neutral-400">{confirmQuestion}</span>
           <Button variant="primary" size="sm" icon={Check} loading={isPending} onClick={() => action(() => setConfirming(false))}>
             Confirmer

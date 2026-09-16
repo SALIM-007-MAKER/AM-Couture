@@ -63,7 +63,7 @@ export default function ClientesListPage() {
         title={t("clientes.title")}
         subtitle={t("clientes.subtitle")}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               as="a"
               href={clientesExportUrl({ q: q || undefined, archived })}

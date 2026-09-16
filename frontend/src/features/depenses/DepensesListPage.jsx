@@ -91,7 +91,7 @@ export default function DepensesListPage() {
         title="Dépenses"
         subtitle="Suivi des dépenses de l'atelier (achats de tissu, fournitures, charges...)."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               as="a"
               href={depensesExportUrl(filters)}

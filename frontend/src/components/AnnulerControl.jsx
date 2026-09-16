@@ -31,7 +31,7 @@ export default function AnnulerControl({ onAnnuler, isPending, error, label = "A
         onChange={(e) => setMotif(e.target.value)}
         className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500"
       />
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <Button
           variant="danger"
           size="sm"

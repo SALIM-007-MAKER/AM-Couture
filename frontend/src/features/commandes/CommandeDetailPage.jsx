@@ -195,7 +195,7 @@ function CommandeDetailContent({ id, commande }) {
 
       <div className="space-y-2">
         <SectionTitle icon={Banknote}>Finances</SectionTitle>
-        <Card className="grid grid-cols-3 gap-3 text-sm text-center">
+        <Card className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-center">
           <div>
             <p className="text-neutral-500 text-xs">Prix total</p>
             <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">

@@ -76,7 +76,7 @@ export default function StockListPage() {
         title={t("stock.title")}
         subtitle={t("stock.subtitle")}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               as="a"
               href={stockExportUrl(filters)}
