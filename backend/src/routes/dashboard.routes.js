@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { resolvePeriod, dateRangeWhere } from "../lib/period.js";
 import { periodQuerySchema, recentQuerySchema } from "../schemas/dashboard.schema.js";
@@ -11,7 +11,7 @@ import { whereCommandesImpayees } from "../lib/commandesImpayees.js";
 // Module PUREMENT consultatif : aucune route de ce fichier n'écrit en base
 // (que des `count`/`aggregate`/`findMany` en lecture seule).
 const router = Router();
-router.use(requireAuth, requireAtelier);
+router.use(requireAuth, requireAtelier, requireAbonnementActif);
 
 // "en cours" / "terminées" / "livrées" sont des compartiments MUTUELLEMENT
 // EXCLUSIFS (chaque commande n'appartient qu'à un seul), contrairement à

@@ -1,14 +1,43 @@
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { CreditCard, Clock3, History } from "lucide-react";
+import { CreditCard, Clock3, History, Hourglass } from "lucide-react";
 import { useAbonnementActuelQuery, useAbonnementsQuery, isNotFound } from "./hooks.js";
 import { STATUT_ABONNEMENT_LABELS, STATUT_TRANSACTION_LABELS, moyenPaiementInfo, formatDateFr } from "./constants.js";
+import { useParametresQuery } from "../parametres/hooks.js";
 import SouscrireCard from "./components/SouscrireCard.jsx";
 import TransactionsEnAttente from "./components/TransactionsEnAttente.jsx";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
+
+// Essai gratuit (§ plan trial) — dérivé de GET /api/parametres
+// (atelier.trialEndsAt + essaiExpire, jamais recalculé côté client au-delà
+// d'un simple affichage). `trialEndsAt` absent (atelier "légataire", créé
+// avant cette fonctionnalité) -> rien n'est affiché, pas de section.
+function EssaiSection() {
+  const { data: atelier } = useParametresQuery();
+  if (!atelier?.trialEndsAt) return null;
+
+  const finEssai = new Date(atelier.trialEndsAt);
+  const joursRestants = Math.ceil((finEssai.getTime() - new Date().getTime()) / 86_400_000);
+
+  return (
+    <Card
+      variant="outlined"
+      className={`flex items-center gap-2 text-sm ${
+        atelier.essaiExpire
+          ? "border-red-200 dark:border-red-900 text-red-700 dark:text-red-400"
+          : "border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-400"
+      }`}
+    >
+      <Hourglass className="size-4 shrink-0" aria-hidden="true" />
+      {atelier.essaiExpire
+        ? `Essai gratuit terminé le ${formatDateFr(atelier.trialEndsAt)}.`
+        : `Essai gratuit — ${joursRestants} jour(s) restant(s) (jusqu'au ${formatDateFr(atelier.trialEndsAt)}).`}
+    </Card>
+  );
+}
 
 const STATUT_TONES = {
   ACTIF: "text-green-600 dark:text-green-400",
@@ -41,6 +70,8 @@ export default function AbonnementPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <PageHeader icon={CreditCard} title="Abonnement" subtitle="Accès de l'atelier à la plateforme Gestion d'Atelier." />
+
+      <EssaiSection />
 
       {paiement === "succes" && (
         <Card className="bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 text-sm">

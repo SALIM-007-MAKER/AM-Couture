@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import {
@@ -17,7 +17,7 @@ const router = Router();
 
 // Toutes les routes Dépenses exigent une session valide et un compte ADMIN
 // rattaché à un atelier (Phase 8 — multi-tenant).
-router.use(requireAuth, requireAtelier);
+router.use(requireAuth, requireAtelier, requireAbonnementActif);
 
 router.param("id", requireValidIdParam);
 

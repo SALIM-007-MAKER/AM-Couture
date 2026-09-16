@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { reconcilierNotifications } from "../lib/notifications.js";
@@ -12,7 +12,7 @@ import {
 } from "../schemas/notification.schema.js";
 
 const router = Router();
-router.use(requireAuth, requireAtelier);
+router.use(requireAuth, requireAtelier, requireAbonnementActif);
 router.param("id", requireValidIdParam);
 
 // Champs commande nécessaires pour reconstruire l'affichage (client, modèle,

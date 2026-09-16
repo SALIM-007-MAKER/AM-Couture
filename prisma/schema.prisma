@@ -189,6 +189,13 @@ model Atelier {
   // auth.middleware.js), sans supprimer aucune donnée.
   actif      Boolean  @default(true)
   suspenduLe DateTime?
+  // Essai gratuit de 7 jours — posé UNE SEULE FOIS à la création (voir
+  // atelierProvisioning.js:creerAtelierEtAdmin), jamais recalculé ni
+  // prolongé après coup, jamais accepté depuis le frontend. `null` pour
+  // tout atelier créé AVANT l'introduction de cette fonctionnalité : ces
+  // ateliers "légataires" ne sont jamais bloqués par le trial (voir
+  // lib/trial.js) — seuls les ateliers créés après ont une échéance réelle.
+  trialEndsAt DateTime?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 

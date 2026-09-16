@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import {
   resolvePeriod,
@@ -25,7 +25,7 @@ import { CATEGORIES_VETEMENT } from "../schemas/modele.schema.js";
 
 // Module PUREMENT consultatif : aucune écriture en base dans ce fichier.
 const router = Router();
-router.use(requireAuth, requireAtelier);
+router.use(requireAuth, requireAtelier, requireAbonnementActif);
 
 const D0 = new Prisma.Decimal(0);
 const dec = (v) => (v == null ? D0 : new Prisma.Decimal(v));

@@ -1,5 +1,6 @@
 import { queryClient } from "./queryClient.js";
 import { ApiError } from "./apiError.js";
+import { useAbonnementStore } from "../stores/abonnementStore.js";
 
 // Ré-exportée pour compatibilité : tout le code existant importe `ApiError`
 // depuis ce fichier. La classe elle-même vit dans apiError.js pour éviter un
@@ -39,8 +40,21 @@ async function request(path, { method = "GET", body, signal } = {}) {
     if (res.status === 401) {
       queryClient.setQueryData(["auth", "me"], null);
     }
+    // 402 = essai gratuit terminé sans abonnement actif (voir
+    // requireAbonnementActif, auth.middleware.js) — signale l'état via
+    // abonnementStore plutôt qu'une invalidation de cache : PaywallBanner
+    // (components/PaywallBanner.jsx) s'en sert pour rediriger vers
+    // /abonnement depuis n'importe quelle page, sans qu'aucun appelant ici
+    // n'ait besoin de connaître ce comportement.
+    if (res.status === 402) {
+      useAbonnementStore.getState().setBloque(true);
+    }
     throw new ApiError(res.status, payload?.error ?? "Une erreur est survenue.", payload?.details);
   }
+
+  // Une requête réussie prouve que l'atelier n'est plus bloqué (ex : juste
+  // après une souscription) — se corrige tout seul, sans rechargement de page.
+  useAbonnementStore.getState().setBloque(false);
 
   return payload;
 }

@@ -2,6 +2,8 @@ import { verifyAuthToken } from "../lib/jwt.js";
 import { COOKIE_NAME } from "../lib/authCookie.js";
 import { HttpError } from "./error.middleware.js";
 import { prisma } from "../lib/prisma.js";
+import { essaiExpire } from "../lib/trial.js";
+import { statutEffectif } from "../lib/abonnement.js";
 
 /**
  * Protège une route : exige un cookie de session valide.
@@ -86,6 +88,51 @@ export async function requireAtelier(req, res, next) {
       return next(new HttpError(403, "Cet atelier a été suspendu par la plateforme. Contactez le support."));
     }
     next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * À utiliser APRÈS requireAtelier sur les routes métier "normales" d'un
+ * atelier (Clientes, Commandes, Modèles, Paiements, Dépenses, Stock, Reçus,
+ * Dashboard, Rapports, Notifications, Paramètres) — § essai gratuit /
+ * abonnement (plan trial). Bloque avec 402 si l'essai de 7 jours est
+ * expiré ET qu'aucun abonnement n'est actuellement ACTIF (voir
+ * lib/abonnement.js:statutEffectif).
+ *
+ * DÉLIBÉRÉMENT PAS appliquée sur : /api/abonnements (l'atelier doit pouvoir
+ * consulter/souscrire pour sortir du blocage), /api/transactions
+ * (confirmation d'un paiement manuel NITA/Amana — même raison),
+ * /api/formules-abonnement (pas de requireAtelier de toute façon),
+ * /api/compte (gestion du compte de connexion lui-même).
+ *
+ * Bypass SUPERADMIN : si la session est une impersonation
+ * (`req.user.impersonatedBy` posé, voir lib/jwt.js), le blocage ne
+ * s'applique jamais — la plateforme doit toujours pouvoir superviser un
+ * atelier, y compris hors essai/abonnement.
+ */
+export async function requireAbonnementActif(req, res, next) {
+  if (req.user.impersonatedBy) return next();
+
+  try {
+    const [atelier, dernierAbonnement] = await Promise.all([
+      prisma.atelier.findUnique({ where: { id: req.user.atelierId }, select: { trialEndsAt: true } }),
+      prisma.abonnement.findFirst({
+        where: { atelierId: req.user.atelierId },
+        orderBy: { createdAt: "desc" },
+        select: { statut: true, dateExpiration: true },
+      }),
+    ]);
+
+    if (!essaiExpire(atelier)) return next();
+    if (dernierAbonnement && statutEffectif(dernierAbonnement) === "ACTIF") return next();
+
+    return next(
+      new HttpError(402, "Votre période d'essai est terminée. Souscrivez à un abonnement pour continuer.", {
+        essaiExpire: true,
+      }),
+    );
   } catch (err) {
     next(err);
   }

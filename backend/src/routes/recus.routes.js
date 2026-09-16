@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { nextNumero } from "../lib/numero.js";
@@ -118,7 +118,7 @@ recusCommandeRouter.get("/", async (req, res) => {
 // ───────────────────────────────────────────────────────────────────────
 const router = Router();
 
-router.use(requireAuth, requireAtelier);
+router.use(requireAuth, requireAtelier, requireAbonnementActif);
 router.param("id", requireValidIdParam);
 
 // GET /api/recus — liste globale (tous reçus, toutes commandes confondues),

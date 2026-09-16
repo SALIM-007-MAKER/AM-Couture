@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import {
@@ -14,7 +14,7 @@ const router = Router();
 
 // Toutes les routes Modèles exigent une session valide et un compte ADMIN
 // rattaché à un atelier (Phase 8 — multi-tenant).
-router.use(requireAuth, requireAtelier);
+router.use(requireAuth, requireAtelier, requireAbonnementActif);
 
 // Rétro-portage du garde-fou anti-octet-nul/caractères de contrôle — voir
 // clientes.routes.js pour le contexte complet (point ouvert depuis le module 5).
