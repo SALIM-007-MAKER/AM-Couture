@@ -20,6 +20,7 @@ import {
   LogOut,
   ChevronsLeft,
   ChevronsRight,
+  Inbox,
 } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { useParametresQuery } from "../features/parametres/hooks.js";
@@ -50,6 +51,7 @@ const NAV_GROUPS = [
       { labelKey: "nav.models", to: "/modeles", icon: Shirt },
       { labelKey: "nav.stock", to: "/stock", icon: Package },
       { labelKey: "nav.orders", to: "/commandes", icon: ClipboardList },
+      { labelKey: "nav.requests", to: "/demandes", icon: Inbox },
       { labelKey: "nav.deliveries", to: "/livraisons", icon: Truck },
     ],
   },
@@ -106,6 +108,7 @@ const MOBILE_DRAWER_GROUPS = [
     items: [
       { labelKey: "nav.deliveries", to: "/livraisons", icon: Truck },
       { labelKey: "nav.stock", to: "/stock", icon: Package },
+      { labelKey: "nav.requests", to: "/demandes", icon: Inbox },
       { labelKey: "nav.receipts", to: "/recus", icon: FileText },
       { labelKey: "nav.reports", to: "/rapports", icon: BarChart3 },
       { labelKey: "nav.calendar", to: "/calendrier", icon: Calendar },

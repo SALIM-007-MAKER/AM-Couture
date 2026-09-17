@@ -1,13 +1,15 @@
 import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 import PublicOnlyRoute from "./routes/PublicOnlyRoute.jsx";
-import { RequireAtelier, RequireSuperadmin } from "./routes/RoleGuards.jsx";
+import { RequireAtelier, RequireSuperadmin, RequireClient } from "./routes/RoleGuards.jsx";
 import AppLayout from "./layouts/AppLayout.jsx";
 import SuperadminLayout from "./layouts/SuperadminLayout.jsx";
+import ClientLayout from "./layouts/ClientLayout.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
 import InscriptionAtelierPage from "./pages/auth/InscriptionAtelierPage.jsx";
 import MotDePasseOublieePage from "./pages/auth/MotDePasseOublieePage.jsx";
 import ReinitialiserMotDePasseTokenPage from "./pages/auth/ReinitialiserMotDePasseTokenPage.jsx";
+import ActiverCompteClientPage from "./pages/auth/ActiverCompteClientPage.jsx";
 import VerifierEmailPage from "./pages/auth/VerifierEmailPage.jsx";
 import AteliersPage from "./pages/superadmin/AteliersPage.jsx";
 import AtelierDetailPage from "./pages/superadmin/AtelierDetailPage.jsx";
@@ -42,6 +44,16 @@ import NotificationsPage from "./features/notifications/NotificationsPage.jsx";
 import CalendrierPage from "./features/calendrier/CalendrierPage.jsx";
 import ComptePage from "./features/compte/ComptePage.jsx";
 import AbonnementPage from "./features/abonnement/AbonnementPage.jsx";
+import DemandesListPage from "./features/demandes/DemandesListPage.jsx";
+import DemandeDetailPage from "./features/demandes/DemandeDetailPage.jsx";
+import ClientProfilPage from "./features/moi/ClientProfilPage.jsx";
+import ClientMesuresPage from "./features/moi/ClientMesuresPage.jsx";
+import ClientCommandesListPage from "./features/moi/ClientCommandesListPage.jsx";
+import ClientCommandeDetailPage from "./features/moi/ClientCommandeDetailPage.jsx";
+import ClientPaiementsPage from "./features/moi/ClientPaiementsPage.jsx";
+import ClientNotificationsPage from "./features/moi/ClientNotificationsPage.jsx";
+import ClientDemandesPage from "./features/moi/ClientDemandesPage.jsx";
+import ClientDemandeFormPage from "./features/moi/ClientDemandeFormPage.jsx";
 
 export default function App() {
   return (
@@ -58,6 +70,10 @@ export default function App() {
           ce navigateur (voir commentaires de chaque page). */}
       <Route path="/reinitialiser-mot-de-passe" element={<ReinitialiserMotDePasseTokenPage />} />
       <Route path="/verifier-email" element={<VerifierEmailPage />} />
+      {/* Lien d'invitation envoyé par l'ADMIN (voir POST /clientes/:id/inviter)
+          — même raisonnement que les deux routes ci-dessus : le jeton dans
+          l'URL authentifie l'action à lui seul. */}
+      <Route path="/client/activer" element={<ActiverCompteClientPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<RequireAtelier />}>
@@ -93,6 +109,21 @@ export default function App() {
             <Route path="/parametres" element={<ParametresPage />} />
             <Route path="/compte" element={<ComptePage />} />
             <Route path="/abonnement" element={<AbonnementPage />} />
+            <Route path="/demandes" element={<DemandesListPage />} />
+            <Route path="/demandes/:id" element={<DemandeDetailPage />} />
+          </Route>
+        </Route>
+
+        <Route element={<RequireClient />}>
+          <Route element={<ClientLayout />}>
+            <Route path="/client" element={<ClientProfilPage />} />
+            <Route path="/client/mesures" element={<ClientMesuresPage />} />
+            <Route path="/client/commandes" element={<ClientCommandesListPage />} />
+            <Route path="/client/commandes/:id" element={<ClientCommandeDetailPage />} />
+            <Route path="/client/paiements" element={<ClientPaiementsPage />} />
+            <Route path="/client/notifications" element={<ClientNotificationsPage />} />
+            <Route path="/client/demandes" element={<ClientDemandesPage />} />
+            <Route path="/client/demandes/nouvelle" element={<ClientDemandeFormPage />} />
           </Route>
         </Route>
 

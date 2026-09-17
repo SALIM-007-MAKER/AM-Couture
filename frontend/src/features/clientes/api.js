@@ -22,6 +22,7 @@ export const clientesApi = {
   archive: (id) => api.post(`/clientes/${id}/archiver`),
   restore: (id) => api.post(`/clientes/${id}/restaurer`),
   totaux: (id) => api.get(`/clientes/${id}/totaux`),
+  inviter: (id) => api.post(`/clientes/${id}/inviter`),
   mesures: {
     list: (clienteId, params) => api.get(`/clientes/${clienteId}/mesures${buildQuery(params)}`),
     create: (clienteId, data) => api.post(`/clientes/${clienteId}/mesures`, data),

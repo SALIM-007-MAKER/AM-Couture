@@ -118,7 +118,21 @@ router.get("/notifications", async (req, res) => {
   const data = await prisma.notification.findMany({
     where: { commande: { clienteId: req.user.clienteId }, type: { in: TYPES_VISIBLES_CLIENT } },
     orderBy: { createdAt: "desc" },
-    include: { commande: { select: { id: true, numero: true, statut: true } } },
+    // Mêmes champs que côté ADMIN (notifications.routes.js) — nécessaires à
+    // notificationMessage() côté frontend (features/notifications/constants.js),
+    // réutilisé tel quel ici pour ne pas dupliquer le texte des notifications.
+    include: {
+      commande: {
+        select: {
+          id: true,
+          numero: true,
+          statut: true,
+          typeVetement: true,
+          dateLivraisonPrevue: true,
+          modele: { select: { id: true, nom: true } },
+        },
+      },
+    },
   });
   res.json({ data });
 });

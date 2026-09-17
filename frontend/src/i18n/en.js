@@ -33,6 +33,7 @@ export default {
     models: "Models",
     stock: "Stock",
     orders: "Orders",
+    requests: "Requests",
     deliveries: "Deliveries",
     payments: "Payments",
     expenses: "Expenses",

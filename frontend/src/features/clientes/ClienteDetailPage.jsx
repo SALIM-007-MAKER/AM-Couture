@@ -17,6 +17,7 @@ import SectionTitle from "../../components/SectionTitle.jsx";
 import MesuresHistory from "./components/MesuresHistory.jsx";
 import ClienteCommandesHistory from "./components/ClienteCommandesHistory.jsx";
 import RappelButton from "./components/RappelButton.jsx";
+import InviterClientButton from "./components/InviterClientButton.jsx";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
@@ -91,6 +92,17 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
             </div>
           )}
         </Card>
+        {!cliente.archivedAt && (
+          <div className="sm:col-span-2">
+            {cliente.userId ? (
+              <p className="inline-flex items-center gap-1.5 rounded-full bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 text-xs font-medium px-2.5 py-1">
+                Compte client actif — {cliente.prenom} peut suivre ses commandes en ligne.
+              </p>
+            ) : (
+              <InviterClientButton clienteId={id} />
+            )}
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">

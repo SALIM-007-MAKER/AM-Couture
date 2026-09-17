@@ -4,11 +4,16 @@ import { api } from "../lib/apiClient.js";
 const ME_KEY = ["auth", "me"];
 
 // Un SUPERADMIN n'a pas d'atelierId — "/" (Dashboard) lui est interdit côté
-// backend (requireAtelier) — son "accueil" est la gestion des ateliers.
-// Utilisé partout où on redirige un utilisateur déjà connecté (voir
-// PublicOnlyRoute.jsx) — une seule source de vérité pour cette règle.
+// backend (requireAtelier) — son "accueil" est la gestion des ateliers. Un
+// USER (§ plan rôle client, Phase 3) a lui aussi un atelierId mais reste
+// interdit des routes ADMIN (voir RequireAtelier, routes/RoleGuards.jsx) —
+// son "accueil" est son propre espace, sous /client. Utilisé partout où on
+// redirige un utilisateur déjà connecté (voir PublicOnlyRoute.jsx) — une
+// seule source de vérité pour cette règle.
 export function homePathForUser(user) {
-  return user?.role === "SUPERADMIN" ? "/vue-ensemble" : "/";
+  if (user?.role === "SUPERADMIN") return "/vue-ensemble";
+  if (user?.role === "USER") return "/client";
+  return "/";
 }
 
 /**
@@ -81,6 +86,22 @@ export function useReinitialiserMotDePasseTokenMutation() {
   return useMutation({
     mutationFn: ({ token, nouveauMotDePasse }) =>
       api.post("/auth/reinitialiser-mot-de-passe-token", { token, nouveauMotDePasse }),
+  });
+}
+
+// Dernière étape de l'invitation d'un client (§ plan rôle USER, Phase 3) —
+// voir POST /api/auth/activer-compte-client (auth.routes.js) et
+// POST /clientes/:id/inviter (features/clientes). Contrairement à
+// useReinitialiserMotDePasseTokenMutation ci-dessus, cette route CONNECTE
+// immédiatement (pose le cookie de session) : on peuple donc le cache de
+// useMeQuery avec la réponse, exactement comme useLoginMutation.
+export function useActiverCompteClientMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ token, nouveauMotDePasse }) => api.post("/auth/activer-compte-client", { token, nouveauMotDePasse }),
+    onSuccess: (user) => {
+      queryClient.setQueryData(ME_KEY, user);
+    },
   });
 }
 

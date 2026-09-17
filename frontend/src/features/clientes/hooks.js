@@ -94,6 +94,21 @@ export function useDerniereMesureQuery(clienteId) {
   });
 }
 
+// Invitation d'un client (§ plan rôle USER, Phase 3) — voir
+// POST /clientes/:id/inviter (backend). N'invalide QUE la fiche détail : la
+// réponse ne porte que { lienActivation }, jamais l'objet Cliente à jour
+// (voir InviterClientButton.jsx, qui affiche le lien une seule fois puis
+// referme le panneau — la fiche se rafraîchit alors avec userId renseigné).
+export function useInviterClienteMutation(id) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => clientesApi.inviter(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clientes", "detail", id] });
+    },
+  });
+}
+
 export function useCreateMesureMutation(clienteId) {
   const queryClient = useQueryClient();
   return useMutation({
