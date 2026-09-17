@@ -148,17 +148,23 @@ export async function demarrerImpersonation({ atelierId, userId, superadminId })
   return compte;
 }
 
-// Supprime un compte d'un atelier — refuse de laisser l'atelier sans AUCUN
-// compte (personne ne pourrait plus jamais s'y connecter, et il n'existe
-// aucune façon d'en recréer un depuis le côté ADMIN — seul le SUPERADMIN le
-// peut, via ce même formulaire "Ajouter un compte").
+// Supprime un compte ADMIN d'un atelier — refuse de laisser l'atelier sans
+// AUCUN compte ADMIN (personne ne pourrait plus jamais le gérer, et il
+// n'existe aucune façon d'en recréer un depuis le côté ADMIN — seul le
+// SUPERADMIN le peut, via ce même formulaire "Ajouter un compte").
+//
+// Restreint EXPLICITEMENT à role: "ADMIN" (§ plan rôle USER, Phase 3) : ce
+// chemin gère les comptes ADMIN d'un atelier, jamais ses comptes clients
+// (USER) — le compte ET le décompte du "dernier compte" ignorent les
+// clients, sans quoi la présence de comptes USER masquerait qu'on retire le
+// DERNIER ADMIN restant.
 export async function supprimerCompteAtelier({ atelierId, userId }) {
-  const compte = await prisma.user.findFirst({ where: { id: userId, atelierId } });
+  const compte = await prisma.user.findFirst({ where: { id: userId, atelierId, role: "ADMIN" } });
   if (!compte) throw new HttpError(404, "Compte introuvable pour cet atelier.");
 
-  const nombreComptes = await prisma.user.count({ where: { atelierId } });
+  const nombreComptes = await prisma.user.count({ where: { atelierId, role: "ADMIN" } });
   if (nombreComptes <= 1) {
-    throw new HttpError(409, "Impossible de supprimer le dernier compte de cet atelier.");
+    throw new HttpError(409, "Impossible de supprimer le dernier compte ADMIN de cet atelier.");
   }
   await prisma.user.delete({ where: { id: compte.id } });
 }

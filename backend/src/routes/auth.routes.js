@@ -92,7 +92,15 @@ router.post("/login", loginLimiter, async (req, res) => {
   // ou ralentir à cause de cet horodatage, purement informatif.
   prisma.user.update({ where: { id: user.id }, data: { derniereConnexionAt: new Date() } }).catch(() => {});
 
-  const token = signAuthToken(user);
+  // clienteId (§ plan rôle USER) : signé UNE FOIS ici depuis la base, jamais
+  // fourni par le frontend — voir signAuthToken, jwt.js.
+  let clienteId;
+  if (user.role === "USER") {
+    const cliente = await prisma.cliente.findUnique({ where: { userId: user.id }, select: { id: true } });
+    clienteId = cliente?.id;
+  }
+
+  const token = signAuthToken({ ...user, clienteId });
   setAuthCookie(res, token);
   res.json({ id: user.id, identifiant: user.identifiant, role: user.role, atelierId: user.atelierId });
 });
@@ -291,6 +299,32 @@ router.post("/reinitialiser-mot-de-passe-token", async (req, res) => {
   // la personne se reconnecte ensuite normalement via /login.
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash, sessionVersion: { increment: 1 } } });
   res.status(204).end();
+});
+
+// POST /api/auth/activer-compte-client — dernière étape de l'invitation
+// envoyée par l'ADMIN (voir clientes.routes.js POST /:id/inviter). Le jeton
+// authentifie l'action (aucune session requise) et désigne le compte USER
+// déjà créé (avec un mot de passe temporaire inutilisable) au moment de
+// l'invitation. Contrairement à la réinitialisation de mot de passe
+// ci-dessus, CONNECTE IMMÉDIATEMENT (même décision que l'inscription
+// libre-service d'un atelier) : c'est une PREMIÈRE activation, pas une
+// récupération après appareil perdu/compromis.
+router.post("/activer-compte-client", async (req, res) => {
+  const parsed = reinitialiserMotDePasseTokenSchema.safeParse(req.body);
+  if (!parsed.success) {
+    throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
+  }
+  const user = await consommerToken({ token: parsed.data.token, type: "INVITATION_CLIENT" });
+  const passwordHash = await bcrypt.hash(parsed.data.nouveauMotDePasse, 12);
+  const misAJour = await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash, sessionVersion: { increment: 1 } },
+  });
+
+  const cliente = await prisma.cliente.findUnique({ where: { userId: misAJour.id }, select: { id: true } });
+  const token = signAuthToken({ ...misAJour, clienteId: cliente?.id });
+  setAuthCookie(res, token);
+  res.json({ id: misAJour.id, identifiant: misAJour.identifiant, role: misAJour.role, atelierId: misAJour.atelierId });
 });
 
 router.post("/logout", (req, res) => {

@@ -41,6 +41,9 @@ export async function requireAuth(req, res, next) {
       // lib/jwt.js) — permet à /auth/quitter-impersonation de retrouver le
       // compte SUPERADMIN d'origine.
       impersonatedBy: payload.impersonatedBy ?? null,
+      // Présent UNIQUEMENT pour un compte USER (§ plan rôle client, voir
+      // requireClient ci-dessous) — jamais pour ADMIN/SUPERADMIN.
+      clienteId: payload.clienteId ?? null,
     };
     next();
   } catch (err) {
@@ -58,6 +61,13 @@ export async function requireAuth(req, res, next) {
  * (POST /ateliers/:id/comptes/:userId/impersonation) pour agir "en tant que"
  * le compte ADMIN de tel ou tel atelier, avec le jeton de CE compte.
  *
+ * Vérifie EXPLICITEMENT `role === "ADMIN"`, pas seulement la présence
+ * d'atelierId : depuis l'introduction du rôle USER (§ plan rôle client,
+ * Phase 3), un compte USER a LUI AUSSI un atelierId (celui de l'atelier dont
+ * il est client) — un simple test de présence laisserait un USER passer et
+ * accéder à toutes les routes ADMIN. USER doit passer par requireClient
+ * (routes /api/moi/*), jamais par ici.
+ *
  * Vérifie aussi que l'atelier n'est pas suspendu — EN BASE, à CHAQUE requête
  * (pas seulement à la connexion) : une suspension décidée par le SUPERADMIN
  * doit prendre effet immédiatement, même pour une session déjà ouverte
@@ -68,11 +78,11 @@ export async function requireAuth(req, res, next) {
  * métier qui suivent de toute façon dans la même route.
  */
 export async function requireAtelier(req, res, next) {
-  if (!req.user?.atelierId) {
+  if (req.user?.role !== "ADMIN" || !req.user?.atelierId) {
     return next(
       new HttpError(
         403,
-        "Un compte SUPERADMIN n'accède pas directement aux données d'un atelier — connectez-vous avec un compte ADMIN de cet atelier.",
+        "Réservé aux comptes ADMIN d'un atelier.",
       ),
     );
   }
@@ -145,6 +155,30 @@ export async function requireAbonnementActif(req, res, next) {
 export function requireSuperadmin(req, res, next) {
   if (req.user?.role !== "SUPERADMIN") {
     return next(new HttpError(403, "Réservé au SUPERADMIN de la plateforme."));
+  }
+  next();
+}
+
+/**
+ * À utiliser APRÈS requireAuth sur les routes du client final (§ plan rôle
+ * USER — voir routes/moi.routes.js, montées sous /api/moi). Exige un compte
+ * USER avec un clienteId valide dans le jeton.
+ *
+ * RÈGLE ABSOLUE pour tout ce qui est monté derrière ce middleware : filtrer
+ * TOUJOURS par `req.user.clienteId`, JAMAIS par `req.user.atelierId` seul —
+ * contrairement à un ADMIN (scopé par atelier, qui voit légitimement TOUTES
+ * les données de son atelier), un USER ne doit voir QUE ses propres données,
+ * même au sein du même atelier. `atelierId` reste disponible pour les
+ * quelques écritures qui en ont besoin (ex: créer une DemandeCommande), mais
+ * ne doit jamais servir de filtre de LECTURE à lui seul ici.
+ *
+ * Délibérément AUCUN requireAbonnementActif sur ces routes : un client final
+ * consultant ses propres commandes ne doit jamais être bloqué parce que SON
+ * atelier n'a pas payé son abonnement plateforme — hors de son contrôle.
+ */
+export function requireClient(req, res, next) {
+  if (req.user?.role !== "USER" || !req.user.clienteId) {
+    return next(new HttpError(403, "Réservé aux comptes clients."));
   }
   next();
 }

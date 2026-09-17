@@ -1,4 +1,6 @@
 import { Router } from "express";
+import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
@@ -12,6 +14,7 @@ import {
 } from "../schemas/cliente.schema.js";
 import mesuresRouter from "./mesures.routes.js";
 import { buildCsv, envoyerCsv } from "../lib/csv.js";
+import { creerToken } from "../lib/tokenAction.js";
 
 const router = Router();
 
@@ -290,6 +293,58 @@ router.post("/:id/restaurer", async (req, res) => {
 
   const cliente = await prisma.cliente.findUnique({ where: { id } });
   res.json(cliente);
+});
+
+// POST /api/clientes/:id/inviter — crée le compte USER de ce client
+// (identifiant = son téléphone) et renvoie un lien d'activation à usage
+// unique (7 jours) pour qu'il choisisse lui-même son mot de passe — même
+// principe que /auth/reinitialiser-mot-de-passe-token, réutilisé tel quel
+// (voir lib/tokenAction.js). Le compte existe IMMÉDIATEMENT avec un mot de
+// passe temporaire ALÉATOIRE ET INUTILISABLE (jamais communiqué, jamais
+// devinable) : sans activation, ce compte ne permet jamais de se connecter.
+//
+// Aucune infrastructure SMS dans ce projet à ce stade (voir Resend, réservé
+// à l'email) : le lien est renvoyé tel quel dans la réponse, à charge de
+// l'ADMIN de le transmettre au client par le canal de son choix (WhatsApp,
+// appel...) — même décision déjà prise pour la réinitialisation de mot de
+// passe par le SUPERADMIN (voir ateliers.routes.js).
+router.post("/:id/inviter", async (req, res) => {
+  const cliente = await prisma.cliente.findFirst({ where: { id: req.params.id, atelierId: req.user.atelierId } });
+  if (!cliente) throw new HttpError(404, "Client introuvable.");
+  if (cliente.userId) {
+    throw new HttpError(409, "Ce client a déjà été invité ou possède déjà un compte.");
+  }
+
+  const identifiant = cliente.telephone;
+  const existant = await prisma.user.findUnique({ where: { identifiant } });
+  if (existant) {
+    throw new HttpError(409, "Un compte existe déjà avec ce numéro de téléphone.", {
+      telephone: ["Un compte existe déjà avec ce numéro de téléphone."],
+    });
+  }
+
+  // Coût bcrypt normal malgré l'inutilisabilité : ce hash ne doit jamais
+  // être plus facile à retrouver par force brute qu'un vrai mot de passe.
+  const passwordHashTemporaire = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
+
+  const { token } = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        identifiant,
+        passwordHash: passwordHashTemporaire,
+        role: "USER",
+        atelierId: cliente.atelierId,
+        prenom: cliente.prenom,
+        nom: cliente.nom,
+      },
+    });
+    await tx.cliente.update({ where: { id: cliente.id }, data: { userId: user.id } });
+    const token = await creerToken({ userId: user.id, type: "INVITATION_CLIENT", dureeMs: 7 * 24 * 60 * 60 * 1000 }, tx);
+    return { token };
+  });
+
+  const origin = `${req.protocol}://${req.get("host")}`;
+  res.status(201).json({ lienActivation: `${origin}/client/activer?token=${token}` });
 });
 
 export default router;

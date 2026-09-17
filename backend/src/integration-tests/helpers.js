@@ -19,17 +19,34 @@ export function arreterServeur(server) {
   return new Promise((resolve) => server.close(resolve));
 }
 
+// Chaque client() simule un utilisateur distinct avec sa propre IP publique
+// (voir plus bas) — un compteur de process suffit, jamais réinitialisé entre
+// tests d'un même run.
+let compteurIp = 1;
+
 /**
  * Client HTTP avec un cookie de session géré manuellement — `fetch` n'a pas
  * de cookie jar intégré côté Node, contrairement à un navigateur.
+ *
+ * Envoie un en-tête X-Forwarded-For unique par instance (app.js configure
+ * `trust proxy`, donc Express en tient compte pour req.ip) : sans ça, TOUS
+ * les logins de TOUS les fichiers de test partageraient la même IP loopback
+ * aux yeux du rate limiter persistant (lib/rateLimiter.js), qui cumule ses
+ * compteurs en base entre tests — un seul fichier avec beaucoup de logins
+ * suffit à déclencher un 429 sur les tests suivants, un faux positif déjà
+ * rencontré deux fois pendant le développement. Chaque client() ici
+ * représente un utilisateur réel différent, donc une IP différente est plus
+ * fidèle au comportement réel, pas un contournement du rate limiter lui-même.
  */
 export function client(baseUrl) {
   let cookie = null;
+  const ip = `203.0.113.${compteurIp++}`;
   async function requete(path, { method = "GET", body } = {}) {
     const res = await fetch(`${baseUrl}${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
+        "X-Forwarded-For": ip,
         ...(cookie ? { Cookie: cookie } : {}),
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
@@ -76,6 +93,21 @@ export async function creerCliente(atelierId, data = {}) {
   });
 }
 
+/**
+ * Crée directement un compte USER lié à une Cliente (état final du flux
+ * d'invitation réel — voir clientes.routes.js POST /:id/inviter et
+ * auth.routes.js POST /activer-compte-client, qui ont chacun leur propre
+ * test dédié) : évite de rejouer la mécanique de jeton dans CHAQUE test
+ * d'autorisation qui a juste besoin d'un compte client déjà actif.
+ */
+export async function creerEtActiverClient(atelierId, clienteId, { password = "password123" } = {}) {
+  const identifiant = identifiantUnique("user-test");
+  const passwordHash = await bcrypt.hash(password, 4);
+  const user = await prisma.user.create({ data: { identifiant, passwordHash, role: "USER", atelierId } });
+  await prisma.cliente.update({ where: { id: clienteId }, data: { userId: user.id } });
+  return { user, identifiant, password };
+}
+
 export async function creerCommande(atelierId, clienteId, data = {}) {
   return prisma.commande.create({
     data: {
@@ -98,12 +130,19 @@ export async function creerCommande(atelierId, clienteId, data = {}) {
 export async function supprimerAtelier(atelierId) {
   const commandes = await prisma.commande.findMany({ where: { atelierId }, select: { id: true } });
   const commandeIds = commandes.map((c) => c.id);
+  // DemandeCommande AVANT commande/cliente : ses 3 FK (atelierId, clienteId,
+  // commandeId) sont toutes en onDelete: Restrict.
+  await prisma.demandeCommande.deleteMany({ where: { atelierId } });
   await prisma.notification.deleteMany({ where: { commandeId: { in: commandeIds } } });
   await prisma.recu.deleteMany({ where: { commandeId: { in: commandeIds } } });
   await prisma.livraison.deleteMany({ where: { commandeId: { in: commandeIds } } });
   await prisma.paiement.deleteMany({ where: { commandeId: { in: commandeIds } } });
   await prisma.commande.deleteMany({ where: { atelierId } });
   await prisma.mesure.deleteMany({ where: { cliente: { atelierId } } });
+  // userId (Cliente -> User) est onDelete: SetNull, mais on détache quand
+  // même explicitement avant de supprimer les User (role USER) ci-dessous,
+  // par clarté plutôt que de compter sur le SetNull implicite.
+  await prisma.cliente.updateMany({ where: { atelierId }, data: { userId: null } });
   await prisma.cliente.deleteMany({ where: { atelierId } });
   await prisma.modele.deleteMany({ where: { atelierId } });
   await prisma.depense.deleteMany({ where: { atelierId } });

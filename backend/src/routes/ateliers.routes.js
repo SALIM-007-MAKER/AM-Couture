@@ -49,7 +49,11 @@ router.get("/", async (req, res) => {
       skip: (page - 1) * pageSize,
       take: pageSize,
       include: {
-        _count: { select: { users: true, clientes: true, commandes: true } },
+        // users filtré à ADMIN (§ plan rôle USER, Phase 3) : depuis
+        // l'introduction des comptes clients (role USER, eux aussi rattachés
+        // à l'atelier), un compte non filtré compterait les clients dans
+        // "nombre de comptes ADMIN" — trompeur pour le SUPERADMIN.
+        _count: { select: { users: { where: { role: "ADMIN" } }, clientes: true, commandes: true } },
       },
     }),
     prisma.atelier.count({ where }),
@@ -233,8 +237,14 @@ router.get("/:id", async (req, res) => {
   const atelier = await prisma.atelier.findUnique({
     where: { id: req.params.id },
     include: {
-      _count: { select: { users: true, clientes: true, commandes: true } },
+      // Filtré à role: "ADMIN" — depuis l'introduction du rôle USER (§ plan
+      // rôle client, Phase 3), un compte client est LUI AUSSI rattaché à cet
+      // atelier ; cette section de la console SUPERADMIN gère les comptes
+      // ADMIN de l'atelier (réinitialisation, retrait, impersonation), pas
+      // ses clients — jamais les mélanger ici.
+      _count: { select: { users: { where: { role: "ADMIN" } }, clientes: true, commandes: true } },
       users: {
+        where: { role: "ADMIN" },
         select: { id: true, identifiant: true, prenom: true, nom: true, email: true, derniereConnexionAt: true, createdAt: true },
         orderBy: { createdAt: "asc" },
       },

@@ -85,10 +85,16 @@ enum StatutTransaction {
 // Multi-tenant (Phase 8) — plateforme "Gestion d'Atelier" : SUPERADMIN gère
 // toute la plateforme (aucun atelierId, voir User ci-dessous) ; ADMIN
 // appartient à exactement un atelier et n'accède qu'à ses propres données
-// (cloisonnement appliqué côté backend, voir lib/scopeAtelier.js).
+// (cloisonnement appliqué côté backend, voir lib/scopeAtelier.js). USER
+// (§ plan rôle client, Phase 3) : un client final, TOUJOURS rattaché à un
+// atelier ET à exactement une Cliente (voir Cliente.userId ci-dessous) —
+// n'accède jamais aux données d'un autre client, même au sein du même
+// atelier (filtrage par clienteId, pas seulement atelierId — voir
+// middlewares/auth.middleware.js:requireClient).
 enum RoleUtilisateur {
   SUPERADMIN
   ADMIN
+  USER
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -138,6 +144,9 @@ model User {
   sessionVersion Int @default(0)
 
   tokensAction TokenAction[]
+  // Présent UNIQUEMENT pour un compte USER (voir Cliente.userId) — null pour
+  // ADMIN/SUPERADMIN, qui ne sont jamais reliés à une Cliente.
+  cliente      Cliente?      @relation
 
   @@index([atelierId])
 }
@@ -145,6 +154,12 @@ model User {
 enum TypeTokenAction {
   VERIFICATION_EMAIL
   REINITIALISATION_MOT_DE_PASSE
+  // Invitation d'un client final (§ plan rôle USER) — voir
+  // clientes.routes.js POST /:id/inviter. Le User (role USER) et le lien
+  // Cliente.userId sont créés IMMÉDIATEMENT à l'invitation (avec un
+  // passwordHash temporaire et inutilisable) ; ce jeton sert uniquement à
+  // laisser le client choisir son VRAI mot de passe pour activer l'accès.
+  INVITATION_CLIENT
 }
 
 // Jetons à usage unique envoyés par email (Resend, voir lib/resend.js) —
@@ -203,9 +218,10 @@ model Atelier {
   clientes      Cliente[]
   modeles       Modele[]
   commandes     Commande[]
-  depenses      Depense[]
-  articlesStock ArticleStock[]
-  abonnements   Abonnement[]
+  depenses         Depense[]
+  articlesStock    ArticleStock[]
+  abonnements      Abonnement[]
+  demandesCommande DemandeCommande[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -227,8 +243,21 @@ model Cliente {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
-  mesures   Mesure[]
-  commandes Commande[]
+  // Lien OPTIONNEL vers un compte de connexion (§ plan rôle USER, Phase 3) —
+  // Cliente reste l'unique source de vérité métier, User n'est qu'un MOYEN
+  // DE CONNEXION greffé dessus : une Cliente peut exister indéfiniment sans
+  // jamais avoir de compte (client géré uniquement par l'atelier). Créé par
+  // l'invitation ADMIN (voir clientes.routes.js POST /:id/inviter), jamais
+  // par auto-inscription. onDelete: SetNull (déroge à la convention Restrict
+  // du reste du schéma) : supprimer le compte de connexion ne doit JAMAIS
+  // faire perdre la moindre donnée métier — la Cliente redevient simplement
+  // "sans compte", son état le plus courant.
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  mesures          Mesure[]
+  commandes        Commande[]
+  demandesCommande DemandeCommande[]
 
   @@index([atelierId])
   @@index([nom, prenom])
@@ -275,7 +304,8 @@ model Modele {
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
-  commandes Commande[]
+  commandes        Commande[]
+  demandesCommande DemandeCommande[]
 
   @@index([atelierId])
   @@index([nom])
@@ -332,6 +362,9 @@ model Commande {
   livraisons    Livraison[]
   recus         Recu[]
   notifications Notification[]
+  // Présente UNIQUEMENT si cette commande est née d'une demande envoyée par
+  // le client (§ plan rôle USER) — voir DemandeCommande.commandeId.
+  demandeOrigine DemandeCommande?
 
   // atelierId : index déjà présent en base depuis la migration Phase 8
   // (20260913051222_multi_tenant_ateliers, ajouté en SQL brut) mais jusqu'ici
@@ -342,6 +375,47 @@ model Commande {
   @@index([clienteId])
   @@index([statut])
   @@index([dateLivraisonPrevue])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Demande de commande (§ plan rôle USER, Phase 3) — un client final PROPOSE,
+// l'ADMIN DÉCIDE. Jamais de création directe de Commande par un USER : le
+// prix, le modèle final, les dates restent entièrement sous le contrôle de
+// l'atelier, qui transforme (ou refuse) la demande en une vraie Commande.
+// ─────────────────────────────────────────────────────────────────────────
+
+enum StatutDemandeCommande {
+  EN_ATTENTE
+  ACCEPTEE
+  REFUSEE
+}
+
+model DemandeCommande {
+  id        String  @id @default(cuid())
+  atelierId String
+  atelier   Atelier @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  clienteId String
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  modeleId  String?
+  modele    Modele? @relation(fields: [modeleId], references: [id], onDelete: SetNull)
+
+  description String?
+
+  statut     StatutDemandeCommande @default(EN_ATTENTE)
+  motifRefus String?
+
+  // Posé UNIQUEMENT quand l'ADMIN accepte la demande — la Commande créée à
+  // ce moment-là est la seule trace formelle de l'engagement (prix, dates),
+  // jamais devinée depuis la demande elle-même.
+  commandeId String?   @unique
+  commande   Commande? @relation(fields: [commandeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([atelierId])
+  @@index([clienteId])
+  @@index([statut])
 }
 
 model Paiement {

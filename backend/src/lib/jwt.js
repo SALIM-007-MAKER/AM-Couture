@@ -27,6 +27,12 @@ const EXPIRES_IN = "7d";
 // re-signer un jeton pour le SUPERADMIN d'origine sans jamais avoir eu
 // besoin de conserver son ancien cookie (le jeton d'impersonation porte
 // lui-même la trace du retour).
+// clienteId (§ plan rôle USER, Phase 3) : présent UNIQUEMENT pour un compte
+// USER — signé une fois pour toutes ici, jamais fourni par le frontend.
+// Narrowing indispensable : contrairement à atelierId (suffisant pour un
+// ADMIN, qui voit toutes les données de SON atelier), un USER doit être
+// filtré par clienteId sur CHAQUE route /api/moi/*, sans quoi il verrait les
+// autres clients de son propre atelier (voir requireClient, auth.middleware.js).
 export function signAuthToken(user, { impersonatedBy } = {}) {
   return jwt.sign(
     {
@@ -35,6 +41,7 @@ export function signAuthToken(user, { impersonatedBy } = {}) {
       role: user.role,
       atelierId: user.atelierId,
       sessionVersion: user.sessionVersion,
+      ...(user.clienteId ? { clienteId: user.clienteId } : {}),
       ...(impersonatedBy ? { impersonatedBy } : {}),
     },
     JWT_SECRET,

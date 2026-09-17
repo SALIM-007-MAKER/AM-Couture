@@ -19,9 +19,9 @@ function genererToken() {
  * vieil email par erreur, mais j'ai aussi redemandé un nouveau lien entre
  * temps" : le dernier lien envoyé ne doit pas invalider silencieusement.
  */
-export async function creerToken({ userId, type, dureeMs }) {
+export async function creerToken({ userId, type, dureeMs }, client = prisma) {
   const token = genererToken();
-  await prisma.tokenAction.create({
+  await client.tokenAction.create({
     data: { token, type, userId, expireLe: new Date(Date.now() + dureeMs) },
   });
   return token;
