@@ -27,7 +27,15 @@ jobs:
       # Le client Prisma généré n'est jamais commité (voir .gitignore) —
       # nécessaire ici car backend/src/lib/money.js importe le client généré
       # (pour Prisma.Decimal), même dans les tests qui ne touchent aucune base.
+      # DIRECT_URL : prisma.config.ts (via `env("DIRECT_URL")`) exige que la
+      # variable existe pour charger la config CLI, même pour `generate` qui
+      # ne se connecte jamais réellement — sans `.env` (jamais commité, voir
+      # .gitignore) et sans cette variable, le chargement de la config échoue
+      # avant même de lire le schéma. Valeur factice : jamais utilisée pour une
+      # vraie connexion dans ce job (aucun service Postgres ici).
       - run: npx prisma generate --schema prisma/schema.prisma
+        env:
+          DIRECT_URL: postgresql://user:pass@localhost:5432/db
 
       - run: npm run lint -w frontend
 
@@ -67,7 +75,14 @@ jobs:
 
       - run: npm ci
 
+      # Voir le commentaire équivalent dans le job `verifier` ci-dessus — même
+      # exigence de prisma.config.ts. Ici, DIRECT_URL pointe déjà vers le
+      # service Postgres jetable de ce job (même valeur que les étapes
+      # suivantes), donc une vraie connexion resterait possible, mais
+      # `generate` ne s'y connecte de toute façon jamais.
       - run: npx prisma generate --schema prisma/schema.prisma
+        env:
+          DIRECT_URL: postgresql://test:test@localhost:5432/gestion_atelier_test
 
       - name: Applique les migrations sur la base Postgres jetable du service CI
         run: npx prisma migrate deploy
