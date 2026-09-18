@@ -134,6 +134,27 @@ describe("Frontières entre rôles ADMIN / USER", () => {
     assert.equal(pdf.status, 404);
   });
 
+  test("le client peut générer lui-même un reçu de sa propre commande, jamais de celle d'un autre", async () => {
+    const adminApi = client(baseUrl);
+    await adminApi.post("/api/auth/login", { identifiant: identifiantAdmin, password: passwordAdmin });
+    const paiement = await adminApi.post(`/api/commandes/${commandeA.id}/paiements`, { montant: "5000", mode: "ESPECES" });
+    assert.equal(paiement.status, 201);
+
+    const apiA = client(baseUrl);
+    await apiA.post("/api/auth/login", { identifiant: userA.identifiant, password: userA.password });
+    const genere = await apiA.post(`/api/moi/commandes/${commandeA.id}/recus`);
+    assert.equal(genere.status, 201);
+    assert.equal(genere.body.montantPaye, "5000");
+
+    const listeA = await apiA.get("/api/moi/recus");
+    assert.ok(listeA.body.data.some((r) => r.id === genere.body.id));
+
+    const apiB = client(baseUrl);
+    await apiB.post("/api/auth/login", { identifiant: userB.identifiant, password: userB.password });
+    const tentativeB = await apiB.post(`/api/moi/commandes/${commandeA.id}/recus`);
+    assert.equal(tentativeB.status, 404);
+  });
+
   test("RÉGRESSION : une demande de commande d'un client compte dans la pastille de notifications de l'ADMIN", async () => {
     const apiA = client(baseUrl);
     await apiA.post("/api/auth/login", { identifiant: userA.identifiant, password: userA.password });

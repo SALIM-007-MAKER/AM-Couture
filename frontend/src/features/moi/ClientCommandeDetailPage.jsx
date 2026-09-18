@@ -1,11 +1,13 @@
 import { useParams } from "react-router-dom";
-import { ClipboardList, Shirt, Banknote, Wallet, Truck } from "lucide-react";
-import { useMaCommandeQuery } from "./hooks.js";
+import { ClipboardList, Shirt, Banknote, Wallet, Truck, FileText, Download } from "lucide-react";
+import { useMaCommandeQuery, useGenererRecuMutation } from "./hooks.js";
+import { recuPdfUrl } from "./api.js";
 import { prioriteLabel, modeLabel } from "../commandes/constants.js";
 import { CATEGORIES_VETEMENT } from "../modeles/constants.js";
-import { LoadingState, ErrorState } from "../../components/QueryState.jsx";
+import { LoadingState, ErrorState, GlobalFormError } from "../../components/QueryState.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
+import Button from "../../components/Button.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
 import CommandeStatutBadge from "../commandes/components/CommandeStatutBadge.jsx";
 import PaiementStatutBadge from "../commandes/components/PaiementStatutBadge.jsx";
@@ -31,6 +33,10 @@ function InfoRow({ label, value }) {
 // ADMIN), sans aucune action de modification (transitions de statut,
 // paiements, livraisons) : un USER consulte, il n'agit jamais directement
 // sur les données métier (voir requireClient, backend/src/middlewares/auth.middleware.js).
+// Seule exception, comme la proposition de nouvelle commande (voir
+// ClientDemandeFormPage.jsx) : générer SON PROPRE reçu récapitulatif
+// (GenererRecuButton plus bas) — ne crée qu'un document à partir de données
+// déjà existantes, jamais une écriture métier.
 export default function ClientCommandeDetailPage() {
   const { id } = useParams();
   const query = useMaCommandeQuery(id);
@@ -94,6 +100,7 @@ export default function ClientCommandeDetailPage() {
             <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">{commande.solde}</p>
           </div>
         </Card>
+        {Number(commande.totalPaye) > 0 && <GenererRecuButton commandeId={commande.id} />}
       </div>
 
       <div className="space-y-2">
@@ -128,6 +135,34 @@ export default function ClientCommandeDetailPage() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Voir le commentaire en tête de fichier — seule action d'écriture possible
+// depuis l'espace client sur une commande, et seulement pour produire un
+// document, jamais pour modifier quoi que ce soit. Même repli "un seul
+// bouton, une carte de résultat" que InviterClientButton.jsx (côté ADMIN).
+function GenererRecuButton({ commandeId }) {
+  const mutation = useGenererRecuMutation(commandeId);
+
+  if (mutation.data) {
+    return (
+      <Card variant="outlined" className="flex items-center justify-between gap-3 text-sm">
+        <span className="text-green-700 dark:text-green-400">Reçu {mutation.data.numero} généré.</span>
+        <Button as="a" href={recuPdfUrl(mutation.data.id)} target="_blank" rel="noreferrer" variant="secondary" size="sm" icon={Download}>
+          Télécharger
+        </Button>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <GlobalFormError error={mutation.error} />
+      <Button variant="secondary" size="sm" icon={FileText} loading={mutation.isPending} onClick={() => mutation.mutate()}>
+        Générer un reçu
+      </Button>
     </div>
   );
 }

@@ -10,6 +10,7 @@ export const moiApi = {
   commandes: {
     list: () => api.get("/moi/commandes"),
     get: (id) => api.get(`/moi/commandes/${id}`),
+    genererRecu: (id) => api.post(`/moi/commandes/${id}/recus`),
   },
   paiements: () => api.get("/moi/paiements"),
   notifications: {

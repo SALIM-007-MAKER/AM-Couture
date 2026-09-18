@@ -25,6 +25,19 @@ export function useMesPaiementsQuery() {
   return useQuery({ queryKey: ["moi", "paiements"], queryFn: moiApi.paiements });
 }
 
+// Le client génère lui-même un reçu récapitulatif de SA commande (voir
+// POST /moi/commandes/:id/recus) — invalide sa propre liste de reçus pour
+// que ClientRecusPage.jsx le voie apparaître sans recharger la page.
+export function useGenererRecuMutation(commandeId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => moiApi.commandes.genererRecu(commandeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["moi", "recus"] });
+    },
+  });
+}
+
 export function useMesNotificationsQuery() {
   return useQuery({ queryKey: ["moi", "notifications", "list"], queryFn: moiApi.notifications.list });
 }

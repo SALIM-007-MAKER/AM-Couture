@@ -10,6 +10,8 @@ import { reconcilierNotifications } from "../lib/notifications.js";
 import { creerDemandeSchema } from "../schemas/demandeCommande.schema.js";
 import { RECU_INCLUDE } from "../lib/recuInclude.js";
 import { streamRecuPdf } from "../lib/recuPdf.js";
+import { Prisma } from "../generated/prisma/client.ts";
+import { nextNumero } from "../lib/numero.js";
 
 // Espace client final (§ plan rôle USER, Phase 3) — un USER voit UNIQUEMENT
 // ses propres données. RÈGLE ABSOLUE, répétée sur chaque route ci-dessous :
@@ -254,6 +256,49 @@ router.get("/demandes", async (req, res) => {
     include: { modele: { select: { id: true, nom: true } }, commande: { select: { id: true, numero: true } } },
   });
   res.json({ data });
+});
+
+// POST /api/moi/commandes/:id/recus — le client génère LUI-MÊME un reçu
+// récapitulatif de sa propre commande (§ notifications/self-service atelier
+// <-> client), sans devoir le demander à l'ADMIN. Même logique EXACTE que
+// POST /commandes/:commandeId/recus côté ADMIN (recus.routes.js) —
+// montantPaye = total réellement encaissé à cet instant, calculé côté base,
+// jamais un chiffre saisi — juste re-scopée par clienteId au lieu
+// d'atelierId. Aucune notification pour l'ADMIN ici : le client consulte
+// ses propres données déjà connues de l'atelier, ce n'est pas un événement
+// qui le concerne (contrairement à un reçu émis PAR l'ADMIN, voir
+// recus.routes.js, qui lui notifie le client).
+router.post("/commandes/:id/recus", async (req, res) => {
+  const commandeId = req.params.id;
+
+  const recu = await prisma.$transaction(
+    async (tx) => {
+      const commande = await tx.commande.findFirst({
+        where: { id: commandeId, clienteId: req.user.clienteId },
+        select: { id: true },
+      });
+      if (!commande) throw new HttpError(404, "Commande introuvable.");
+
+      const agrege = await tx.paiement.aggregate({
+        where: { commandeId, annuleAt: null },
+        _sum: { montant: true },
+      });
+      const montantPaye = agrege._sum.montant ?? new Prisma.Decimal(0);
+
+      if (montantPaye.lessThanOrEqualTo(0)) {
+        throw new HttpError(409, "Aucun paiement encaissé sur cette commande : impossible d'émettre un reçu.");
+      }
+
+      const numero = await nextNumero(tx, "REC");
+      return tx.recu.create({
+        data: { commandeId, montantPaye: montantPaye.toString(), numero },
+        include: RECU_INCLUDE,
+      });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
+
+  res.status(201).json(recu);
 });
 
 // GET /api/moi/recus — historique des reçus, toutes commandes confondues

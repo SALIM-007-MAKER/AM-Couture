@@ -149,7 +149,6 @@ describe("Fil d'activité client — un événement par action ADMIN", () => {
   test("le compteur non-lues progresse, et le marquage lu ne fonctionne QUE pour les événements (jamais les états)", async () => {
     const adminApi = client(baseUrl);
     await adminApi.post("/api/auth/login", { identifiant: identifiantAdmin, password: passwordAdmin });
-    const commande = await creerCommande(atelier.id, clienteA.id);
 
     const apiA = client(baseUrl);
     await apiA.post("/api/auth/login", { identifiant: userA.identifiant, password: userA.password });
