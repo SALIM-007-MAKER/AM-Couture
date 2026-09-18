@@ -126,60 +126,6 @@ export default {
     "markUnread": "Mark as unread",
     "markRead": "Mark as read"
   },
-  "abo": {
-    "statut": {
-      "EN_ATTENTE": "Awaiting payment",
-      "ACTIF": "Active",
-      "EXPIRE": "Expired",
-      "ANNULE": "Cancelled"
-    },
-    "trx": {
-      "EN_ATTENTE": "Pending",
-      "REUSSIE": "Successful",
-      "ECHOUEE": "Failed",
-      "ANNULEE": "Cancelled",
-      "EXPIREE": "Expired"
-    },
-    "trialEnded": "Free trial ended on {{date}}.",
-    "trialLeft": "Free trial — {{jours}} day(s) left (until {{date}}).",
-    "subtitle": "The workshop's access to the Gestion d'Atelier platform.",
-    "verifying": "Wave payment being verified — the status below will update automatically once confirmed (never before a reliable server-side check).",
-    "failed": "Wave payment cancelled or failed — you can try again below.",
-    "currentStatus": "Current status",
-    "planLine": "{{nom}} plan — {{prix}} FCFA",
-    "expiresOn": "Expires on {{date}}",
-    "expiredOn": "Expired on {{date}}",
-    "none": "No subscription yet.",
-    "subscribeRenew": "Subscribe / renew",
-    "pendingManual": "Payments awaiting manual confirmation",
-    "history": "History",
-    "historyEmpty": "No subscriptions yet.",
-    "loadingPlans": "Loading plans…",
-    "mockBanner": "Test mode — no real API key is configured. Payments are simulated, no real money is moved.",
-    "selectedPlan": "Plan",
-    "paymentMethod": "Payment method",
-    "manualNotice": "Manual confirmation: make the transfer to the workshop's {{moyen}} account, then enter the reference below. The subscription will only be activated after manual verification — this is not an automatic check.",
-    "transferRef": "Transfer reference",
-    "refPlaceholder": "{{moyen}} reference",
-    "payWithWave": "Pay with Wave",
-    "sendForConfirmation": "Send for confirmation",
-    "requestSent": "Request sent — awaiting manual confirmation once the payment is verified.",
-    "noPendingManual": "No payment awaiting manual confirmation.",
-    "reference": "Reference",
-    "reject": "Reject",
-    "test": {
-      "REUSSIE": "Simulate a successful payment",
-      "ECHOUEE": "Simulate a failed payment",
-      "ANNULEE": "Simulate a cancellation",
-      "EXPIREE": "Simulate an expiry",
-      "loading": "Loading the transaction…",
-      "title": "Test payment",
-      "subtitle": "{{moyen}} simulation — no real money is moved.",
-      "plan": "Plan",
-      "choose": "Choose the result to simulate for this payment attempt.",
-      "redirecting": "Result simulated — redirecting to your subscription…"
-    }
-  },
   "mesure": {
     "card": {
       "noStructured": "No structured measurements recorded."

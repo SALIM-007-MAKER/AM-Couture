@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { etatAbonnementAtelier } from "../lib/abonnement.js";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth, requireSuperadmin } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
@@ -195,11 +196,11 @@ router.get("/alertes", async (req, res) => {
   res.json({ nouveauxAteliers, ateliersSuspendus, abonnementsAlerte });
 });
 
-// GET /api/ateliers/abonnements — statut d'abonnement de CHAQUE atelier
-// (dernier abonnement souscrit, s'il existe) — vue plateforme en lecture
-// seule ; la souscription/le paiement restent une action de l'ADMIN de
-// l'atelier lui-même (voir abonnements.routes.js), jamais du SUPERADMIN.
-// Défini avant /:id pour la même raison que /resume ci-dessus.
+// GET /api/ateliers/abonnements — état d'abonnement de CHAQUE atelier
+// (ACTIF | EN_ATTENTE | ESSAI | EXPIRE | AUCUN, voir etatAbonnementAtelier) —
+// vue d'ensemble plateforme ; l'activation se fait atelier par atelier (voir
+// ateliersAbonnement.routes.js). Défini avant /:id pour la même raison que
+// /resume ci-dessus.
 router.get("/abonnements", async (req, res) => {
   const ateliers = await prisma.atelier.findMany({
     orderBy: { createdAt: "desc" },
@@ -207,26 +208,16 @@ router.get("/abonnements", async (req, res) => {
       id: true,
       nom: true,
       actif: true,
+      trialEndsAt: true,
       abonnements: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: {
-          numero: true,
-          statut: true,
-          dateDebut: true,
-          dateExpiration: true,
-          prix: true,
-          formule: { select: { nom: true } },
-        },
+        select: { statut: true, planNom: true, dureeMois: true, prix: true, dateDebut: true, dateExpiration: true },
       },
     },
   });
-  const maintenant = new Date();
   res.json(
-    ateliers.map(({ abonnements, ...atelier }) => {
-      const dernier = abonnements[0] ?? null;
-      const expire = Boolean(dernier?.dateExpiration && new Date(dernier.dateExpiration) < maintenant);
-      return { ...atelier, abonnement: dernier ? { ...dernier, expire } : null };
+    ateliers.map(({ abonnements, trialEndsAt, ...atelier }) => {
+      const etat = etatAbonnementAtelier({ trialEndsAt }, abonnements);
+      return { ...atelier, statut: etat.statut, essai: etat.essai, abonnement: etat.abonnement };
     }),
   );
 });

@@ -1,7 +1,6 @@
 import { PaymentProvider } from "./PaymentProvider.js";
 
-// Même situation que NitaPaymentProvider (voir son commentaire) : pas d'API
-// Amanata exploitable aujourd'hui, confirmation manuelle uniquement.
+// DORMANT, même situation que NitaPaymentProvider (voir son commentaire).
 // MoyenPaiement.AMANA (schema.prisma) est conservé tel quel malgré le nom
 // "Amanata" ici — voir le commentaire sur l'enum dans schema.prisma.
 export class AmanataPaymentProvider extends PaymentProvider {

@@ -15,10 +15,9 @@ import parametresRouter from "./routes/parametres.routes.js";
 import notificationsRouter from "./routes/notifications.routes.js";
 import compteRouter from "./routes/compte.routes.js";
 import abonnementsRouter from "./routes/abonnements.routes.js";
-import transactionsRouter from "./routes/transactions.routes.js";
-import formulesAbonnementRouter from "./routes/formulesAbonnement.routes.js";
-import webhooksRouter from "./routes/webhooks.routes.js";
+import plansRouter from "./routes/plans.routes.js";
 import ateliersRouter from "./routes/ateliers.routes.js";
+import ateliersAbonnementRouter from "./routes/ateliersAbonnement.routes.js";
 import cronRouter from "./routes/cron.routes.js";
 import stockRouter from "./routes/stock.routes.js";
 import moiRouter from "./routes/moi.routes.js";
@@ -71,8 +70,7 @@ app.use("/api/parametres", parametresRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/compte", compteRouter);
 app.use("/api/abonnements", abonnementsRouter);
-app.use("/api/transactions", transactionsRouter);
-app.use("/api/formules-abonnement", formulesAbonnementRouter);
+app.use("/api/plans-abonnement", plansRouter);
 app.use("/api/stock", stockRouter);
 // Espace client final (§ plan rôle USER, Phase 3) — réservé aux comptes
 // USER (requireClient), jamais aux comptes ADMIN/SUPERADMIN.
@@ -81,8 +79,13 @@ app.use("/api/moi", moiRouter);
 app.use("/api/demandes", demandesRouter);
 // Pas de requireAuth : Wave appelle cette route directement (voir
 // webhooks.routes.js — confiance basée sur la signature HMAC, pas un cookie).
-app.use("/api/webhooks", webhooksRouter);
+// Webhooks de paiement (routes/webhooks.routes.js) : volontairement NON montés
+// tant qu'aucun paiement en ligne n'existe (abonnements activés
+// manuellement par le SUPERADMIN). À remonter ici avec l'intégration réelle.
 // Réservé SUPERADMIN (Phase 8 — multi-tenant) : gestion des ateliers/tenants.
+// Abonnement d'un atelier (activation manuelle) : monté AVANT ateliersRouter,
+// qui porte des routes /:id plus génériques.
+app.use("/api/ateliers", ateliersAbonnementRouter);
 app.use("/api/ateliers", ateliersRouter);
 // Déclenchée uniquement par Vercel Cron (voir vercel.json) — pas de
 // requireAuth/requireAtelier, authentification par secret partagé (voir

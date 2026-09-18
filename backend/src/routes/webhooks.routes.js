@@ -108,7 +108,7 @@ router.post("/wave", async (req, res) => {
     if (reussi) {
       await activerAbonnement(tx, {
         abonnementId: transaction.abonnementId,
-        dureeMois: transaction.abonnement.formule.dureeMois,
+        dureeMois: transaction.abonnement.dureeMois ?? transaction.abonnement.formule?.dureeMois,
       });
     }
   });

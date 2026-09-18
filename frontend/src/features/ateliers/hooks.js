@@ -138,3 +138,49 @@ export function useImpersonationsQuery(atelierId) {
     enabled: Boolean(atelierId),
   });
 }
+
+const abonnementKey = (id) => ["ateliers", id, "abonnement"];
+
+export function useAtelierAbonnementQuery(atelierId) {
+  return useQuery({
+    queryKey: abonnementKey(atelierId),
+    queryFn: () => ateliersApi.abonnement(atelierId),
+    enabled: Boolean(atelierId),
+  });
+}
+
+// Après chaque action : la fiche de l'atelier ET la vue d'ensemble des
+// abonnements se rafraîchissent (le PDG voit le changement à son prochain
+// rafraîchissement automatique, voir features/abonnement).
+function useAbonnementMutation(atelierId, mutationFn) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: abonnementKey(atelierId) });
+      queryClient.invalidateQueries({ queryKey: ABONNEMENTS_KEY });
+    },
+  });
+}
+
+export function useActiverAbonnementMutation(atelierId) {
+  return useAbonnementMutation(atelierId, (data) => ateliersApi.activerAbonnement(atelierId, data));
+}
+
+export function useModifierAbonnementMutation(atelierId) {
+  return useAbonnementMutation(atelierId, ({ abonnementId, data }) =>
+    ateliersApi.modifierAbonnement(atelierId, abonnementId, data),
+  );
+}
+
+export function useExpirerAbonnementMutation(atelierId) {
+  return useAbonnementMutation(atelierId, ({ abonnementId, note }) =>
+    ateliersApi.expirerAbonnement(atelierId, abonnementId, note ? { note } : {}),
+  );
+}
+
+export function useDesactiverAbonnementMutation(atelierId) {
+  return useAbonnementMutation(atelierId, ({ abonnementId, note }) =>
+    ateliersApi.desactiverAbonnement(atelierId, abonnementId, note ? { note } : {}),
+  );
+}

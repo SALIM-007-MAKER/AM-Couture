@@ -21,6 +21,7 @@ import {
   UserPlus,
   UserCog,
   History,
+  CreditCard,
   X,
 } from "lucide-react";
 import {
@@ -35,6 +36,7 @@ import {
   useImpersonerMutation,
   useImpersonationsQuery,
 } from "../../features/ateliers/hooks.js";
+import AbonnementAtelierSection from "../../features/ateliers/components/AbonnementAtelierSection.jsx";
 import { LoadingState, ErrorState, EmptyState, FieldError, GlobalFormError } from "../../components/QueryState.jsx";
 import { Field, inputClass } from "../../components/FormField.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
@@ -595,6 +597,11 @@ function AtelierDetailPageInner({ id }) {
       <div className="space-y-3">
         <SectionTitle icon={UserCircle}>{t("sa.detail.sectionAccounts")}</SectionTitle>
         <ComptesSection atelierId={atelier.id} comptes={atelier.comptes} />
+      </div>
+
+      <div className="space-y-3">
+        <SectionTitle icon={CreditCard}>{t("saSub.section.title")}</SectionTitle>
+        <AbonnementAtelierSection atelierId={atelier.id} />
       </div>
 
       <div className="space-y-3">

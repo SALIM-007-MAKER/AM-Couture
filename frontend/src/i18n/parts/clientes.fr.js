@@ -126,60 +126,6 @@ export default {
     "markUnread": "Marquer non lue",
     "markRead": "Marquer lue"
   },
-  "abo": {
-    "statut": {
-      "EN_ATTENTE": "En attente de paiement",
-      "ACTIF": "Actif",
-      "EXPIRE": "Expiré",
-      "ANNULE": "Annulé"
-    },
-    "trx": {
-      "EN_ATTENTE": "En attente",
-      "REUSSIE": "Réussie",
-      "ECHOUEE": "Échouée",
-      "ANNULEE": "Annulée",
-      "EXPIREE": "Expirée"
-    },
-    "trialEnded": "Essai gratuit terminé le {{date}}.",
-    "trialLeft": "Essai gratuit — {{jours}} jour(s) restant(s) (jusqu'au {{date}}).",
-    "subtitle": "Accès de l'atelier à la plateforme Gestion d'Atelier.",
-    "verifying": "Paiement Wave en cours de vérification — le statut ci-dessous se mettra à jour automatiquement dès confirmation (jamais avant une vérification serveur fiable).",
-    "failed": "Paiement Wave annulé ou échoué — vous pouvez réessayer ci-dessous.",
-    "currentStatus": "Statut actuel",
-    "planLine": "Formule {{nom}} — {{prix}} FCFA",
-    "expiresOn": "Expire le {{date}}",
-    "expiredOn": "Expiré le {{date}}",
-    "none": "Aucun abonnement souscrit pour l'instant.",
-    "subscribeRenew": "Souscrire / renouveler",
-    "pendingManual": "Paiements en attente de confirmation manuelle",
-    "history": "Historique",
-    "historyEmpty": "Aucun abonnement pour l'instant.",
-    "loadingPlans": "Chargement des formules…",
-    "mockBanner": "Mode test — aucune vraie clé API n'est configurée. Les paiements sont simulés, aucun argent réel n'est déplacé.",
-    "selectedPlan": "Formule",
-    "paymentMethod": "Moyen de paiement",
-    "manualNotice": "Confirmation manuelle : effectuez le transfert vers le compte {{moyen}} de l'atelier, puis indiquez la référence ci-dessous. L'abonnement ne sera activé qu'après vérification manuelle — ce n'est pas une vérification automatique.",
-    "transferRef": "Référence du transfert",
-    "refPlaceholder": "Référence {{moyen}}",
-    "payWithWave": "Payer avec Wave",
-    "sendForConfirmation": "Envoyer pour confirmation",
-    "requestSent": "Demande envoyée — en attente de confirmation manuelle une fois le paiement vérifié.",
-    "noPendingManual": "Aucun paiement en attente de confirmation manuelle.",
-    "reference": "Référence",
-    "reject": "Rejeter",
-    "test": {
-      "REUSSIE": "Simuler un paiement réussi",
-      "ECHOUEE": "Simuler un paiement échoué",
-      "ANNULEE": "Simuler une annulation",
-      "EXPIREE": "Simuler une expiration",
-      "loading": "Chargement de la transaction…",
-      "title": "Paiement test",
-      "subtitle": "Simulation {{moyen}} — aucun argent réel n'est déplacé.",
-      "plan": "Formule",
-      "choose": "Choisissez le résultat à simuler pour cette tentative de paiement.",
-      "redirecting": "Résultat simulé — redirection vers votre abonnement…"
-    }
-  },
   "mesure": {
     "card": {
       "noStructured": "Aucune mesure structurée renseignée."

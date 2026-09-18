@@ -1,0 +1,33 @@
+// Traductions EN — page Abonnement du PDG (mêmes clés que abonnement.fr.js).
+export default {
+  sub: {
+    subtitle: "Your workshop's access to the Gestion d'Atelier platform.",
+    currentStatus: "Current status",
+    status: {
+      ESSAI: "Free trial",
+      ACTIF: "Active",
+      EXPIRE: "Expired",
+      EN_ATTENTE: "Awaiting activation",
+      AUCUN: "No subscription",
+    },
+    plan: "Plan",
+    startDate: "Start",
+    expiryDate: "Expiry",
+    daysLeftLabel: "Days left",
+    daysLeft: "{{jours}} day(s)",
+    duration: "Duration",
+    months: "{{mois}} month(s)",
+    pendingNote: "Your subscription will be activated on {{date}}.",
+    expiredNote: "Your subscription has expired. Contact the administrator to renew it.",
+    noSubscription: "No subscription activated yet.",
+    trialTitle: "Free trial",
+    trialLeft: "Free trial — {{jours}} day(s) left (until {{date}}).",
+    trialEnded: "Free trial ended on {{date}}.",
+    plansTitle: "Available plans",
+    plansEmpty: "Plans will be available soon.",
+    perMonth: "/ month",
+    currentPlan: "Your plan",
+    contactMessage:
+      "Want to subscribe to this plan? Contact the administrator to activate your subscription.",
+  },
+};

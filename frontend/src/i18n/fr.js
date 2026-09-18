@@ -6,12 +6,16 @@ import shared from "./parts/shared.fr.js";
 import commandes from "./parts/commandes.fr.js";
 import clientes from "./parts/clientes.fr.js";
 import superadmin from "./parts/superadmin.fr.js";
+import abonnement from "./parts/abonnement.fr.js";
+import superadminAbo from "./parts/superadminAbo.fr.js";
 
 export default {
   ...shared,
   ...commandes,
   ...clientes,
   ...superadmin,
+  ...abonnement,
+  ...superadminAbo,
   common: {
     save: "Enregistrer",
     cancel: "Annuler",

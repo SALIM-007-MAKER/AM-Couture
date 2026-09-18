@@ -97,6 +97,15 @@ enum StatutTransaction {
   EXPIREE
 }
 
+// Historique des changements d'abonnement d'un atelier (§ abonnement géré
+// manuellement par le SUPERADMIN) — une ligne par action, jamais modifiée.
+enum ActionAbonnement {
+  ACTIVATION
+  MODIFICATION
+  EXPIRATION
+  DESACTIVATION
+}
+
 // Multi-tenant (Phase 8) — plateforme "Gestion d'Atelier" : SUPERADMIN gère
 // toute la plateforme (aucun atelierId, voir User ci-dessous) ; ADMIN
 // appartient à exactement un atelier et n'accède qu'à ses propres données
@@ -117,28 +126,28 @@ enum RoleUtilisateur {
 // ─────────────────────────────────────────────────────────────────────────
 
 model User {
-  id           String          @id @default(cuid())
-  identifiant  String          @unique
-  passwordHash String
+  id                  String          @id @default(cuid())
+  identifiant         String          @unique
+  passwordHash        String
   // Identité de la personne (Phase 8 — inscription en libre-service, voir
   // auth.routes.js POST /inscription-atelier) — optionnels car les comptes
   // créés avant cette phase (ex: le seed "admin") n'en ont pas ; jamais
   // utilisés pour la connexion, qui reste basée sur `identifiant` uniquement.
-  prenom       String?
-  nom          String?
-  email        String?         @unique
+  prenom              String?
+  nom                 String?
+  email               String?         @unique
   // Préférence stockée uniquement (Phase 6) : aucune infrastructure i18n,
   // l'interface reste 100% en français pour l'instant — voir constants.js
   // frontend pour la liste des valeurs acceptées.
-  langue       String          @default("fr")
-  role         RoleUtilisateur @default(ADMIN)
+  langue              String          @default("fr")
+  role                RoleUtilisateur @default(ADMIN)
   // null UNIQUEMENT pour SUPERADMIN — un ADMIN doit toujours appartenir à un
   // atelier (contrainte applicative vérifiée au login/à la création, voir
   // auth.routes.js/ateliers.routes.js ; pas de contrainte CHECK SQL native
   // pour ce genre de règle croisée avec Prisma).
-  atelierId    String?
-  atelier      Atelier?        @relation(fields: [atelierId], references: [id], onDelete: Restrict)
-  createdAt    DateTime        @default(now())
+  atelierId           String?
+  atelier             Atelier?        @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  createdAt           DateTime        @default(now())
   // Mis à jour à chaque connexion réussie (voir POST /auth/login) — sert
   // uniquement à l'affichage (fiche atelier côté SUPERADMIN), jamais à une
   // décision d'autorisation.
@@ -147,7 +156,7 @@ model User {
   // n'a pas été cliqué — jamais une condition bloquante pour se connecter ou
   // utiliser l'application (voir décision : accès immédiat après inscription),
   // juste une information affichée (bannière de rappel côté frontend).
-  emailVerifieLe DateTime?
+  emailVerifieLe      DateTime?
   // Incrémenté à CHAQUE changement de mot de passe (self-service, mot de
   // passe oublié, ou réinitialisation par le SUPERADMIN) — embarqué dans le
   // JWT à sa signature (voir jwt.js) et revérifié à chaque requête (voir
@@ -156,7 +165,7 @@ model User {
   // Sans ça, changer son mot de passe ne déconnectait aucune AUTRE session
   // déjà ouverte ailleurs (un JWT reste valide par nature jusqu'à son
   // expiration, quoi qu'il arrive côté base).
-  sessionVersion Int @default(0)
+  sessionVersion      Int             @default(0)
 
   tokensAction TokenAction[]
   // Présent UNIQUEMENT pour un compte USER (voir Cliente.userId) — null pour
@@ -185,14 +194,14 @@ enum TypeTokenAction {
 // contrairement aux données métier (Commande, Paiement...) qu'on protège
 // délibérément d'une suppression en cascade silencieuse.
 model TokenAction {
-  id        String           @id @default(cuid())
-  token     String           @unique
+  id        String          @id @default(cuid())
+  token     String          @unique
   type      TypeTokenAction
   userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   expireLe  DateTime
   utiliseLe DateTime?
-  createdAt DateTime         @default(now())
+  createdAt DateTime        @default(now())
 
   @@index([userId])
 }
@@ -201,24 +210,24 @@ model TokenAction {
 /// logo, coordonnées, comptes ADMIN et données métier (Clientes, Commandes,
 /// Modèles, Dépenses, Abonnement) — jamais partagés entre ateliers.
 model Atelier {
-  id         String   @id @default(cuid())
-  nom        String
-  logoUrl    String?
-  telephone  String?
-  adresse    String?
+  id          String    @id @default(cuid())
+  nom         String
+  logoUrl     String?
+  telephone   String?
+  adresse     String?
   // Distincts d'`adresse` (rue/complément, en texte libre) — ajoutés pour
   // l'inscription en libre-service (Phase 8), qui les demande séparément.
-  ville      String?
-  pays       String?
-  slogan     String?
-  devise     String   @default("FCFA")
-  recuConfig Json?
+  ville       String?
+  pays        String?
+  slogan      String?
+  devise      String    @default("FCFA")
+  recuConfig  Json?
   // Suspension par le SUPERADMIN (ex: impayé, litige) — bloque IMMÉDIATEMENT
   // les nouvelles requêtes de tout compte de cet atelier (vérifié à chaque
   // requête via requireAtelier, pas seulement à la connexion : voir
   // auth.middleware.js), sans supprimer aucune donnée.
-  actif      Boolean  @default(true)
-  suspenduLe DateTime?
+  actif       Boolean   @default(true)
+  suspenduLe  DateTime?
   // Essai gratuit de 7 jours — posé UNE SEULE FOIS à la création (voir
   // atelierProvisioning.js:creerAtelierEtAdmin), jamais recalculé ni
   // prolongé après coup, jamais accepté depuis le frontend. `null` pour
@@ -226,17 +235,18 @@ model Atelier {
   // ateliers "légataires" ne sont jamais bloqués par le trial (voir
   // lib/trial.js) — seuls les ateliers créés après ont une échéance réelle.
   trialEndsAt DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  users         User[]
-  clientes      Cliente[]
-  modeles       Modele[]
-  commandes     Commande[]
-  depenses         Depense[]
-  articlesStock    ArticleStock[]
-  abonnements      Abonnement[]
-  demandesCommande DemandeCommande[]
+  users                User[]
+  clientes             Cliente[]
+  modeles              Modele[]
+  commandes            Commande[]
+  depenses             Depense[]
+  articlesStock        ArticleStock[]
+  abonnements          Abonnement[]
+  historiqueAbonnement HistoriqueAbonnement[]
+  demandesCommande     DemandeCommande[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -244,9 +254,9 @@ model Atelier {
 // ─────────────────────────────────────────────────────────────────────────
 
 model Cliente {
-  id         String     @id @default(cuid())
+  id         String    @id @default(cuid())
   atelierId  String
-  atelier    Atelier    @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  atelier    Atelier   @relation(fields: [atelierId], references: [id], onDelete: Restrict)
   nom        String
   prenom     String
   telephone  String
@@ -259,8 +269,8 @@ model Cliente {
   sexe       Sexe?
   notes      String?
   archivedAt DateTime?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   // Lien OPTIONNEL vers un compte de connexion (§ plan rôle USER, Phase 3) —
   // Cliente reste l'unique source de vérité métier, User n'est qu'un MOYEN
@@ -349,8 +359,8 @@ model Commande {
   description  String?
   couleur      String?
   tissu        String?
-  quantite     Int      @default(1)
-  prixTotal    Decimal  @db.Decimal(10, 2)
+  quantite     Int               @default(1)
+  prixTotal    Decimal           @db.Decimal(10, 2)
   // Pas de champ "acompte" ici : le premier versement est enregistré comme un
   // Paiement normal (créé en transaction à la création de la commande). Le
   // solde est TOUJOURS dérivé de prixTotal - SUM(paiements.montant), jamais stocké.
@@ -360,7 +370,7 @@ model Commande {
 
   dateCommande        DateTime @default(now())
   dateLivraisonPrevue DateTime
-  observations         String?
+  observations        String?
 
   // Photos (Phase 2) : mêmes conventions que Modele.photoUrl / Atelier.logoUrl
   // — data URL base64 stockée telle quelle (voir optionalImageField), pas de
@@ -372,16 +382,16 @@ model Commande {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  paiements  Paiement[]
+  paiements           Paiement[]
   // Livraison[] (et non Livraison? comme avant) : une livraison peut être
   // annulée (annuleAt) pour cause d'erreur de saisie, auquel cas une
   // nouvelle doit pouvoir être enregistrée pour la même commande — un
   // Livraison? unique en base l'aurait interdit à vie. "La" livraison
   // active (au plus une à la fois, contrainte partielle en base, voir
   // migration) se retrouve par livraisons.find(l => !l.annuleAt).
-  livraisons    Livraison[]
-  recus         Recu[]
-  notifications Notification[]
+  livraisons          Livraison[]
+  recus               Recu[]
+  notifications       Notification[]
   // Présente UNIQUEMENT si cette commande est née d'une demande envoyée par
   // le client (§ plan rôle USER) — voir DemandeCommande.commandeId.
   demandeOrigine      DemandeCommande?
@@ -608,24 +618,24 @@ enum TypeMouvementStock {
 }
 
 model ArticleStock {
-  id        String     @id @default(cuid())
-  atelierId String
-  atelier   Atelier    @relation(fields: [atelierId], references: [id], onDelete: Restrict)
-  nom       String
+  id           String     @id @default(cuid())
+  atelierId    String
+  atelier      Atelier    @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  nom          String
   // Libre (comme Depense.categorie) plutôt qu'un enum : la variété de noms
   // de tissus/fournitures d'un atelier réel est trop large pour une liste fermée.
-  categorie String?
-  unite     UniteStock @default(PIECE)
+  categorie    String?
+  unite        UniteStock @default(PIECE)
   // Pas de champ "quantite" ici : TOUJOURS dérivée de
   // SUM(mouvements ENTREE) - SUM(mouvements SORTIE), jamais stockée — même
   // principe que Commande.solde, dérivé des Paiements (voir
   // paiements.routes.js). Calculée à la lecture par lib/stock.js.
-  seuilAlerte  Decimal?  @db.Decimal(10, 2)
-  prixUnitaire Decimal?  @db.Decimal(10, 2)
+  seuilAlerte  Decimal?   @db.Decimal(10, 2)
+  prixUnitaire Decimal?   @db.Decimal(10, 2)
   notes        String?
   archivedAt   DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   mouvements MouvementStock[]
 
@@ -670,56 +680,102 @@ model FormuleAbonnement {
 }
 
 model Abonnement {
-  id        String            @id @default(cuid())
-  atelierId String
-  atelier   Atelier           @relation(fields: [atelierId], references: [id], onDelete: Restrict)
-  numero    String            @unique // ABN-2026-0001, même Counter que CMD/REC
-  formuleId String
-  formule   FormuleAbonnement @relation(fields: [formuleId], references: [id], onDelete: Restrict)
+  id             String             @id @default(cuid())
+  atelierId      String
+  atelier        Atelier            @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  numero         String             @unique // ABN-2026-0001, même Counter que CMD/REC
+  // Ancien modèle "formule = durée" (paiement en ligne, Phase 6) — optionnel
+  // depuis l'activation manuelle par plan (planId ci-dessous).
+  formuleId      String?
+  formule        FormuleAbonnement? @relation(fields: [formuleId], references: [id], onDelete: Restrict)
+  planId         String?
+  plan           PlanAbonnement?    @relation(fields: [planId], references: [id], onDelete: Restrict)
+  // Snapshots : le nom du plan et la durée au moment de l'activation ne
+  // changent jamais rétroactivement si le plan est renommé ensuite.
+  planNom        String?
+  dureeMois      Int?
+  creePar        String? // identifiant du SUPERADMIN qui a activé manuellement
   // Snapshot du prix de la formule AU MOMENT de la souscription — ne change
   // jamais rétroactivement si le tarif de la formule est ajusté ensuite
   // (même principe que Commande.prixTotal / Paiement.montant : un montant
   // déjà engagé n'est jamais recalculé après coup).
-  prix           Decimal          @db.Decimal(10, 2)
+  prix           Decimal            @db.Decimal(10, 2)
   dateDebut      DateTime?
   dateExpiration DateTime?
-  statut         StatutAbonnement @default(EN_ATTENTE)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  statut         StatutAbonnement   @default(EN_ATTENTE)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   transactions Transaction[]
+  historique   HistoriqueAbonnement[]
 
   @@index([atelierId])
   @@index([statut])
   @@index([formuleId])
+  @@index([planId])
 }
 
 model Transaction {
-  id           String            @id @default(cuid())
-  numero       String            @unique // TRX-2026-0001
-  abonnementId String
-  abonnement   Abonnement        @relation(fields: [abonnementId], references: [id], onDelete: Restrict)
-  moyenPaiement MoyenPaiement
-  montant      Decimal           @db.Decimal(10, 2)
-  statut       StatutTransaction @default(EN_ATTENTE)
+  id                   String            @id @default(cuid())
+  numero               String            @unique // TRX-2026-0001
+  abonnementId         String
+  abonnement           Abonnement        @relation(fields: [abonnementId], references: [id], onDelete: Restrict)
+  moyenPaiement        MoyenPaiement
+  montant              Decimal           @db.Decimal(10, 2)
+  statut               StatutTransaction @default(EN_ATTENTE)
   // Notre clé d'idempotence — envoyée à Wave comme client_reference : permet
   // de retrouver la transaction depuis le webhook sans jamais en créer deux
   // pour un même paiement (rejeu webhook, double-clic sur "Payer"...).
-  referenceInterne String  @unique
+  referenceInterne     String            @unique
   // Id de session Wave (cos-...), ou référence de transfert saisie
   // manuellement pour NITA/Amana (voir confirmeManuellement ci-dessous).
-  referenceExterne String?
+  referenceExterne     String?
   // true UNIQUEMENT pour NITA/Amana — jamais mis à true automatiquement,
   // seulement via une action explicite de l'admin (voir notifications.routes
   // équivalent pour abonnements : POST .../confirmer-manuellement).
-  confirmeManuellement Boolean @default(false)
+  confirmeManuellement Boolean           @default(false)
   // Payload webhook Wave brut, conservé pour audit/litige — jamais
   // réinterprété après coup, juste une preuve horodatée de ce qui a été reçu.
   donneesBrutesWebhook Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   @@index([abonnementId])
+}
+
+/// Plans d'abonnement de la plateforme (Essentiel, Professionnel...) —
+/// gérés par le SUPERADMIN. Le prix est mensuel ; la durée d'un abonnement
+/// est choisie librement à l'activation (voir Abonnement.dureeMois).
+model PlanAbonnement {
+  id              String   @id @default(cuid())
+  nom             String   @unique
+  description     String?
+  prixMensuel     Decimal  @db.Decimal(10, 2)
+  fonctionnalites String[]
+  ordre           Int      @default(0)
+  actif           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  abonnements Abonnement[]
+}
+
+model HistoriqueAbonnement {
+  id             String           @id @default(cuid())
+  atelierId      String
+  atelier        Atelier          @relation(fields: [atelierId], references: [id], onDelete: Cascade)
+  abonnementId   String?
+  abonnement     Abonnement?      @relation(fields: [abonnementId], references: [id], onDelete: SetNull)
+  action         ActionAbonnement
+  planNom        String?
+  dureeMois      Int?
+  dateDebut      DateTime?
+  dateExpiration DateTime?
+  par            String? // identifiant du SUPERADMIN
+  note           String?
+  createdAt      DateTime         @default(now())
+
+  @@index([atelierId, createdAt])
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -764,14 +820,14 @@ model LimiteTaux {
 // en instantané au moment de l'action, comme Abonnement.prix pour
 // FormuleAbonnement.
 model JournalImpersonation {
-  id                     String   @id @default(cuid())
-  superadminId           String
-  superadminIdentifiant  String
-  atelierId              String
-  atelierNom             String
-  adminUserId            String
-  adminIdentifiant       String
-  demarreLe              DateTime @default(now())
+  id                    String   @id @default(cuid())
+  superadminId          String
+  superadminIdentifiant String
+  atelierId             String
+  atelierNom            String
+  adminUserId           String
+  adminIdentifiant      String
+  demarreLe             DateTime @default(now())
 
   @@index([atelierId])
   @@index([superadminId])

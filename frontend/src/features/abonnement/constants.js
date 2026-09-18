@@ -1,40 +1,25 @@
-import { Smartphone, Landmark, Wallet } from "lucide-react";
-import { translate } from "../../i18n/index.js";
+import { Gift, CheckCircle2, XCircle, Hourglass, Minus } from "lucide-react";
 import { useLocaleStore } from "../../stores/localeStore.js";
 
-// Doit rester synchronisé avec l'enum Prisma MoyenPaiement (schema.prisma).
-// WAVE = vérification automatique (webhook signé + relecture serveur, voir
-// backend/src/routes/webhooks.routes.js). NITA/AMANA = confirmation
-// MANUELLE uniquement (aucune API exploitable aujourd'hui, voir audit
-// Phase 6) — jamais présentée comme une vérification automatique.
-export const MOYENS_PAIEMENT = [
-  { value: "WAVE", label: "Wave", icon: Smartphone, verificationAutomatique: true },
-  { value: "NITA", label: "NITA", icon: Landmark, verificationAutomatique: false },
-  { value: "AMANA", label: "Amana", icon: Wallet, verificationAutomatique: false },
-];
-
-export function moyenPaiementInfo(value) {
-  return MOYENS_PAIEMENT.find((m) => m.value === value);
-}
-
-// Doit rester synchronisé avec statutEffectif() (backend/src/lib/abonnement.js).
-export const STATUT_ABONNEMENT_LABELS = {
-  get EN_ATTENTE() { return translate("abo.statut.EN_ATTENTE"); },
-  get ACTIF() { return translate("abo.statut.ACTIF"); },
-  get EXPIRE() { return translate("abo.statut.EXPIRE"); },
-  get ANNULE() { return translate("abo.statut.ANNULE"); },
+// Statuts affichés au PDG (voir GET /api/abonnements/etat) — mêmes tons que
+// les autres badges de statut de l'app (vert actif, ambre attente/essai,
+// rouge expiré, neutre sinon).
+export const STATUT_ABONNEMENT_STYLES = {
+  ESSAI: { icon: Gift, tone: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" },
+  ACTIF: { icon: CheckCircle2, tone: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400" },
+  EXPIRE: { icon: XCircle, tone: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" },
+  EN_ATTENTE: { icon: Hourglass, tone: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" },
+  AUCUN: { icon: Minus, tone: "bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400" },
 };
 
-export const STATUT_TRANSACTION_LABELS = {
-  get EN_ATTENTE() { return translate("abo.trx.EN_ATTENTE"); },
-  get REUSSIE() { return translate("abo.trx.REUSSIE"); },
-  get ECHOUEE() { return translate("abo.trx.ECHOUEE"); },
-  get ANNULEE() { return translate("abo.trx.ANNULEE"); },
-  get EXPIREE() { return translate("abo.trx.EXPIREE"); },
-};
-
-function formatDateFr(iso) {
-  return new Date(iso).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { year: "numeric", month: "long", day: "numeric" });
+function dateLocale() {
+  return useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR";
 }
 
-export { formatDateFr };
+export function formatDateFr(iso) {
+  return new Date(iso).toLocaleDateString(dateLocale(), { year: "numeric", month: "long", day: "numeric" });
+}
+
+export function formatPrix(prix) {
+  return Number(prix).toLocaleString(dateLocale(), { maximumFractionDigits: 2 });
+}

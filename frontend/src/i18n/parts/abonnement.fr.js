@@ -1,0 +1,34 @@
+// Traductions FR — page Abonnement du PDG (lecture seule, activation manuelle
+// par le SUPERADMIN), namespace "sub".
+export default {
+  sub: {
+    subtitle: "Accès de l'atelier à la plateforme Gestion d'Atelier.",
+    currentStatus: "Statut actuel",
+    status: {
+      ESSAI: "Essai gratuit",
+      ACTIF: "Actif",
+      EXPIRE: "Expiré",
+      EN_ATTENTE: "En attente d'activation",
+      AUCUN: "Aucun abonnement",
+    },
+    plan: "Formule",
+    startDate: "Début",
+    expiryDate: "Expiration",
+    daysLeftLabel: "Jours restants",
+    daysLeft: "{{jours}} jour(s)",
+    duration: "Durée",
+    months: "{{mois}} mois",
+    pendingNote: "Votre abonnement sera activé le {{date}}.",
+    expiredNote: "Votre abonnement est expiré. Contactez l'administrateur pour le renouveler.",
+    noSubscription: "Aucun abonnement activé pour l'instant.",
+    trialTitle: "Essai gratuit",
+    trialLeft: "Essai gratuit — {{jours}} jour(s) restant(s) (jusqu'au {{date}}).",
+    trialEnded: "Essai gratuit terminé le {{date}}.",
+    plansTitle: "Formules disponibles",
+    plansEmpty: "Les formules seront bientôt disponibles.",
+    perMonth: "/ mois",
+    currentPlan: "Votre formule",
+    contactMessage:
+      "Vous souhaitez souscrire à cette formule ? Contactez l'administrateur pour procéder à l'activation de votre abonnement.",
+  },
+};

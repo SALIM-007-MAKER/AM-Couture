@@ -114,7 +114,7 @@ export async function requireAtelier(req, res, next) {
  * DÉLIBÉRÉMENT PAS appliquée sur : /api/abonnements (l'atelier doit pouvoir
  * consulter/souscrire pour sortir du blocage), /api/transactions
  * (confirmation d'un paiement manuel NITA/Amana — même raison),
- * /api/formules-abonnement (pas de requireAtelier de toute façon),
+ * /api/plans-abonnement (pas de requireAtelier de toute façon),
  * /api/compte (gestion du compte de connexion lui-même).
  *
  * Bypass SUPERADMIN : si la session est une impersonation
@@ -126,17 +126,19 @@ export async function requireAbonnementActif(req, res, next) {
   if (req.user.impersonatedBy) return next();
 
   try {
-    const [atelier, dernierAbonnement] = await Promise.all([
+    const [atelier, abonnementsConfirmes] = await Promise.all([
       prisma.atelier.findUnique({ where: { id: req.user.atelierId }, select: { trialEndsAt: true } }),
-      prisma.abonnement.findFirst({
-        where: { atelierId: req.user.atelierId },
-        orderBy: { createdAt: "desc" },
-        select: { statut: true, dateExpiration: true },
+      // TOUS les abonnements confirmés, pas seulement le dernier créé : un
+      // abonnement planifié (début futur) ou un ancien abonnement annulé ne
+      // doit jamais masquer un abonnement réellement actif.
+      prisma.abonnement.findMany({
+        where: { atelierId: req.user.atelierId, statut: "CONFIRME" },
+        select: { statut: true, dateDebut: true, dateExpiration: true },
       }),
     ]);
 
     if (!essaiExpire(atelier)) return next();
-    if (dernierAbonnement && statutEffectif(dernierAbonnement) === "ACTIF") return next();
+    if (abonnementsConfirmes.some((a) => statutEffectif(a) === "ACTIF")) return next();
 
     return next(
       new HttpError(402, "Votre période d'essai est terminée. Souscrivez à un abonnement pour continuer.", {

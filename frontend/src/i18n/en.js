@@ -5,12 +5,16 @@ import shared from "./parts/shared.en.js";
 import commandes from "./parts/commandes.en.js";
 import clientes from "./parts/clientes.en.js";
 import superadmin from "./parts/superadmin.en.js";
+import abonnement from "./parts/abonnement.en.js";
+import superadminAbo from "./parts/superadminAbo.en.js";
 
 export default {
   ...shared,
   ...commandes,
   ...clientes,
   ...superadmin,
+  ...abonnement,
+  ...superadminAbo,
   common: {
     save: "Save",
     cancel: "Cancel",

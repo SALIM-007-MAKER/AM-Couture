@@ -23,4 +23,14 @@ export const ateliersApi = {
   supprimerCompte: (atelierId, userId) => api.delete(`/ateliers/${atelierId}/comptes/${userId}`),
   impersoner: (atelierId, userId) => api.post(`/ateliers/${atelierId}/comptes/${userId}/impersonation`),
   impersonations: (atelierId) => api.get(`/ateliers/${atelierId}/impersonations`),
+  // Abonnement activé MANUELLEMENT par le SUPERADMIN (aucun paiement en ligne) —
+  // voir backend/src/routes/ateliersAbonnement.routes.js.
+  abonnement: (atelierId) => api.get(`/ateliers/${atelierId}/abonnement`),
+  activerAbonnement: (atelierId, data) => api.post(`/ateliers/${atelierId}/abonnement/activer`, data),
+  modifierAbonnement: (atelierId, abonnementId, data) =>
+    api.patch(`/ateliers/${atelierId}/abonnement/${abonnementId}`, data),
+  expirerAbonnement: (atelierId, abonnementId, data) =>
+    api.post(`/ateliers/${atelierId}/abonnement/${abonnementId}/expirer`, data ?? {}),
+  desactiverAbonnement: (atelierId, abonnementId, data) =>
+    api.post(`/ateliers/${atelierId}/abonnement/${abonnementId}/desactiver`, data ?? {}),
 };
