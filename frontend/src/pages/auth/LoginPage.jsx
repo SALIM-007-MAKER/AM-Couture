@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { Scissors, User, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Scissors, User, Phone, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { useLoginMutation, useAtelierPourIdentifiantQuery } from "../../hooks/useAuth.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { useTranslation } from "../../i18n/index.js";
@@ -31,6 +31,7 @@ const NOM_PLATEFORME = "Gestion d'Atelier";
 
 export default function LoginPage() {
   const { t } = useTranslation();
+  const [modeClient, setModeClient] = useState(false);
   const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -86,19 +87,43 @@ export default function LoginPage() {
         >
           <div className="text-center space-y-1.5">
             <h1 className="text-2xl font-semibold tracking-tight text-white">
-              {t("login.heading")} <span className="text-amber-400">{t("login.headingHighlight")}</span>
+              {t(modeClient ? "login.clientHeading" : "login.heading")}{" "}
+              <span className="text-amber-400">{t(modeClient ? "login.clientHeadingHighlight" : "login.headingHighlight")}</span>
             </h1>
-            <p className="text-sm text-neutral-400">{t("login.subtitle", { plateforme: NOM_PLATEFORME })}</p>
+            <p className="text-sm text-neutral-400">
+              {modeClient ? t("login.clientSubtitle") : t("login.subtitle", { plateforme: NOM_PLATEFORME })}
+            </p>
+          </div>
+
+          {/* Bascule purement présentationnelle (libellés/icône seulement) :
+              POST /auth/login reste identique dans les deux cas — le
+              backend détecte déjà le rôle depuis l'identifiant lui-même
+              (voir signAuthToken, jwt.js) et redirige au bon endroit
+              (homePathForUser, hooks/useAuth.js). Sert uniquement à éviter
+              qu'un client ne bute sur le mot "Identifiant" en cherchant où
+              entrer son numéro de téléphone. */}
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setModeClient((v) => !v)}
+              className="text-xs text-neutral-400 hover:text-amber-300 underline transition-colors"
+            >
+              {modeClient ? t("login.atelierToggleAction") : t("login.clientToggleAction")}
+            </button>
           </div>
 
           <GlobalFormError error={loginMutation.error} />
 
           <div className="space-y-1.5">
             <label htmlFor="identifiant" className="text-sm font-medium text-neutral-300">
-              {t("login.identifiant")}
+              {t(modeClient ? "login.clientIdentifiant" : "login.identifiant")}
             </label>
             <div className="relative">
-              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
+              {modeClient ? (
+                <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
+              ) : (
+                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
+              )}
               <input
                 id="identifiant"
                 name="identifiant"
@@ -108,7 +133,7 @@ export default function LoginPage() {
                 value={identifiant}
                 onChange={(e) => setIdentifiant(e.target.value)}
                 className={darkInputClass}
-                placeholder={t("login.identifiantPlaceholder")}
+                placeholder={t(modeClient ? "login.clientIdentifiantPlaceholder" : "login.identifiantPlaceholder")}
               />
             </div>
             <FieldError messages={details?.identifiant} />
@@ -157,12 +182,16 @@ export default function LoginPage() {
             {!loginMutation.isPending && <ArrowRight className="size-4" aria-hidden="true" />}
           </button>
 
-          <p className="text-center text-sm text-neutral-400">
-            {t("login.ownerQuestion")}{" "}
-            <Link to="/inscription" className="text-amber-400 hover:text-amber-300 font-medium transition-colors">
-              {t("login.createWorkshop")}
-            </Link>
-          </p>
+          {modeClient ? (
+            <p className="text-center text-sm text-neutral-400">{t("login.clientNoAccount")}</p>
+          ) : (
+            <p className="text-center text-sm text-neutral-400">
+              {t("login.ownerQuestion")}{" "}
+              <Link to="/inscription" className="text-amber-400 hover:text-amber-300 font-medium transition-colors">
+                {t("login.createWorkshop")}
+              </Link>
+            </p>
+          )}
         </form>
 
         <p className="mt-6 text-xs text-neutral-500">{NOM_PLATEFORME}</p>
