@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { Scissors, User, Ruler, ClipboardList, Wallet, FileText, Inbox, Bell, Menu, LogOut } from "lucide-react";
 import { useLogoutMutation } from "../hooks/useAuth.js";
+import { useMonProfilQuery } from "../features/moi/hooks.js";
 
 // Espace client final (§ plan rôle USER, Phase 3) — mêmes conventions que
 // AppLayout.jsx : 5 destinations principales dans la barre du bas (mobile)
@@ -19,6 +20,31 @@ const NAV_ITEMS = [
 
 const DRAWER_ITEMS = [{ label: "Reçus", to: "/client/recus", icon: FileText }];
 
+// `nom`/`logoUrl` viennent de l'atelier DONT LE CLIENT CONNECTÉ EST CLIENT —
+// exposés via GET /api/moi (voir moi.routes.js), le seul endpoint accessible
+// à un USER : /api/parametres est réservé ADMIN (requireAtelier). Même
+// repli que Logo (AppLayout.jsx) tant que non chargé/configuré.
+function Logo({ logoUrl, nom }) {
+  return (
+    <>
+      {logoUrl ? (
+        <img
+          src={logoUrl}
+          alt="Logo de l'atelier"
+          className="size-8 shrink-0 rounded-lg object-contain bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-800"
+        />
+      ) : (
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow-brand">
+          <Scissors className="size-4" aria-hidden="true" />
+        </span>
+      )}
+      <span className="text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 truncate">
+        {nom || "Espace client"}
+      </span>
+    </>
+  );
+}
+
 function NotificationBell() {
   return (
     <NavLink
@@ -34,6 +60,12 @@ function NotificationBell() {
 export default function ClientLayout() {
   const logoutMutation = useLogoutMutation();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // isPending/isError ignorés volontairement : le logo est un détail
+  // décoratif, jamais bloquant pour le reste de la mise en page (même
+  // logique que Logo dans AppLayout.jsx).
+  const profilQuery = useMonProfilQuery();
+  const logoUrl = profilQuery.data?.atelier?.logoUrl;
+  const nomAtelier = profilQuery.data?.atelier?.nom;
 
   return (
     <div className="min-h-svh flex flex-col bg-neutral-50 dark:bg-neutral-950">
@@ -47,12 +79,7 @@ export default function ClientLayout() {
           >
             <Menu className="size-4" aria-hidden="true" />
           </button>
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow-brand">
-            <Scissors className="size-4" aria-hidden="true" />
-          </span>
-          <span className="text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 truncate">
-            Espace client
-          </span>
+          <Logo logoUrl={logoUrl} nom={nomAtelier} />
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <NotificationBell />
@@ -111,10 +138,7 @@ export default function ClientLayout() {
         }`}
       >
         <div className="flex items-center gap-2 px-4 py-4 border-b border-neutral-200 dark:border-neutral-800">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-white">
-            <Scissors className="size-4" aria-hidden="true" />
-          </span>
-          <span className="text-base font-semibold text-neutral-900 dark:text-neutral-50">Espace client</span>
+          <Logo logoUrl={logoUrl} nom={nomAtelier} />
         </div>
         <nav className="flex flex-col gap-0.5 p-3">
           {DRAWER_ITEMS.map((item) => (

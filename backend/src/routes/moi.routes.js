@@ -23,9 +23,17 @@ const router = Router();
 router.use(requireAuth, requireClient);
 router.param("id", requireValidIdParam);
 
-// GET /api/moi — profil (la Cliente liée à ce compte).
+// GET /api/moi — profil (la Cliente liée à ce compte), avec l'identité
+// visuelle de l'atelier (nom/logo) pour l'en-tête de l'espace client — un
+// USER n'a accès à AUCUNE route /api/parametres (réservée ADMIN, voir
+// requireAtelier), c'est donc ici son seul moyen de la récupérer. Rien de
+// sensible n'est exposé au-delà de ce que côté ADMIN affiche déjà
+// publiquement dans sa propre sidebar (nom, logo).
 router.get("/", async (req, res) => {
-  const cliente = await prisma.cliente.findUnique({ where: { id: req.user.clienteId } });
+  const cliente = await prisma.cliente.findUnique({
+    where: { id: req.user.clienteId },
+    include: { atelier: { select: { nom: true, logoUrl: true } } },
+  });
   if (!cliente) throw new HttpError(404, "Profil introuvable.");
   res.json(cliente);
 });
