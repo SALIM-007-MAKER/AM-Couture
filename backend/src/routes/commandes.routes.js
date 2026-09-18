@@ -56,6 +56,22 @@ router.post("/", async (req, res) => {
     throw new HttpError(409, "Client archivé : restaurez-le avant de créer une nouvelle commande.");
   }
 
+  // Une commande sur mesure suppose des mesures déjà prises — jamais pour un
+  // client qui n'en a AUCUNE en historique (nouveau client). Un client déjà
+  // connu (au moins une mesure déjà enregistrée, même ancienne) peut
+  // continuer de commander sans repasser par une nouvelle prise à chaque
+  // fois — la dernière mesure en date reste affichée sur la fiche commande
+  // (voir GET /clientes/:id/mesures/derniere, déjà utilisé par
+  // CommandeDetailPage.jsx).
+  const nombreMesures = await prisma.mesure.count({ where: { clienteId: cliente.id } });
+  if (nombreMesures === 0) {
+    throw new HttpError(
+      409,
+      "Ce client n'a aucune mesure enregistrée — enregistrez ses mesures avant de créer une commande.",
+      { mesureManquante: true },
+    );
+  }
+
   if (data.modeleId) {
     const modele = await prisma.modele.findFirst({
       where: { id: data.modeleId, atelierId: req.user.atelierId },

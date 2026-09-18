@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ClipboardList, Wallet, Save, X } from "lucide-react";
+import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
+import { ClipboardList, Wallet, Save, X, Ruler } from "lucide-react";
 import { useCommandeQuery, useCreateCommandeMutation, useUpdateCommandeMutation } from "./hooks.js";
+import { useDerniereMesureQuery } from "../clientes/hooks.js";
 import { PRIORITES, MODES_PAIEMENT, TISSUS_SUGGERES } from "./constants.js";
 import { CATEGORIES_VETEMENT } from "../modeles/constants.js";
 import ClientePicker from "./components/ClientePicker.jsx";
@@ -99,6 +100,16 @@ function CommandeForm({ mode, initial }) {
     setForm((f) => ({ ...f, [field]: value }));
   }
 
+  // Une commande exige au moins une mesure déjà enregistrée pour ce client
+  // (voir POST /api/commandes, backend — un client sans AUCUNE mesure en
+  // historique ne peut pas encore commander). `enabled` seulement en
+  // création : en modification, le client est déjà fixé et déjà passé par
+  // ce contrôle à la création de la commande. Un 404 signifie "aucune
+  // mesure" (même convention que CommandeDetailPage.jsx), pas une erreur.
+  const mesureQuery = useDerniereMesureQuery(!isEdit ? form.clienteId : undefined);
+  const clienteSansMesure =
+    !isEdit && Boolean(form.clienteId) && mesureQuery.isError && mesureQuery.error instanceof ApiError && mesureQuery.error.status === 404;
+
   function handleSubmit(e) {
     e.preventDefault();
     if (isEdit) {
@@ -158,6 +169,18 @@ function CommandeForm({ mode, initial }) {
             <ClientePicker value={form.clienteId} onChange={(v) => update("clienteId", v)} required />
             <FieldError messages={details?.clienteId} />
           </Field>
+        )}
+
+        {clienteSansMesure && (
+          <Card variant="outlined" className="flex items-center justify-between gap-3 flex-wrap border-amber-200 dark:border-amber-900">
+            <span className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+              <Ruler className="size-4 shrink-0" aria-hidden="true" />
+              Ce client n'a aucune mesure enregistrée — impossible de créer une commande tant qu'aucune n'est prise.
+            </span>
+            <Button as={Link} to={`/clientes/${form.clienteId}/mesures/nouvelle`} variant="secondary" size="sm" icon={Ruler}>
+              Prendre ses mesures
+            </Button>
+          </Card>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -355,7 +378,7 @@ function CommandeForm({ mode, initial }) {
         )}
 
         <div className="flex gap-2 pt-1">
-          <Button type="submit" variant="primary" icon={Save} loading={mutation.isPending}>
+          <Button type="submit" variant="primary" icon={Save} loading={mutation.isPending} disabled={clienteSansMesure}>
             Enregistrer
           </Button>
           <Button type="button" variant="secondary" icon={X} onClick={() => navigate(-1)}>
