@@ -65,6 +65,7 @@ export function client(baseUrl) {
     get: (path) => requete(path),
     post: (path, body) => requete(path, { method: "POST", body }),
     patch: (path, body) => requete(path, { method: "PATCH", body }),
+    put: (path, body) => requete(path, { method: "PUT", body }),
     delete: (path) => requete(path, { method: "DELETE" }),
   };
 }

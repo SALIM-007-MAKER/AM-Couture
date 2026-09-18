@@ -6,7 +6,7 @@ import { requireValidIdParam } from "../lib/idParam.js";
 import { formatZodError } from "../lib/validation.js";
 import { nextNumero } from "../lib/numero.js";
 import { activerAbonnementSchema, modifierAbonnementSchema, noteSchema } from "../schemas/abonnement.schema.js";
-import { calculerDateExpiration, etatAbonnementAtelier, statutEffectif } from "../lib/abonnement.js";
+import { calculerDateExpiration, etatAbonnementAtelier, statutEffectif, prixPourDuree } from "../lib/abonnement.js";
 
 // Gestion MANUELLE de l'abonnement d'un atelier par le SUPERADMIN (§
 // abonnement sans paiement en ligne). Monté sous /api/ateliers — chemins
@@ -109,7 +109,8 @@ router.get("/:atelierId/abonnement", async (req, res) => {
 // POST /api/ateliers/:atelierId/abonnement/activer — crée un abonnement
 // CONFIRME pour cet atelier. dateDebut par défaut = maintenant ; une date de
 // début future donne un abonnement "En attente d'activation" jusqu'à cette
-// date. Le prix est figé (prix mensuel du plan × durée) à l'activation.
+// date. Le prix est figé à l'activation : prix mensuel × durée, avec la remise
+// de la durée si elle fait partie des durées proposées du plan (prixPourDuree).
 router.post("/:atelierId/abonnement/activer", async (req, res) => {
   const parsed = activerAbonnementSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
@@ -135,7 +136,7 @@ router.post("/:atelierId/abonnement/activer", async (req, res) => {
           planId: plan.id,
           planNom: plan.nom,
           dureeMois,
-          prix: plan.prixMensuel.mul(dureeMois),
+          prix: prixPourDuree(plan, dureeMois),
           statut: "CONFIRME",
           dateDebut,
           dateExpiration,

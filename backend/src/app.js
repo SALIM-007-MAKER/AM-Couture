@@ -16,6 +16,7 @@ import notificationsRouter from "./routes/notifications.routes.js";
 import compteRouter from "./routes/compte.routes.js";
 import abonnementsRouter from "./routes/abonnements.routes.js";
 import plansRouter from "./routes/plans.routes.js";
+import plateformeRouter from "./routes/plateforme.routes.js";
 import ateliersRouter from "./routes/ateliers.routes.js";
 import ateliersAbonnementRouter from "./routes/ateliersAbonnement.routes.js";
 import cronRouter from "./routes/cron.routes.js";
@@ -71,6 +72,7 @@ app.use("/api/notifications", notificationsRouter);
 app.use("/api/compte", compteRouter);
 app.use("/api/abonnements", abonnementsRouter);
 app.use("/api/plans-abonnement", plansRouter);
+app.use("/api/plateforme", plateformeRouter);
 app.use("/api/stock", stockRouter);
 // Espace client final (§ plan rôle USER, Phase 3) — réservé aux comptes
 // USER (requireClient), jamais aux comptes ADMIN/SUPERADMIN.

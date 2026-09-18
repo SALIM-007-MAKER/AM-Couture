@@ -8,8 +8,6 @@ import { useTranslation } from "../../../i18n/index.js";
 // fonctionnalités incluses. `courant`
 // met en évidence le plan de l'abonnement en cours (même bordure de sélection
 // que les autres cartes cliquables de l'app). Purement informatif.
-const DUREES = [1, 3, 6, 12];
-
 export default function PlanCard({ plan, courant }) {
   const { t } = useTranslation();
   return (
@@ -31,11 +29,18 @@ export default function PlanCard({ plan, courant }) {
       </div>
       <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-xs space-y-1">
         <p className="font-medium text-neutral-500">{t("sub.byDuration")}</p>
-        {DUREES.map((mois) => (
-          <div key={mois} className="flex items-center justify-between gap-2 text-neutral-600 dark:text-neutral-400">
-            <span>{t("sub.months", { mois })}</span>
+        {plan.tarifs.map((tarif) => (
+          <div key={tarif.dureeMois} className="flex items-center justify-between gap-2 text-neutral-600 dark:text-neutral-400">
+            <span className="flex items-center gap-1.5">
+              {t("sub.months", { mois: tarif.dureeMois })}
+              {tarif.remisePourcent > 0 && (
+                <span className="rounded-full bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 px-1.5 py-0.5 text-[10px] font-medium">
+                  {t("sub.discount", { pourcent: tarif.remisePourcent })}
+                </span>
+              )}
+            </span>
             <span className="tabular-nums font-medium text-neutral-900 dark:text-neutral-100">
-              {formatPrix(Number(plan.prixMensuel) * mois)} FCFA
+              {formatPrix(tarif.total)} FCFA
             </span>
           </div>
         ))}

@@ -193,6 +193,22 @@ function ActiverForm({ atelierId }) {
   const details = mutation.error instanceof ApiError ? mutation.error.details : undefined;
   const plans = (plansQuery.data ?? []).filter((p) => p.actif);
 
+  // Prix qui sera enregistré (le serveur refait le même calcul à l'activation) :
+  // total du tarif de la durée si elle fait partie des durées proposées du plan
+  // (remise incluse), sinon prix mensuel × durée.
+  const planChoisi = plans.find((p) => p.id === planId);
+  const mois = Number(dureeMois);
+  let estimation = null;
+  if (planChoisi && modeFin === "duree" && Number.isInteger(mois) && mois >= 1) {
+    const tarif = planChoisi.tarifs.find((x) => x.dureeMois === mois);
+    estimation = {
+      total: tarif ? tarif.total : Number(planChoisi.prixMensuel) * mois,
+      remisePourcent: tarif?.remisePourcent ?? 0,
+      prixMensuel: planChoisi.prixMensuel,
+      mois,
+    };
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
     setDone(false);
@@ -258,6 +274,22 @@ function ActiverForm({ atelierId }) {
               />
             </div>
             <FieldError messages={details?.dureeMois} />
+            {estimation && (
+              <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
+                {t("saSub.estimate.label")} :{" "}
+                <span className="font-semibold tabular-nums text-neutral-900 dark:text-neutral-100">
+                  {Number(estimation.total).toLocaleString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { maximumFractionDigits: 2 })} FCFA
+                </span>
+                <span className="text-xs text-neutral-500">
+                  {" "}
+                  (
+                  {estimation.remisePourcent > 0
+                    ? t("saSub.estimate.withDiscount", { pourcent: estimation.remisePourcent })
+                    : t("saSub.estimate.monthly", { prix: estimation.prixMensuel, mois: estimation.mois })}
+                  )
+                </span>
+              </p>
+            )}
           </Field>
         ) : (
           <Field label={t("saSub.section.expiry")} required>

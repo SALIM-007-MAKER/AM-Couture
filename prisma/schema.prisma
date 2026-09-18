@@ -752,6 +752,10 @@ model PlanAbonnement {
   description     String?
   prixMensuel     Decimal  @db.Decimal(10, 2)
   fonctionnalites String[]
+  // Durées proposées avec remise : [{ dureeMois, remisePourcent }] — vide =
+  // durées standard (1/3/6/12 mois) sans remise. Voir lib/abonnement.js
+  // (prixPourDuree) : le prix figé à l'activation utilise la même règle.
+  tarifsDuree     Json     @default("[]")
   ordre           Int      @default(0)
   actif           Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -776,6 +780,14 @@ model HistoriqueAbonnement {
   createdAt      DateTime         @default(now())
 
   @@index([atelierId, createdAt])
+}
+
+/// Réglages globaux de la plateforme (ligne unique, id "plateforme") —
+/// aujourd'hui : le contact WhatsApp affiché aux PDG sur la page Abonnement.
+model ParametresPlateforme {
+  id              String   @id @default("plateforme")
+  contactWhatsapp String?
+  updatedAt       DateTime @updatedAt
 }
 
 // ─────────────────────────────────────────────────────────────────────────

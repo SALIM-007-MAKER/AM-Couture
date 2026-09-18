@@ -30,6 +30,9 @@ export default {
     plansEmpty: "Plans will be available soon.",
     perMonth: "/ month",
     currentPlan: "Your plan",
+    contactButton: "Contact the administrator",
+    contactPrefill: "Hello, I would like to subscribe to a plan.",
+    discount: "−{{pourcent}}%",
     contactMessage: "Interested in a plan? Contact the administrator to subscribe.",
   },
 };

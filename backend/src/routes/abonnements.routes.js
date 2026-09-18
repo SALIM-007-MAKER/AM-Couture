@@ -28,15 +28,18 @@ const ABONNEMENT_SELECT = {
 // la base (le frontend interroge régulièrement) : tout changement fait par le
 // SUPERADMIN est visible sans rechargement de page.
 router.get("/etat", async (req, res) => {
-  const [atelier, abonnements] = await Promise.all([
+  const [atelier, abonnements, plateforme] = await Promise.all([
     prisma.atelier.findUnique({ where: { id: req.user.atelierId }, select: { trialEndsAt: true } }),
     prisma.abonnement.findMany({ where: { atelierId: req.user.atelierId }, select: ABONNEMENT_SELECT }),
+    prisma.parametresPlateforme.findUnique({ where: { id: "plateforme" } }),
   ]);
   const etat = etatAbonnementAtelier(atelier ?? { trialEndsAt: null }, abonnements);
   const a = etat.abonnement;
   res.json({
     statut: etat.statut,
     essai: etat.essai,
+    // Contact WhatsApp de l'administrateur (réglé par le SUPERADMIN) — null si non configuré.
+    contact: { whatsapp: plateforme?.contactWhatsapp ?? null },
     abonnement: a && {
       planNom: a.planNom ?? a.plan?.nom ?? null,
       dureeMois: a.dureeMois,

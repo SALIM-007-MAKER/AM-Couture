@@ -5,6 +5,7 @@ import { requireAuth, requireSuperadmin } from "../middlewares/auth.middleware.j
 import { requireValidIdParam } from "../lib/idParam.js";
 import { formatZodError } from "../lib/validation.js";
 import { creerPlanSchema, patchPlanSchema } from "../schemas/plan.schema.js";
+import { planAvecTarifs } from "../lib/abonnement.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -17,13 +18,13 @@ const ORDRE = [{ ordre: "asc" }, { prixMensuel: "asc" }];
 // action de souscription n'existe côté atelier : voir abonnements.routes.js.
 router.get("/", async (req, res) => {
   const plans = await prisma.planAbonnement.findMany({ where: { actif: true }, orderBy: ORDRE });
-  res.json(plans);
+  res.json(plans.map(planAvecTarifs));
 });
 
 // GET /api/plans-abonnement/tous (SUPERADMIN) — y compris désactivés.
 router.get("/tous", requireSuperadmin, async (req, res) => {
   const plans = await prisma.planAbonnement.findMany({ orderBy: ORDRE });
-  res.json(plans);
+  res.json(plans.map(planAvecTarifs));
 });
 
 router.post("/", requireSuperadmin, async (req, res) => {
@@ -34,7 +35,7 @@ router.post("/", requireSuperadmin, async (req, res) => {
     throw new HttpError(409, "Un plan porte déjà ce nom.", { nom: ["Un plan porte déjà ce nom."] });
   }
   const plan = await prisma.planAbonnement.create({ data: parsed.data });
-  res.status(201).json(plan);
+  res.status(201).json(planAvecTarifs(plan));
 });
 
 // PATCH /api/plans-abonnement/:id (SUPERADMIN) — un changement de prix ne
@@ -49,7 +50,7 @@ router.patch("/:id", requireSuperadmin, async (req, res) => {
     const doublon = await prisma.planAbonnement.findUnique({ where: { nom: parsed.data.nom } });
     if (doublon) throw new HttpError(409, "Un plan porte déjà ce nom.", { nom: ["Un plan porte déjà ce nom."] });
   }
-  res.json(await prisma.planAbonnement.update({ where: { id: plan.id }, data: parsed.data }));
+  res.json(planAvecTarifs(await prisma.planAbonnement.update({ where: { id: plan.id }, data: parsed.data })));
 });
 
 export default router;

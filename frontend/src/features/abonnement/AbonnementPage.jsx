@@ -1,4 +1,4 @@
-import { CreditCard, Clock3, Gift, Layers, Info } from "lucide-react";
+import { CreditCard, Clock3, Gift, Layers, Info, MessageCircle } from "lucide-react";
 import { useEtatAbonnementQuery, usePlansQuery } from "./hooks.js";
 import { formatDateFr, formatPrix } from "./constants.js";
 import StatutAbonnementBadge from "./components/StatutAbonnementBadge.jsx";
@@ -7,6 +7,7 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/QueryStat
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
+import Button from "../../components/Button.jsx";
 import { useTranslation } from "../../i18n/index.js";
 
 function InfoRow({ label, value }) {
@@ -30,6 +31,7 @@ export default function AbonnementPage() {
   const etat = etatQuery.data;
   const abonnement = etat?.abonnement;
   const essai = etat?.essai;
+  const whatsapp = etat?.contact?.whatsapp;
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -110,9 +112,25 @@ export default function AbonnementPage() {
           </div>
         )}
 
-        <Card variant="outlined" className="flex items-start gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-          <Info className="size-4 shrink-0 mt-0.5" aria-hidden="true" />
-          {t("sub.contactMessage")}
+        <Card variant="outlined" className="flex items-center justify-between gap-3 flex-wrap text-sm text-neutral-600 dark:text-neutral-400">
+          <span className="flex items-start gap-2">
+            <Info className="size-4 shrink-0 mt-0.5" aria-hidden="true" />
+            {t("sub.contactMessage")}
+          </span>
+          {/* Simple lien de contact WhatsApp (numéro réglé par le SUPERADMIN) :
+              jamais une action d'achat ni d'activation. */}
+          {whatsapp && (
+            <Button
+              as="a"
+              href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(t("sub.contactPrefill"))}`}
+              target="_blank"
+              rel="noreferrer"
+              variant="secondary"
+              icon={MessageCircle}
+            >
+              {t("sub.contactButton")}
+            </Button>
+          )}
         </Card>
       </div>
     </div>

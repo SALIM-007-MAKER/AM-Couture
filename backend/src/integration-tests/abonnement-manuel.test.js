@@ -119,6 +119,60 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
     await superApi.patch(`/api/plans-abonnement/${plan.id}`, { actif: true, nom: `Professionnel ${process.pid}` });
   });
 
+  test("TARIFS PAR DURÉE : sans config -> 1/3/6/12 sans remise ; avec config -> total remisé calculé par le serveur", async () => {
+    const standard = (await adminApi.get("/api/plans-abonnement")).body.find((p) => p.id === plan.id);
+    assert.deepEqual(standard.tarifs.map((t) => t.dureeMois), [1, 3, 6, 12]);
+    assert.ok(standard.tarifs.every((t) => t.remisePourcent === 0));
+
+    const maj = await superApi.patch(`/api/plans-abonnement/${plan.id}`, {
+      tarifsDuree: [
+        { dureeMois: 12, remisePourcent: 10 },
+        { dureeMois: 3, remisePourcent: 0 },
+      ],
+    });
+    assert.equal(maj.status, 200);
+    const vu = (await adminApi.get("/api/plans-abonnement")).body.find((p) => p.id === plan.id);
+    assert.deepEqual(vu.tarifs.map((t) => t.dureeMois), [3, 12]);
+    assert.equal(Number(vu.tarifs.find((t) => t.dureeMois === 12).total), 162000); // 15000 x 12 x 0,90
+    assert.equal(Number(vu.tarifs.find((t) => t.dureeMois === 3).total), 45000);
+
+    // Le prix figé à l'activation applique la MÊME remise.
+    const activation = await superApi.post(`/api/ateliers/${autreAtelier.id}/abonnement/activer`, { planId: plan.id, dureeMois: 12 });
+    assert.equal(activation.status, 201);
+    assert.equal(Number(activation.body.prix), 162000);
+    // Une durée non proposée : prix mensuel x durée, sans remise.
+    const horsGrille = await superApi.post(`/api/ateliers/${autreAtelier.id}/abonnement/activer`, { planId: plan.id, dureeMois: 2 });
+    assert.equal(Number(horsGrille.body.prix), 30000);
+
+    // Validation : durées en double / remise hors bornes refusées.
+    const doublon = await superApi.patch(`/api/plans-abonnement/${plan.id}`, {
+      tarifsDuree: [{ dureeMois: 6, remisePourcent: 5 }, { dureeMois: 6, remisePourcent: 8 }],
+    });
+    assert.equal(doublon.status, 400);
+    assert.equal((await superApi.patch(`/api/plans-abonnement/${plan.id}`, { tarifsDuree: [{ dureeMois: 6, remisePourcent: 95 }] })).status, 400);
+    // Un PDG ne peut pas modifier les tarifs.
+    assert.equal((await adminApi.patch(`/api/plans-abonnement/${plan.id}`, { tarifsDuree: [] })).status, 403);
+
+    await superApi.patch(`/api/plans-abonnement/${plan.id}`, { tarifsDuree: [] });
+    await prisma.historiqueAbonnement.deleteMany({ where: { atelierId: autreAtelier.id } });
+    await prisma.abonnement.deleteMany({ where: { atelierId: autreAtelier.id } });
+  });
+
+  test("CONTACT WHATSAPP : réglé par le SUPERADMIN seulement, normalisé, visible du PDG dans /etat", async () => {
+    assert.equal((await etat()).contact.whatsapp, null);
+    assert.equal((await adminApi.put("/api/plateforme/contact", { whatsapp: "221771234567" })).status, 403);
+    assert.equal((await adminApi.get("/api/plateforme/contact")).status, 403);
+
+    assert.equal((await superApi.put("/api/plateforme/contact", { whatsapp: "abc" })).status, 400);
+    const ok = await superApi.put("/api/plateforme/contact", { whatsapp: "+221 77 123 45 67" });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body.whatsapp, "221771234567");
+    assert.equal((await etat()).contact.whatsapp, "221771234567");
+
+    assert.equal((await superApi.put("/api/plateforme/contact", { whatsapp: "" })).body.whatsapp, null);
+    assert.equal((await etat()).contact.whatsapp, null);
+  });
+
   test("état : essai en cours -> ESSAI avec jours restants", async () => {
     await prisma.atelier.update({ where: { id: atelier.id }, data: { trialEndsAt: new Date(Date.now() + 12 * JOUR - 1000) } });
     const e = await etat();

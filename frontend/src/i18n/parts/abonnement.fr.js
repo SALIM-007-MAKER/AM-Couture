@@ -31,6 +31,9 @@ export default {
     plansEmpty: "Les formules seront bientôt disponibles.",
     perMonth: "/ mois",
     currentPlan: "Votre formule",
+    contactButton: "Contacter l'administrateur",
+    contactPrefill: "Bonjour, je souhaite souscrire à un abonnement.",
+    discount: "−{{pourcent}} %",
     contactMessage: "Une formule vous intéresse ? Contactez l'administrateur pour souscrire.",
   },
 };
