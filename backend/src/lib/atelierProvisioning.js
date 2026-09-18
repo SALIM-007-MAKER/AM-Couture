@@ -43,11 +43,11 @@ export async function creerAtelierEtAdmin({
   // origines d'un hash dans ce projet.
   const passwordHash = await bcrypt.hash(adminPassword, 12);
 
-  // Essai gratuit de 7 jours (§ plan trial) — posé UNE SEULE FOIS ici, à la
+  // Essai gratuit de 15 jours (§ plan trial) — posé UNE SEULE FOIS ici, à la
   // création, quelle que soit l'origine (SUPERADMIN ou inscription en
   // libre-service) : jamais recalculé ni prolongé après coup, jamais
   // accepté depuis le frontend (voir lib/trial.js, middlewares/auth.middleware.js).
-  const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const trialEndsAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
 
   return prisma.$transaction(async (tx) => {
     const atelier = await tx.atelier.create({

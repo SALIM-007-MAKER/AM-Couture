@@ -1,4 +1,4 @@
-// Essai gratuit de 7 jours (§ plan trial/abonnement) — voir Atelier.trialEndsAt,
+// Essai gratuit de 15 jours (§ plan trial/abonnement) — voir Atelier.trialEndsAt,
 // posé une seule fois à la création, jamais recalculé.
 
 /**

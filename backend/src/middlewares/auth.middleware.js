@@ -107,7 +107,7 @@ export async function requireAtelier(req, res, next) {
  * À utiliser APRÈS requireAtelier sur les routes métier "normales" d'un
  * atelier (Clientes, Commandes, Modèles, Paiements, Dépenses, Stock, Reçus,
  * Dashboard, Rapports, Notifications, Paramètres) — § essai gratuit /
- * abonnement (plan trial). Bloque avec 402 si l'essai de 7 jours est
+ * abonnement (plan trial). Bloque avec 402 si l'essai de 15 jours est
  * expiré ET qu'aucun abonnement n'est actuellement ACTIF (voir
  * lib/abonnement.js:statutEffectif).
  *

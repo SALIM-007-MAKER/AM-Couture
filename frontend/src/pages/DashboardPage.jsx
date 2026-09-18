@@ -20,6 +20,7 @@ import { useTranslation } from "../i18n/index.js";
 import PageHeader from "../components/PageHeader.jsx";
 import PeriodSelector from "../components/PeriodSelector.jsx";
 import Card from "../components/Card.jsx";
+import TrialBanner from "../components/TrialBanner.jsx";
 import { LoadingState, ErrorState, EmptyState } from "../components/QueryState.jsx";
 
 function formatDate(iso) {
@@ -152,6 +153,8 @@ export default function DashboardPage() {
         subtitle={t("dashboard.subtitle")}
         actions={<PeriodSelector value={periodValue} onChange={handlePeriodChange} />}
       />
+
+      <TrialBanner />
 
       {summaryQuery.isPending && <LoadingState label={t("common.loading")} />}
       {summaryQuery.isError && <ErrorState error={summaryQuery.error} onRetry={summaryQuery.refetch} />}

@@ -58,6 +58,32 @@ describe("Essai gratuit et blocage post-expiration", () => {
     assert.notEqual(res.status, 402);
   });
 
+  test("un atelier créé via l'inscription en libre-service reçoit un essai de 15 jours pile", async () => {
+    const api = client(baseUrl);
+    const avant = Date.now();
+    const res = await api.post("/api/auth/inscription-atelier", {
+      nom: "Atelier Essai 15 Jours",
+      prenom: "Jean",
+      nomProprietaire: "Dupont",
+      email: `essai-15j-${Date.now()}@example.com`,
+      adminPassword: "password123",
+      telephone: "90000099",
+    });
+    assert.equal(res.status, 201);
+
+    const atelierCree = await prisma.atelier.findUnique({ where: { id: res.body.atelierId } });
+    const dureeMs = new Date(atelierCree.trialEndsAt).getTime() - avant;
+    const quinzeJoursMs = 15 * 24 * 60 * 60 * 1000;
+    // Marge de 5s pour le temps d'exécution du test lui-même — la durée doit
+    // rester pile 15 jours, ni 7 (ancienne valeur), ni une autre durée.
+    assert.ok(
+      Math.abs(dureeMs - quinzeJoursMs) < 5000,
+      `attendu ~15 jours, obtenu ${dureeMs / 86_400_000} jours`,
+    );
+
+    await supprimerAtelier(res.body.atelierId);
+  });
+
   test("abonnement CONFIRME actif -> accès restauré malgré l'essai expiré", async () => {
     const formule = await prisma.formuleAbonnement.upsert({
       where: { dureeMois: 1 },
