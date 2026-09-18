@@ -90,6 +90,35 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
     assert.equal((await adminApi.get(`/api/ateliers/${atelier.id}/abonnement`)).status, 403);
   });
 
+  test("PERMISSIONS : un PDG ne peut ni modifier, ni faire expirer, ni désactiver un abonnement, ni éditer un plan (403)", async () => {
+    const base = `/api/ateliers/${atelier.id}/abonnement/abn-quelconque`;
+    assert.equal((await adminApi.patch(base, { dateExpiration: "2031-01-01" })).status, 403);
+    assert.equal((await adminApi.post(`${base}/expirer`, {})).status, 403);
+    assert.equal((await adminApi.post(`${base}/desactiver`, {})).status, 403);
+    assert.equal((await adminApi.patch(`/api/plans-abonnement/${plan.id}`, { prixMensuel: "1" })).status, 403);
+    assert.equal((await adminApi.get("/api/plans-abonnement/tous")).status, 403);
+    // Et sans être connecté : refus net.
+    const anonyme = client(baseUrl);
+    assert.equal((await anonyme.get("/api/abonnements/etat")).status, 401);
+    assert.equal((await anonyme.post(`/api/ateliers/${atelier.id}/abonnement/activer`, { planId: plan.id, dureeMois: 1 })).status, 401);
+  });
+
+  test("SOURCE UNIQUE : un plan modifié/désactivé dans Tarification est reflété côté PDG", async () => {
+    const nouveauNom = `Pro Renommé ${process.pid}`;
+    await superApi.patch(`/api/plans-abonnement/${plan.id}`, { nom: nouveauNom, description: "Le plus complet" });
+    let visibles = (await adminApi.get("/api/plans-abonnement")).body;
+    const vu = visibles.find((p) => p.id === plan.id);
+    assert.equal(vu.nom, nouveauNom);
+    assert.equal(vu.description, "Le plus complet");
+    assert.deepEqual(vu.fonctionnalites, ["Clients illimités", "Rapports"]);
+
+    await superApi.patch(`/api/plans-abonnement/${plan.id}`, { actif: false });
+    visibles = (await adminApi.get("/api/plans-abonnement")).body;
+    assert.ok(!visibles.some((p) => p.id === plan.id));
+
+    await superApi.patch(`/api/plans-abonnement/${plan.id}`, { actif: true, nom: `Professionnel ${process.pid}` });
+  });
+
   test("état : essai en cours -> ESSAI avec jours restants", async () => {
     await prisma.atelier.update({ where: { id: atelier.id }, data: { trialEndsAt: new Date(Date.now() + 12 * JOUR - 1000) } });
     const e = await etat();
@@ -140,6 +169,7 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
     assert.equal(e.statut, "ACTIF");
     assert.equal(e.abonnement.planNom, plan.nom);
     assert.equal(e.abonnement.dureeMois, 2);
+    assert.equal(Number(e.abonnement.prix), 30000);
     assert.ok(e.abonnement.dateDebut && e.abonnement.dateExpiration);
     assert.ok(e.abonnement.joursRestants >= 58 && e.abonnement.joursRestants <= 62);
 

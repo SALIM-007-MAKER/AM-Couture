@@ -40,6 +40,7 @@ router.get("/etat", async (req, res) => {
     abonnement: a && {
       planNom: a.planNom ?? a.plan?.nom ?? null,
       dureeMois: a.dureeMois,
+      prix: a.prix,
       dateDebut: a.dateDebut,
       dateExpiration: a.dateExpiration,
       statutEffectif: statutEffectif(a),

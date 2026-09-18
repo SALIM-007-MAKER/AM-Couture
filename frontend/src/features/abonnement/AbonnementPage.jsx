@@ -1,6 +1,6 @@
 import { CreditCard, Clock3, Gift, Layers, Info } from "lucide-react";
 import { useEtatAbonnementQuery, usePlansQuery } from "./hooks.js";
-import { formatDateFr } from "./constants.js";
+import { formatDateFr, formatPrix } from "./constants.js";
 import StatutAbonnementBadge from "./components/StatutAbonnementBadge.jsx";
 import PlanCard from "./components/PlanCard.jsx";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
@@ -46,6 +46,10 @@ export default function AbonnementPage() {
             {abonnement && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
                 <InfoRow label={t("sub.plan")} value={abonnement.planNom ?? "—"} />
+                <InfoRow
+                  label={t("sub.price")}
+                  value={abonnement.prix != null ? `${formatPrix(abonnement.prix)} FCFA` : "—"}
+                />
                 <InfoRow
                   label={t("sub.startDate")}
                   value={abonnement.dateDebut ? formatDateFr(abonnement.dateDebut) : "—"}

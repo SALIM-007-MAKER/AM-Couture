@@ -11,6 +11,9 @@ export default {
       AUCUN: "No subscription",
     },
     plan: "Plan",
+    price: "Price",
+    included: "Included in this plan",
+    byDuration: "Price by duration",
     startDate: "Start",
     expiryDate: "Expiry",
     daysLeftLabel: "Days left",
@@ -27,7 +30,6 @@ export default {
     plansEmpty: "Plans will be available soon.",
     perMonth: "/ month",
     currentPlan: "Your plan",
-    contactMessage:
-      "Want to subscribe to this plan? Contact the administrator to activate your subscription.",
+    contactMessage: "Interested in a plan? Contact the administrator to subscribe.",
   },
 };

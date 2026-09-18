@@ -14,5 +14,11 @@ export function useEtatAbonnementQuery() {
 }
 
 export function usePlansQuery() {
-  return useQuery({ queryKey: ["plans-abonnement"], queryFn: () => plansApi.list() });
+  return useQuery({
+    queryKey: ["plans-abonnement"], queryFn: () => plansApi.list(),
+    // Même source que SuperAdmin > Tarification : un plan créé, modifié ou
+    // désactivé là-bas apparaît ici sans recharger la page.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
 }

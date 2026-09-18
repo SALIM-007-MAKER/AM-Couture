@@ -3,9 +3,13 @@ import { formatPrix } from "../constants.js";
 import Card from "../../../components/Card.jsx";
 import { useTranslation } from "../../../i18n/index.js";
 
-// Un plan d'abonnement : prix mensuel + fonctionnalités incluses. `courant`
+// Une formule : prix mensuel, tarif selon la durée (mensuel × mois, exactement
+// le prix figé à l'activation — voir ateliersAbonnement.routes.js) et
+// fonctionnalités incluses. `courant`
 // met en évidence le plan de l'abonnement en cours (même bordure de sélection
 // que les autres cartes cliquables de l'app). Purement informatif.
+const DUREES = [1, 3, 6, 12];
+
 export default function PlanCard({ plan, courant }) {
   const { t } = useTranslation();
   return (
@@ -25,6 +29,20 @@ export default function PlanCard({ plan, courant }) {
         </p>
         {plan.description && <p className="text-xs text-neutral-500 mt-1">{plan.description}</p>}
       </div>
+      <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 px-3 py-2 text-xs space-y-1">
+        <p className="font-medium text-neutral-500">{t("sub.byDuration")}</p>
+        {DUREES.map((mois) => (
+          <div key={mois} className="flex items-center justify-between gap-2 text-neutral-600 dark:text-neutral-400">
+            <span>{t("sub.months", { mois })}</span>
+            <span className="tabular-nums font-medium text-neutral-900 dark:text-neutral-100">
+              {formatPrix(Number(plan.prixMensuel) * mois)} FCFA
+            </span>
+          </div>
+        ))}
+      </div>
+      {plan.fonctionnalites.length > 0 && (
+        <p className="text-xs font-medium text-neutral-500">{t("sub.included")}</p>
+      )}
       {plan.fonctionnalites.length > 0 && (
         <ul className="space-y-1.5 text-sm text-neutral-600 dark:text-neutral-400">
           {plan.fonctionnalites.map((f) => (

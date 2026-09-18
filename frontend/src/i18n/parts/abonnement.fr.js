@@ -12,6 +12,9 @@ export default {
       AUCUN: "Aucun abonnement",
     },
     plan: "Formule",
+    price: "Prix",
+    included: "Inclus dans cette formule",
+    byDuration: "Tarif selon la durée",
     startDate: "Début",
     expiryDate: "Expiration",
     daysLeftLabel: "Jours restants",
@@ -28,7 +31,6 @@ export default {
     plansEmpty: "Les formules seront bientôt disponibles.",
     perMonth: "/ mois",
     currentPlan: "Votre formule",
-    contactMessage:
-      "Vous souhaitez souscrire à cette formule ? Contactez l'administrateur pour procéder à l'activation de votre abonnement.",
+    contactMessage: "Une formule vous intéresse ? Contactez l'administrateur pour souscrire.",
   },
 };
