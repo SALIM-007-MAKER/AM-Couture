@@ -13,10 +13,11 @@ import Button from "./Button.jsx";
  * REBOURS pendant que l'essai est encore actif, ce qu'aucune autre page
  * n'affichait avant que l'atelier n'atteigne /abonnement lui-même.
  *
- * Mêmes composants/tons que le reste de l'app (Card variant="outlined",
- * palette amber/red déjà utilisée pour les alertes — voir EssaiSection,
- * AbonnementPage.jsx, dont ce composant reprend exactement le calcul de
- * jours restants) : aucun style nouveau.
+ * Composants/tons déjà existants dans l'app, aucun style inventé : essai
+ * actif -> même dégradé doré + texte sombre que le variant "accent" de
+ * Button.jsx (réservé aux moments particuliers) ; essai expiré -> même
+ * palette rouge que PaywallBanner.jsx. Calcul des jours restants identique
+ * à EssaiSection (AbonnementPage.jsx).
  *
  * Disparaît automatiquement si un abonnement est ACTIF, quelle que soit
  * l'échéance de l'essai — un atelier qui a payé n'a plus besoin de voir un
@@ -55,8 +56,11 @@ export default function TrialBanner() {
 
   return (
     <Card
-      variant="outlined"
-      className="flex items-center gap-2 text-sm border-amber-200 dark:border-amber-900 text-amber-700 dark:text-amber-400"
+      padded={false}
+      // Fond doré plein + texte sombre — mêmes tokens que le variant
+      // "accent" de Button.jsx (réservé aux moments particuliers, voir son
+      // commentaire), jamais une couleur inventée pour l'occasion.
+      className="flex items-center gap-2 text-sm px-5 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-neutral-950 font-medium"
     >
       <Gift className="size-4 shrink-0" aria-hidden="true" />
       Période d'essai gratuit — il vous reste {joursRestants} jour{joursRestants > 1 ? "s" : ""} d'utilisation
