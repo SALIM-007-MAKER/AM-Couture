@@ -106,7 +106,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setModeClient((v) => !v)}
-              className="text-xs text-neutral-400 hover:text-amber-300 underline transition-colors"
+              className="text-xs font-medium text-amber-400 hover:text-amber-300 underline transition-colors"
             >
               {modeClient ? t("login.atelierToggleAction") : t("login.clientToggleAction")}
             </button>
