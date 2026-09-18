@@ -33,6 +33,10 @@ export function useMesDemandesQuery() {
   return useQuery({ queryKey: ["moi", "demandes"], queryFn: moiApi.demandes.list });
 }
 
+export function useMesRecusQuery() {
+  return useQuery({ queryKey: ["moi", "recus"], queryFn: moiApi.recus });
+}
+
 export function useCreerDemandeMutation() {
   const queryClient = useQueryClient();
   return useMutation({

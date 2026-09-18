@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Scissors, User, Ruler, ClipboardList, Wallet, Inbox, Bell, LogOut } from "lucide-react";
+import { Scissors, User, Ruler, ClipboardList, Wallet, FileText, Inbox, Bell, LogOut } from "lucide-react";
 import { useLogoutMutation } from "../hooks/useAuth.js";
 
 // Espace client final (§ plan rôle USER, Phase 3) — volontairement plus
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { label: "Mesures", to: "/client/mesures", icon: Ruler },
   { label: "Commandes", to: "/client/commandes", icon: ClipboardList },
   { label: "Paiements", to: "/client/paiements", icon: Wallet },
+  { label: "Reçus", to: "/client/recus", icon: FileText },
   { label: "Demandes", to: "/client/demandes", icon: Inbox },
   { label: "Notifications", to: "/client/notifications", icon: Bell },
 ];

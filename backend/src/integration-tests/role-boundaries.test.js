@@ -28,6 +28,7 @@ describe("Frontières entre rôles ADMIN / USER", () => {
   let clienteA;
   let clienteB;
   let commandeA;
+  let recuA;
   let userA;
   let userB;
 
@@ -39,6 +40,9 @@ describe("Frontières entre rôles ADMIN / USER", () => {
     clienteB = await creerCliente(atelier.id, { nom: "Cliente", prenom: "B", telephone: "91000002" });
     commandeA = await creerCommande(atelier.id, clienteA.id);
     await prisma.mesure.create({ data: { clienteId: clienteA.id, taille: "70" } });
+    recuA = await prisma.recu.create({
+      data: { commandeId: commandeA.id, montantPaye: "5000", numero: `REC-TEST-${Date.now()}` },
+    });
 
     userA = await creerEtActiverClient(atelier.id, clienteA.id);
     userB = await creerEtActiverClient(atelier.id, clienteB.id);
@@ -110,6 +114,24 @@ describe("Frontières entre rôles ADMIN / USER", () => {
     // demander explicitement le profil de la cliente A.
     const profil = await api.get("/api/moi");
     assert.equal(profil.body.id, clienteB.id);
+  });
+
+  test("USER A voit son reçu, USER B ne peut ni le lister ni télécharger son PDF", async () => {
+    const apiA = client(baseUrl);
+    await apiA.post("/api/auth/login", { identifiant: userA.identifiant, password: userA.password });
+    const recusA = await apiA.get("/api/moi/recus");
+    assert.equal(recusA.status, 200);
+    assert.equal(recusA.body.data.length, 1);
+    assert.equal(recusA.body.data[0].id, recuA.id);
+
+    const apiB = client(baseUrl);
+    await apiB.post("/api/auth/login", { identifiant: userB.identifiant, password: userB.password });
+    const recusB = await apiB.get("/api/moi/recus");
+    assert.equal(recusB.status, 200);
+    assert.equal(recusB.body.data.length, 0);
+
+    const pdf = await apiB.get(`/api/moi/recus/${recuA.id}/pdf`);
+    assert.equal(pdf.status, 404);
   });
 });
 

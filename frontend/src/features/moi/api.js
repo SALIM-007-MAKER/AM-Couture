@@ -17,4 +17,12 @@ export const moiApi = {
     list: () => api.get("/moi/demandes"),
     create: (data) => api.post("/moi/demandes", data),
   },
+  recus: () => api.get("/moi/recus"),
 };
+
+// Chemin direct (flux PDF, pas du JSON) — même origine, le cookie de session
+// part automatiquement. Voir recuPdfUrl (features/recus/api.js, côté ADMIN),
+// même pattern.
+export function recuPdfUrl(recuId) {
+  return `/api/moi/recus/${recuId}/pdf`;
+}

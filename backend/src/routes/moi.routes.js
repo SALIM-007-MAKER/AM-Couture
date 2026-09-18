@@ -7,6 +7,8 @@ import { requireValidIdParam } from "../lib/idParam.js";
 import { computeSolde, statutPaiement } from "../lib/money.js";
 import { reconcilierNotifications } from "../lib/notifications.js";
 import { creerDemandeSchema } from "../schemas/demandeCommande.schema.js";
+import { RECU_INCLUDE } from "../lib/recuInclude.js";
+import { streamRecuPdf } from "../lib/recuPdf.js";
 
 // Espace client final (§ plan rôle USER, Phase 3) — un USER voit UNIQUEMENT
 // ses propres données. RÈGLE ABSOLUE, répétée sur chaque route ci-dessous :
@@ -169,6 +171,33 @@ router.get("/demandes", async (req, res) => {
     include: { modele: { select: { id: true, nom: true } }, commande: { select: { id: true, numero: true } } },
   });
   res.json({ data });
+});
+
+// GET /api/moi/recus — historique des reçus, toutes commandes confondues
+// (mais toujours filtré via clienteId de la commande parente, même pattern
+// que GET /paiements ci-dessus).
+router.get("/recus", async (req, res) => {
+  const data = await prisma.recu.findMany({
+    where: { commande: { clienteId: req.user.clienteId } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    include: RECU_INCLUDE,
+  });
+  res.json({ data });
+});
+
+// GET /api/moi/recus/:id/pdf — flux PDF, jamais stocké (voir recus.routes.js
+// côté ADMIN, même génération réutilisée telle quelle).
+router.get("/recus/:id/pdf", async (req, res) => {
+  const recu = await prisma.recu.findFirst({
+    where: { id: req.params.id, commande: { clienteId: req.user.clienteId } },
+    include: RECU_INCLUDE,
+  });
+  if (!recu) throw new HttpError(404, "Reçu introuvable.");
+
+  const cliente = await prisma.cliente.findUnique({ where: { id: req.user.clienteId }, select: { atelierId: true } });
+  const atelier = await prisma.atelier.findUnique({ where: { id: cliente.atelierId } });
+
+  streamRecuPdf(res, { recu, atelier });
 });
 
 export default router;

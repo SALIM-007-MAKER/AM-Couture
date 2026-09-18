@@ -51,6 +51,7 @@ import ClientMesuresPage from "./features/moi/ClientMesuresPage.jsx";
 import ClientCommandesListPage from "./features/moi/ClientCommandesListPage.jsx";
 import ClientCommandeDetailPage from "./features/moi/ClientCommandeDetailPage.jsx";
 import ClientPaiementsPage from "./features/moi/ClientPaiementsPage.jsx";
+import ClientRecusPage from "./features/moi/ClientRecusPage.jsx";
 import ClientNotificationsPage from "./features/moi/ClientNotificationsPage.jsx";
 import ClientDemandesPage from "./features/moi/ClientDemandesPage.jsx";
 import ClientDemandeFormPage from "./features/moi/ClientDemandeFormPage.jsx";
@@ -121,6 +122,7 @@ export default function App() {
             <Route path="/client/commandes" element={<ClientCommandesListPage />} />
             <Route path="/client/commandes/:id" element={<ClientCommandeDetailPage />} />
             <Route path="/client/paiements" element={<ClientPaiementsPage />} />
+            <Route path="/client/recus" element={<ClientRecusPage />} />
             <Route path="/client/notifications" element={<ClientNotificationsPage />} />
             <Route path="/client/demandes" element={<ClientDemandesPage />} />
             <Route path="/client/demandes/nouvelle" element={<ClientDemandeFormPage />} />
