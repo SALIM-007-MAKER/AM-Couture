@@ -19,3 +19,20 @@ export function statutEffectif(abonnement, now = new Date()) {
   if (abonnement.dateExpiration && new Date(abonnement.dateExpiration) > now) return "ACTIF";
   return "EXPIRE";
 }
+
+// Seul point d'activation d'un abonnement dans toute la base de code — voir
+// webhooks.routes.js (Wave), transactions.routes.js (confirmation manuelle
+// NITA/Amanata + simulation mock) : les trois chemins finissent ICI plutôt
+// que de dupliquer le calcul de dateExpiration, pour qu'un futur changement
+// de règle (durée, grâce...) ne puisse pas diverger entre eux. `tx` est
+// TOUJOURS un client Prisma en transaction ($transaction), jamais `prisma`
+// directement — l'activation et la mise à jour du statut de la Transaction
+// doivent réussir ou échouer ensemble.
+export async function activerAbonnement(tx, { abonnementId, dureeMois }, maintenant = new Date()) {
+  const dateExpiration = calculerDateExpiration(maintenant, dureeMois);
+  await tx.abonnement.update({
+    where: { id: abonnementId },
+    data: { statut: "CONFIRME", dateDebut: maintenant, dateExpiration },
+  });
+  return dateExpiration;
+}

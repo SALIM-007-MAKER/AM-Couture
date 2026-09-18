@@ -27,6 +27,8 @@ export const STATUT_TRANSACTION_LABELS = {
   EN_ATTENTE: "En attente",
   REUSSIE: "Réussie",
   ECHOUEE: "Échouée",
+  ANNULEE: "Annulée",
+  EXPIREE: "Expirée",
 };
 
 function formatDateFr(iso) {

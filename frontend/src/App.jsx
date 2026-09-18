@@ -44,6 +44,7 @@ import NotificationsPage from "./features/notifications/NotificationsPage.jsx";
 import CalendrierPage from "./features/calendrier/CalendrierPage.jsx";
 import ComptePage from "./features/compte/ComptePage.jsx";
 import AbonnementPage from "./features/abonnement/AbonnementPage.jsx";
+import PaiementTestPage from "./features/abonnement/PaiementTestPage.jsx";
 import DemandesListPage from "./features/demandes/DemandesListPage.jsx";
 import DemandeDetailPage from "./features/demandes/DemandeDetailPage.jsx";
 import ClientProfilPage from "./features/moi/ClientProfilPage.jsx";
@@ -110,6 +111,7 @@ export default function App() {
             <Route path="/parametres" element={<ParametresPage />} />
             <Route path="/compte" element={<ComptePage />} />
             <Route path="/abonnement" element={<AbonnementPage />} />
+            <Route path="/abonnement/paiement-test/:id" element={<PaiementTestPage />} />
             <Route path="/demandes" element={<DemandesListPage />} />
             <Route path="/demandes/:id" element={<DemandeDetailPage />} />
           </Route>

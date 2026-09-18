@@ -70,16 +70,31 @@ enum StatutAbonnement {
   ANNULE
 }
 
+// Valeur AMANA conservée telle quelle (historique) même si le prestataire est
+// parfois désigné "Amanata" — voir AmanataPaymentProvider (lib/payments/) :
+// renommer une valeur d'enum déjà utilisée en base serait une migration
+// destructive pour un simple changement de libellé, aucun bénéfice réel.
 enum MoyenPaiement {
   WAVE
   NITA
   AMANA
 }
 
+// pending/paid/failed/cancelled/expired (§ architecture paiement abonnement)
+// — noms français pour rester cohérent avec le reste du schéma (voir
+// StatutCommande, StatutDemandeCommande...), jamais un mélange FR/EN dans les
+// enums Prisma. EN_ATTENTE = pending, REUSSIE = paid, ECHOUEE = failed
+// (référence invalide/rejetée), ANNULEE = cancelled (paiement abandonné
+// avant complétion, ex: session Wave fermée sans payer), EXPIREE = expired
+// (fenêtre de paiement dépassée sans action, ex: session Wave expirée) —
+// distinction utile pour l'audit/support, même si l'effet sur l'abonnement
+// est identique (aucune activation).
 enum StatutTransaction {
   EN_ATTENTE
   REUSSIE
   ECHOUEE
+  ANNULEE
+  EXPIREE
 }
 
 // Multi-tenant (Phase 8) — plateforme "Gestion d'Atelier" : SUPERADMIN gère

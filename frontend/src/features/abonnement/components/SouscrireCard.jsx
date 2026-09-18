@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { CreditCard } from "lucide-react";
-import { useFormulesQuery, useCreerAbonnementMutation } from "../hooks.js";
+import { useNavigate } from "react-router-dom";
+import { CreditCard, FlaskConical } from "lucide-react";
+import { useFormulesQuery, useCreerAbonnementMutation, useAbonnementConfigQuery } from "../hooks.js";
 import { MOYENS_PAIEMENT } from "../constants.js";
 import { LoadingState, ErrorState, GlobalFormError, FieldError } from "../../../components/QueryState.jsx";
 import { Field, inputClass } from "../../../components/FormField.jsx";
@@ -11,12 +12,17 @@ import { ApiError } from "../../../lib/apiClient.js";
 /**
  * Choix de formule + moyen de paiement + souscription. WAVE redirige vers
  * la page de paiement Wave (vérification automatique côté serveur ensuite,
- * voir webhooks.routes.js) ; NITA/AMANA demandent la référence d'un
- * transfert déjà effectué par l'atelier, en attente de confirmation
- * manuelle (voir TransactionsEnAttente.jsx) — jamais activé tout seul.
+ * voir webhooks.routes.js) — ou, en mode test (PAYMENTS_MODE=mock, voir
+ * useAbonnementConfigQuery), vers la page de simulation interne
+ * (PaiementTestPage.jsx), qui suit exactement le même chemin d'activation.
+ * NITA/AMANA demandent la référence d'un transfert déjà effectué par
+ * l'atelier, en attente de confirmation manuelle (voir
+ * TransactionsEnAttente.jsx) — jamais activé tout seul, mode test ou pas.
  */
 export default function SouscrireCard() {
+  const navigate = useNavigate();
   const formulesQuery = useFormulesQuery();
+  const configQuery = useAbonnementConfigQuery();
   const mutation = useCreerAbonnementMutation();
   const [formuleId, setFormuleId] = useState(null);
   const [moyenPaiement, setMoyenPaiement] = useState(null);
@@ -44,10 +50,15 @@ export default function SouscrireCard() {
       { formuleId, moyenPaiement, referenceExterne: moyenPaiement === "WAVE" ? undefined : referenceExterne },
       {
         onSuccess: (data) => {
-          if (data.waveCheckoutUrl) {
-            window.location.href = data.waveCheckoutUrl;
-          } else {
+          if (!data.checkoutUrl) {
             setEnvoye(true);
+          } else if (data.checkoutUrl.startsWith("/")) {
+            // Chemin interne (page de simulation mock) — navigation SPA,
+            // pas de rechargement complet contrairement à une vraie
+            // redirection externe.
+            navigate(data.checkoutUrl);
+          } else {
+            window.location.href = data.checkoutUrl;
           }
         },
       },
@@ -56,6 +67,13 @@ export default function SouscrireCard() {
 
   return (
     <div className="space-y-3">
+      {configQuery.data?.mockActif && (
+        <div className="flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-xs px-3 py-2">
+          <FlaskConical className="size-4 shrink-0" aria-hidden="true" />
+          Mode test — aucune vraie clé API n'est configurée. Les paiements sont simulés, aucun argent réel n'est
+          déplacé.
+        </div>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {formules.map((f) => (
           <button

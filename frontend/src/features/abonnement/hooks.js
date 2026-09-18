@@ -24,6 +24,17 @@ export function useAbonnementsQuery(params) {
   });
 }
 
+// Indique si PAYMENTS_MODE=mock est actif côté serveur (voir
+// backend/src/lib/payments/index.js) — jamais déduit côté client, toujours
+// demandé au serveur qui seul connaît sa propre configuration.
+export function useAbonnementConfigQuery() {
+  return useQuery({ queryKey: ["abonnements", "config"], queryFn: () => abonnementsApi.config() });
+}
+
+export function useTransactionQuery(id) {
+  return useQuery({ queryKey: ["transactions", id], queryFn: () => transactionsApi.get(id), enabled: !!id });
+}
+
 function invalidateAbonnements(queryClient) {
   queryClient.invalidateQueries({ queryKey: ["abonnements"] });
 }
@@ -49,6 +60,17 @@ export function useRejeterManuelMutation() {
   return useMutation({
     mutationFn: (id) => transactionsApi.rejeterManuel(id),
     onSuccess: () => invalidateAbonnements(queryClient),
+  });
+}
+
+export function useSimulerMockMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, resultat }) => transactionsApi.simulerMock(id, resultat),
+    onSuccess: (data) => {
+      invalidateAbonnements(queryClient);
+      queryClient.invalidateQueries({ queryKey: ["transactions", data.id] });
+    },
   });
 }
 

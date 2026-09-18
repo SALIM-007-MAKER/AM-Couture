@@ -13,9 +13,12 @@ export const abonnementsApi = {
   actuel: () => api.get("/abonnements/actuel"),
   get: (id) => api.get(`/abonnements/${id}`),
   creer: (data) => api.post("/abonnements", data),
+  config: () => api.get("/abonnements/config"),
 };
 
 export const transactionsApi = {
+  get: (id) => api.get(`/transactions/${id}`),
   confirmerManuel: (id) => api.post(`/transactions/${id}/confirmer-manuel`, {}),
   rejeterManuel: (id) => api.post(`/transactions/${id}/rejeter-manuel`, {}),
+  simulerMock: (id, resultat) => api.post(`/transactions/${id}/simuler-mock`, { resultat }),
 };

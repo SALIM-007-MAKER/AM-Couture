@@ -8,7 +8,7 @@ import { formatZodError } from "../lib/validation.js";
 import { nextNumero } from "../lib/numero.js";
 import { creerAbonnementSchema, listAbonnementsQuerySchema } from "../schemas/abonnement.schema.js";
 import { statutEffectif } from "../lib/abonnement.js";
-import { creerSessionCheckout } from "../lib/wave.js";
+import { getPaymentProvider, PAYMENTS_MOCK_ACTIF } from "../lib/payments/index.js";
 
 const router = Router();
 // L'abonnement est celui DE L'ATELIER (Phase 8) — un SUPERADMIN n'a pas
@@ -33,6 +33,7 @@ router.post("/", async (req, res) => {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
   const { formuleId, moyenPaiement, referenceExterne } = parsed.data;
+  const provider = getPaymentProvider(moyenPaiement);
 
   const formule = await prisma.formuleAbonnement.findUnique({ where: { id: formuleId } });
   if (!formule || !formule.actif) {
@@ -56,6 +57,11 @@ router.post("/", async (req, res) => {
           statut: "EN_ATTENTE",
         },
       });
+      // Pour un moyen à vérification automatique (WAVE), c'est le
+      // prestataire (ou sa simulation mock) qui génère la référence externe
+      // ci-dessous — rien à stocker ici pour l'instant. Pour un moyen manuel
+      // (NITA/Amanata), c'est la référence de virement déjà transmise par
+      // l'atelier (creerAbonnementSchema l'exige dans ce cas).
       const numeroTrx = await nextNumero(tx, "TRX");
       const transactionCreee = await tx.transaction.create({
         data: {
@@ -64,9 +70,7 @@ router.post("/", async (req, res) => {
           moyenPaiement,
           montant: formule.prix,
           referenceInterne,
-          // Pour WAVE, c'est Wave qui génère l'identifiant de session
-          // ci-dessous — rien à stocker ici pour l'instant.
-          referenceExterne: moyenPaiement === "WAVE" ? null : referenceExterne,
+          referenceExterne: provider.verificationAutomatique ? null : referenceExterne,
         },
       });
       return { abonnement: abonnementCree, transaction: transactionCreee };
@@ -74,7 +78,7 @@ router.post("/", async (req, res) => {
     { maxWait: 10_000, timeout: 15_000 },
   );
 
-  if (moyenPaiement !== "WAVE") {
+  if (!provider.verificationAutomatique) {
     return res.status(201).json({ abonnement: serialiser(abonnement), transaction });
   }
 
@@ -82,28 +86,34 @@ router.post("/", async (req, res) => {
   // d'environnement supplémentaire nécessaire pour les URL de redirection.
   const origin = `${req.protocol}://${req.get("host")}`;
   try {
-    const session = await creerSessionCheckout({
+    const { referenceExterne: referenceExterneProvider, checkoutUrl } = await provider.initierPaiement({
       montant: formule.prix,
       referenceInterne,
+      transactionId: transaction.id,
       successUrl: `${origin}/abonnement?paiement=succes`,
       errorUrl: `${origin}/abonnement?paiement=echec`,
     });
     const transactionMaj = await prisma.transaction.update({
       where: { id: transaction.id },
-      data: { referenceExterne: session.id },
+      data: { referenceExterne: referenceExterneProvider },
     });
-    res.status(201).json({
-      abonnement: serialiser(abonnement),
-      transaction: transactionMaj,
-      waveCheckoutUrl: session.wave_launch_url,
-    });
+    res.status(201).json({ abonnement: serialiser(abonnement), transaction: transactionMaj, checkoutUrl });
   } catch (err) {
-    // Échec à la création de session (clé Wave manquante/invalide, panne
+    // Échec au démarrage du paiement (clé manquante/invalide, panne
     // réseau...) : la transaction reste une trace ÉCHOUÉE, jamais un
     // "EN_ATTENTE" fantôme qu'on oublierait de traiter.
     await prisma.transaction.update({ where: { id: transaction.id }, data: { statut: "ECHOUEE" } });
-    throw new HttpError(502, `Impossible de créer la session de paiement Wave : ${err.message}`);
+    throw new HttpError(502, `Impossible de démarrer le paiement ${moyenPaiement} : ${err.message}`);
   }
+});
+
+// GET /api/abonnements/config — indique si le mode test (PAYMENTS_MODE=mock)
+// est actif, pour que le frontend affiche un bandeau explicite (jamais un
+// silence qui laisserait croire à un vrai paiement) et propose la page de
+// simulation. Définie avant "/:id" pour ne pas être capturée comme un
+// identifiant.
+router.get("/config", (req, res) => {
+  res.json({ mockActif: PAYMENTS_MOCK_ACTIF });
 });
 
 // GET /api/abonnements — historique complet, plus récent en premier.

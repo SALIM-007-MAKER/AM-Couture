@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { verifierSignatureWebhook, recupererSession } from "../lib/wave.js";
-import { calculerDateExpiration } from "../lib/abonnement.js";
+import { activerAbonnement } from "../lib/abonnement.js";
 
 // PAS de requireAuth sur ce routeur : Wave appelle cette route directement,
 // sans cookie de session. La confiance vient EXCLUSIVEMENT de la signature
@@ -88,22 +88,27 @@ router.post("/wave", async (req, res) => {
   const coherent =
     session.client_reference === referenceInterne && Number(session.amount) === Number(transaction.montant);
   const reussi = coherent && session.checkout_status === "complete" && session.payment_status === "succeeded";
-  const echoue = session.checkout_status === "expired" || session.payment_status === "cancelled";
+  // Distingue "expirée" (fenêtre de paiement dépassée sans action) de
+  // "annulée" (l'atelier a fermé/refusé le paiement) de "échouée" (tout
+  // autre refus, ex: fonds insuffisants côté Wave) — même statut cohérent
+  // que la relecture manuelle (voir statuts_transaction_etendus, schema.prisma).
+  const statutFinal = reussi
+    ? "REUSSIE"
+    : session.checkout_status === "expired"
+      ? "EXPIREE"
+      : session.payment_status === "cancelled"
+        ? "ANNULEE"
+        : "EN_ATTENTE";
 
   await prisma.$transaction(async (tx) => {
     await tx.transaction.update({
       where: { id: transaction.id },
-      data: {
-        statut: reussi ? "REUSSIE" : echoue ? "ECHOUEE" : "EN_ATTENTE",
-        donneesBrutesWebhook: event,
-      },
+      data: { statut: statutFinal, donneesBrutesWebhook: event },
     });
     if (reussi) {
-      const maintenant = new Date();
-      const dateExpiration = calculerDateExpiration(maintenant, transaction.abonnement.formule.dureeMois);
-      await tx.abonnement.update({
-        where: { id: transaction.abonnementId },
-        data: { statut: "CONFIRME", dateDebut: maintenant, dateExpiration },
+      await activerAbonnement(tx, {
+        abonnementId: transaction.abonnementId,
+        dureeMois: transaction.abonnement.formule.dureeMois,
       });
     }
   });

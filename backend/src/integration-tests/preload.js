@@ -28,3 +28,9 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 process.env.DIRECT_URL = process.env.TEST_DATABASE_URL;
 process.env.JWT_SECRET ??= "test-secret-integration-tests-only";
 process.env.NODE_ENV = "test";
+// Mode test des paiements d'abonnement (voir lib/payments/index.js) — permet
+// aux tests d'exercer le flux complet souscription -> paiement -> activation
+// sans clé Wave/NITA/Amanata réelle. Lu une seule fois au premier import de
+// lib/payments/index.js, donc doit être fixé ici, AVANT que quoi que ce soit
+// n'importe la chaîne de routes (même contrainte que DATABASE_URL ci-dessus).
+process.env.PAYMENTS_MODE ??= "mock";
