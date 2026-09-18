@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Scissors, Lock, Eye, EyeOff, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useActiverCompteClientMutation } from "../../hooks/useAuth.js";
 import { GlobalFormError } from "../../components/QueryState.jsx";
@@ -129,12 +129,6 @@ export default function ActiverCompteClientPage() {
               </button>
             </form>
           )}
-
-          <p className="text-center text-sm text-neutral-400">
-            <Link to="/login" className="text-amber-400 hover:text-amber-300 font-medium transition-colors">
-              Retour à la connexion
-            </Link>
-          </p>
         </div>
 
         <p className="mt-6 text-xs text-neutral-500">{NOM_PLATEFORME}</p>
