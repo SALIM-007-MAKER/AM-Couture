@@ -69,10 +69,17 @@ export function client(baseUrl) {
   };
 }
 
+// `process.pid` obligatoire en plus de Date.now()+compteur : `node --test`
+// exécute chaque FICHIER de test dans son propre process, chacun avec son
+// compteur remis à zéro — deux fichiers peuvent donc produire le même
+// identifiant à la même milliseconde (trouvé en CI après l'ajout d'un
+// nouveau fichier de test, qui a fait basculer une collision jusque-là
+// juste assez rare pour ne jamais se produire). Le pid, unique par
+// process, élimine cette collision inter-fichiers.
 let compteur = 0;
 function identifiantUnique(prefixe) {
   compteur += 1;
-  return `${prefixe}-${Date.now()}-${compteur}`;
+  return `${prefixe}-${process.pid}-${Date.now()}-${compteur}`;
 }
 
 /** Coût bcrypt volontairement réduit (4) : rapidité des tests, aucune

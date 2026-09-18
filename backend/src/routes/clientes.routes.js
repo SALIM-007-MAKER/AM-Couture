@@ -327,6 +327,18 @@ router.post("/:id/inviter", async (req, res) => {
     });
   }
 
+  // Reporté sur le compte de connexion UNIQUEMENT si disponible : User.email
+  // est unique (voir schema.prisma), or Cliente.email ne l'est pas — deux
+  // clientes peuvent partager la même adresse (couple, famille). Sans ce
+  // compte connecté, "mot de passe oublié" (auth.routes.js) ne peut envoyer
+  // aucun email pour ce compte, faute d'email enregistré dessus — mieux
+  // qu'un email en doublon qui ferait échouer toute l'invitation.
+  let emailPourCompte;
+  if (cliente.email) {
+    const emailDejaUtilise = await prisma.user.findUnique({ where: { email: cliente.email } });
+    if (!emailDejaUtilise) emailPourCompte = cliente.email;
+  }
+
   // Coût bcrypt normal malgré l'inutilisabilité : ce hash ne doit jamais
   // être plus facile à retrouver par force brute qu'un vrai mot de passe.
   const passwordHashTemporaire = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
@@ -340,6 +352,7 @@ router.post("/:id/inviter", async (req, res) => {
         atelierId: cliente.atelierId,
         prenom: cliente.prenom,
         nom: cliente.nom,
+        email: emailPourCompte,
       },
     });
     await tx.cliente.update({ where: { id: cliente.id }, data: { userId: user.id } });

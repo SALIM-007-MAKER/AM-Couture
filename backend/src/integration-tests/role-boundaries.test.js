@@ -210,6 +210,31 @@ describe("Invitation client de bout en bout", () => {
     const invitation = await adminApi.post(`/api/clientes/${clienteAvecEmail.id}/inviter`);
     assert.equal(invitation.status, 201);
     assert.ok(invitation.body.lienActivation);
+
+    // RÉGRESSION : sans cet email reporté sur le compte, "mot de passe
+    // oublié" (auth.routes.js) ne peut jamais rien envoyer pour ce client.
+    const compteCree = await prisma.user.findUnique({ where: { identifiant: "92000002" } });
+    assert.equal(compteCree.email, "test@example.com");
+  });
+
+  test("RÉGRESSION : deux clientes avec le MÊME email -> le compte de la seconde reste sans email (User.email est unique)", async () => {
+    const clienteA = await creerCliente(atelier.id, { telephone: "92000003", email: "partage@example.com" });
+    const clienteB = await creerCliente(atelier.id, { telephone: "92000004", email: "partage@example.com" });
+    const adminApi = client(baseUrl);
+    await adminApi.post("/api/auth/login", { identifiant: identifiantAdmin, password: passwordAdmin });
+
+    const invitationA = await adminApi.post(`/api/clientes/${clienteA.id}/inviter`);
+    assert.equal(invitationA.status, 201);
+
+    // Ne doit JAMAIS échouer (contrainte unique évitée en amont), même si
+    // l'email est déjà pris par le compte de la cliente A.
+    const invitationB = await adminApi.post(`/api/clientes/${clienteB.id}/inviter`);
+    assert.equal(invitationB.status, 201);
+
+    const compteA = await prisma.user.findUnique({ where: { identifiant: "92000003" } });
+    const compteB = await prisma.user.findUnique({ where: { identifiant: "92000004" } });
+    assert.equal(compteA.email, "partage@example.com");
+    assert.equal(compteB.email, null);
   });
 });
 
