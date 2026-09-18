@@ -11,6 +11,7 @@ import { HttpError } from "../middlewares/error.middleware.js";
 // transaction atomique atelier+admin) quelle que soit l'origine.
 export async function creerAtelierEtAdmin({
   nom,
+  logoUrl,
   devise,
   telephone,
   adresse,
@@ -49,7 +50,9 @@ export async function creerAtelierEtAdmin({
   const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
   return prisma.$transaction(async (tx) => {
-    const atelier = await tx.atelier.create({ data: { nom, devise, telephone, adresse, ville, pays, trialEndsAt } });
+    const atelier = await tx.atelier.create({
+      data: { nom, logoUrl, devise, telephone, adresse, ville, pays, trialEndsAt },
+    });
     const admin = await tx.user.create({
       data: {
         identifiant: adminIdentifiant,

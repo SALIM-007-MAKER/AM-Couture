@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { emptyToUndefined, normalizeText, optionalTrimmed } from "../lib/zodHelpers.js";
+import { emptyToUndefined, normalizeText, optionalTrimmed, optionalImageField } from "../lib/zodHelpers.js";
 import { normalizePhone } from "../lib/phone.js";
 import { LANGUES_DISPONIBLES } from "./compte.schema.js";
 
@@ -61,10 +61,13 @@ const emailField = z.string().trim().toLowerCase().max(190).email("Email invalid
 // `email` pour ce champ lors de l'appel à creerAtelierEtAdmin).
 // `nom` (atelier) OPTIONNEL : un repli ("Atelier de {prénom}") est appliqué
 // côté route si non fourni — un propriétaire pressé doit pouvoir s'inscrire
-// sans avoir déjà choisi de nom commercial.
+// sans avoir déjà choisi de nom commercial. `logoUrl` OPTIONNEL de la même
+// façon (voir putParametresSchema, atelier.schema.js) — un propriétaire peut
+// aussi l'ajouter plus tard depuis Paramètres.
 export const inscriptionAtelierSchema = z
   .object({
     nom: nomAtelierField.optional(),
+    logoUrl: optionalImageField(),
     prenom: personNameField("Prénom"),
     nomProprietaire: personNameField("Nom"),
     email: emailField,

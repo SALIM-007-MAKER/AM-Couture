@@ -156,13 +156,15 @@ router.post("/inscription-atelier", inscriptionLimiter, rejectIfDejaConnecte, as
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
-  const { nom, prenom, nomProprietaire, email, adminPassword, telephone, ville, pays, devise, langue } = parsed.data;
+  const { nom, logoUrl, prenom, nomProprietaire, email, adminPassword, telephone, ville, pays, devise, langue } =
+    parsed.data;
 
   const { admin } = await creerAtelierEtAdmin({
     // Repli si le nom d'atelier est laissé vide (champ optionnel ici, voir
     // atelierAdmin.schema.js) — un propriétaire pressé peut le renommer
     // ensuite depuis Paramètres.
     nom: nom || `Atelier de ${prenom}`,
+    logoUrl,
     devise,
     telephone,
     ville,

@@ -5,6 +5,7 @@ import { useInscriptionAtelierMutation } from "../../hooks/useAuth.js";
 import { LANGUES_DISPONIBLES } from "../../features/compte/constants.js";
 import { ApiError } from "../../lib/apiClient.js";
 import { GlobalFormError, FieldError } from "../../components/QueryState.jsx";
+import ImageUploadField from "../../components/ImageUploadField.jsx";
 
 // Même esthétique que LoginPage.jsx (voir ses commentaires) — un propriétaire
 // d'atelier crée ici SON atelier + son propre compte ADMIN en une seule
@@ -23,6 +24,7 @@ const NOM_PLATEFORME = "Gestion d'Atelier";
 
 const FORM_INITIAL = {
   nom: "",
+  logoUrl: "",
   prenom: "",
   nomProprietaire: "",
   email: "",
@@ -62,6 +64,7 @@ export default function InscriptionAtelierPage() {
     mutation.mutate(
       {
         nom: form.nom || undefined,
+        logoUrl: form.logoUrl || undefined,
         prenom: form.prenom,
         nomProprietaire: form.nomProprietaire,
         email: form.email,
@@ -120,6 +123,19 @@ export default function InscriptionAtelierPage() {
               />
             </div>
             <FieldError messages={details?.nom} />
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="text-sm font-medium text-neutral-300">
+              Logo de l'atelier <span className="text-neutral-500 font-normal">(optionnel)</span>
+            </span>
+            <ImageUploadField
+              value={form.logoUrl}
+              onChange={(v) => update("logoUrl", v)}
+              alt="Logo de l'atelier"
+              previewClassName="h-16 w-16 object-contain bg-white"
+            />
+            <FieldError messages={details?.logoUrl} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
