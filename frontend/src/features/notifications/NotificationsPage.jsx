@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, CheckCheck, Trash2, Check, X } from "lucide-react";
+import { Bell, CheckCheck, Trash2, Check, X, Inbox, ArrowRight } from "lucide-react";
 import {
   useNotificationsQuery,
+  useNombreNonLuesQuery,
   useMarquerLuMutation,
   useMarquerLuMasseMutation,
   useSupprimerMasseMutation,
@@ -45,6 +46,7 @@ export default function NotificationsPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const query = useNotificationsQuery({ lu: filtreLu || undefined, page, pageSize: PAGE_SIZE });
+  const nombreQuery = useNombreNonLuesQuery();
   const marquerLuMutation = useMarquerLuMutation();
   const marquerLuMasseMutation = useMarquerLuMasseMutation();
   const supprimerMasseMutation = useSupprimerMasseMutation();
@@ -90,6 +92,28 @@ export default function NotificationsPage() {
         title="Notifications"
         subtitle="Alertes automatiques : retards, commandes prêtes, livraisons proches, impayés."
       />
+
+      {/* Les demandes de commande des clients comptent dans la pastille de la
+          cloche (voir GET /notifications/nombre-non-lues) mais ne sont PAS
+          des Notification au sens du schéma (pas liées à une Commande) —
+          jamais listées ci-dessous, seulement rappelées ici pour que le
+          total affiché par la cloche reste explicable, avec un lien direct
+          vers leur propre page de gestion. */}
+      {nombreQuery.data?.demandes > 0 && (
+        <Link to="/demandes">
+          <Card
+            variant="outlined"
+            className="flex items-center justify-between gap-3 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors"
+          >
+            <span className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <Inbox className="size-4 shrink-0" aria-hidden="true" />
+              {nombreQuery.data.demandes} demande{nombreQuery.data.demandes > 1 ? "s" : ""} de commande en attente de
+              traitement.
+            </span>
+            <ArrowRight className="size-4 shrink-0 text-neutral-400" aria-hidden="true" />
+          </Card>
+        </Link>
+      )}
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex gap-2">

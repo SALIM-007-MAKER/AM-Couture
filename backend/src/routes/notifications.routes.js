@@ -56,12 +56,22 @@ router.get("/", async (req, res) => {
 // GET /api/notifications/nombre-non-lues — pastille de l'en-tête (voir
 // AppLayout.jsx). Déclarée avant "/:id" pour ne pas être capturée comme un
 // identifiant (même précaution que /derniere sur Mesures).
+//
+// Inclut aussi les demandes de commande EN_ATTENTE (voir
+// routes/demandes.routes.js) : ce ne sont pas des `Notification` au sens du
+// schéma (pas liées à une Commande, DemandeCommande est un modèle séparé —
+// voir schema.prisma), mais elles réclament la même attention de l'ADMIN.
+// Sans ça, la cloche de l'en-tête restait silencieuse à chaque nouvelle
+// demande envoyée par un client, seule la page Demandes le révélait.
+// `demandes` renvoyé séparément pour que la page Notifications puisse
+// expliquer le total affiché par la cloche (jamais un chiffre muet).
 router.get("/nombre-non-lues", async (req, res) => {
   await reconcilierNotifications(prisma, req.user.atelierId);
-  const count = await prisma.notification.count({
-    where: { lu: false, commande: { atelierId: req.user.atelierId } },
-  });
-  res.json({ count });
+  const [notifications, demandes] = await Promise.all([
+    prisma.notification.count({ where: { lu: false, commande: { atelierId: req.user.atelierId } } }),
+    prisma.demandeCommande.count({ where: { atelierId: req.user.atelierId, statut: "EN_ATTENTE" } }),
+  ]);
+  res.json({ count: notifications + demandes, notifications, demandes });
 });
 
 // PATCH /api/notifications/:id — { lu: true|false }, marquer lu/non lu à l'unité.

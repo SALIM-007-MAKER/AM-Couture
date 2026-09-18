@@ -133,6 +133,24 @@ describe("Frontières entre rôles ADMIN / USER", () => {
     const pdf = await apiB.get(`/api/moi/recus/${recuA.id}/pdf`);
     assert.equal(pdf.status, 404);
   });
+
+  test("RÉGRESSION : une demande de commande d'un client compte dans la pastille de notifications de l'ADMIN", async () => {
+    const apiA = client(baseUrl);
+    await apiA.post("/api/auth/login", { identifiant: userA.identifiant, password: userA.password });
+
+    const adminApi = client(baseUrl);
+    await adminApi.post("/api/auth/login", { identifiant: identifiantAdmin, password: passwordAdmin });
+    const avant = await adminApi.get("/api/notifications/nombre-non-lues");
+    assert.equal(avant.status, 200);
+
+    const demande = await apiA.post("/api/moi/demandes", { description: "Un boubou pour un mariage." });
+    assert.equal(demande.status, 201);
+
+    const apres = await adminApi.get("/api/notifications/nombre-non-lues");
+    assert.equal(apres.status, 200);
+    assert.equal(apres.body.demandes, avant.body.demandes + 1);
+    assert.equal(apres.body.count, avant.body.count + 1);
+  });
 });
 
 describe("Invitation client de bout en bout", () => {
