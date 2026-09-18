@@ -87,10 +87,14 @@ router.post("/login", loginLimiter, async (req, res) => {
     throw new HttpError(401, "Identifiant ou mot de passe incorrect.");
   }
 
-  // Fil d'activité SUPERADMIN (voir GET /api/ateliers/:id/activite) — pas
-  // attendu avant la réponse : une connexion réussie ne doit jamais échouer
-  // ou ralentir à cause de cet horodatage, purement informatif.
-  prisma.user.update({ where: { id: user.id }, data: { derniereConnexionAt: new Date() } }).catch(() => {});
+  // Fil d'activité SUPERADMIN (voir GET /api/ateliers/:id/activite) — un
+  // échec de cet horodatage ne doit jamais faire échouer la connexion,
+  // purement informatif (voir .catch() local ci-dessous). AWAIT tout de
+  // même obligatoire (piège serverless trouvé en production, voir le
+  // commentaire complet dans le bloc email de vérification plus bas) :
+  // sans lui, cette écriture pouvait être suspendue avant de s'exécuter et
+  // ne jamais aboutir — coût négligeable (une écriture Postgres poolée).
+  await prisma.user.update({ where: { id: user.id }, data: { derniereConnexionAt: new Date() } }).catch(() => {});
 
   // clienteId (§ plan rôle USER) : signé UNE FOIS ici depuis la base, jamais
   // fourni par le frontend — voir signAuthToken, jwt.js.
@@ -181,21 +185,31 @@ router.post("/inscription-atelier", inscriptionLimiter, rejectIfDejaConnecte, as
   // (visible dans les logs Vercel) plutôt que remonté au propriétaire de
   // l'atelier, qui a de toute façon un accès immédiat sans vérification
   // (voir décision : accès immédiat après inscription).
-  creerToken({ userId: admin.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 })
-    .then((verifToken) => {
-      const origin = `${req.protocol}://${req.get("host")}`;
-      return envoyerEmail({
-        to: admin.email,
-        subject: "Confirmez votre email — Gestion d'Atelier",
-        html: emailVerificationTemplate({
-          prenom: admin.prenom,
-          lienVerification: `${origin}/verifier-email?token=${verifToken}`,
-        }),
-      });
-    })
-    .catch((err) => {
-      console.error(`[inscription-atelier] Échec de l'envoi de l'email de vérification à ${admin.email} :`, err.message);
+  //
+  // AWAIT obligatoire malgré le "best effort" (piège serverless trouvé en
+  // production) : une promesse simplement lancée puis ignorée (sans await)
+  // AVANT de répondre est suspendue dès que la réponse HTTP part — l'instance
+  // de fonction peut être gelée avant que l'envoi n'ait eu le temps
+  // d'atteindre Resend, et ne reprend (par chance) que si cette même
+  // instance est réutilisée pour une requête ultérieure. Pour un vrai
+  // utilisateur, cette suspension est définitive : l'email ne part jamais.
+  // `await` garantit que l'opération se termine (succès ou échec) DANS le
+  // cycle de vie de cette requête, sans changer la sémantique "n'échoue
+  // jamais l'action principale" (le .catch() reste local, jamais propagé).
+  try {
+    const verifToken = await creerToken({ userId: admin.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
+    const origin = `${req.protocol}://${req.get("host")}`;
+    await envoyerEmail({
+      to: admin.email,
+      subject: "Confirmez votre email — Gestion d'Atelier",
+      html: emailVerificationTemplate({
+        prenom: admin.prenom,
+        lienVerification: `${origin}/verifier-email?token=${verifToken}`,
+      }),
     });
+  } catch (err) {
+    console.error(`[inscription-atelier] Échec de l'envoi de l'email de vérification à ${admin.email} :`, err.message);
+  }
 
   const token = signAuthToken(admin);
   setAuthCookie(res, token);
@@ -262,21 +276,25 @@ router.post("/mot-de-passe-oublie", motDePasseOublieLimiter, async (req, res) =>
   const message = "Si un compte existe avec cet identifiant et un email associé, un lien de réinitialisation vient de lui être envoyé.";
 
   const user = await prisma.user.findUnique({ where: { identifiant: parsed.data.identifiant } });
+  // AWAIT obligatoire (même piège serverless que inscription-atelier ci-dessus,
+  // voir son commentaire complet) : sans lui, l'envoi peut être suspendu
+  // avant d'atteindre Resend et ne jamais repartir. Le .catch() reste local
+  // (jamais propagé) : la réponse générique ci-dessous est renvoyée que
+  // l'envoi ait réussi ou non, pour ne jamais révéler l'existence du compte.
   if (user?.email) {
-    creerToken({ userId: user.id, type: "REINITIALISATION_MOT_DE_PASSE", dureeMs: 60 * 60 * 1000 })
-      .then((resetToken) => {
-        const origin = `${req.protocol}://${req.get("host")}`;
-        return envoyerEmail({
-          to: user.email,
-          subject: "Réinitialisation de votre mot de passe — Gestion d'Atelier",
-          html: emailReinitialisationTemplate({
-            lienReinitialisation: `${origin}/reinitialiser-mot-de-passe?token=${resetToken}`,
-          }),
-        });
-      })
-      .catch((err) => {
-        console.error(`[mot-de-passe-oublie] Échec de l'envoi à ${user.email} :`, err.message);
+    try {
+      const resetToken = await creerToken({ userId: user.id, type: "REINITIALISATION_MOT_DE_PASSE", dureeMs: 60 * 60 * 1000 });
+      const origin = `${req.protocol}://${req.get("host")}`;
+      await envoyerEmail({
+        to: user.email,
+        subject: "Réinitialisation de votre mot de passe — Gestion d'Atelier",
+        html: emailReinitialisationTemplate({
+          lienReinitialisation: `${origin}/reinitialiser-mot-de-passe?token=${resetToken}`,
+        }),
       });
+    } catch (err) {
+      console.error(`[mot-de-passe-oublie] Échec de l'envoi à ${user.email} :`, err.message);
+    }
   }
 
   res.json({ message });

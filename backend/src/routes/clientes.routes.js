@@ -354,14 +354,21 @@ router.post("/:id/inviter", async (req, res) => {
   // vérification à l'inscription, auth.routes.js) : la réponse renvoie de
   // toute façon le lien, l'ADMIN peut toujours le transmettre lui-même si
   // l'envoi échoue ou si la cliente n'a pas d'email.
+  //
+  // AWAIT obligatoire (piège serverless trouvé en production — voir le
+  // commentaire complet dans auth.routes.js) : une promesse lancée sans await
+  // avant de répondre peut être suspendue avant d'atteindre Resend et ne
+  // jamais repartir, alors même que la requête HTTP répond "succès".
   if (cliente.email) {
-    envoyerEmail({
-      to: cliente.email,
-      subject: "Créez votre compte client — Gestion d'Atelier",
-      html: emailInvitationClientTemplate({ prenom: cliente.prenom, identifiant, lienActivation }),
-    }).catch((err) => {
+    try {
+      await envoyerEmail({
+        to: cliente.email,
+        subject: "Créez votre compte client — Gestion d'Atelier",
+        html: emailInvitationClientTemplate({ prenom: cliente.prenom, identifiant, lienActivation }),
+      });
+    } catch (err) {
       console.error(`[clientes:inviter] Échec de l'envoi de l'invitation à ${cliente.email} :`, err.message);
-    });
+    }
   }
 
   res.status(201).json({ lienActivation });
