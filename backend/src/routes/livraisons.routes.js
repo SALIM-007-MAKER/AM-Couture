@@ -13,6 +13,7 @@ import {
   listLivraisonsGlobalQuerySchema,
 } from "../schemas/livraison.schema.js";
 import { annulerSchema } from "../schemas/annulation.schema.js";
+import { creerNotificationClient } from "../lib/notificationsClient.js";
 
 // mergeParams: true — monté sous /api/commandes/:commandeId/livraisons.
 // requireAuth et la validation de :commandeId sont déjà appliqués par le
@@ -101,6 +102,12 @@ router.post("/", async (req, res) => {
           }
           paiement = await tx.paiement.create({ data: { ...paiementFinal, commandeId } });
           soldeApres = soldeAvant.minus(montantDecimal);
+          await creerNotificationClient(tx, {
+            clienteId: commande.clienteId,
+            commandeId,
+            type: "PAIEMENT_ENREGISTRE",
+            message: `Paiement de ${paiement.montant} enregistré sur votre commande ${commande.numero}.`,
+          });
         }
 
         // Snapshot calculé côté serveur, APRÈS le paiement final éventuel de
@@ -116,6 +123,12 @@ router.post("/", async (req, res) => {
         });
 
         await tx.commande.update({ where: { id: commandeId }, data: { statut: "LIVREE" } });
+        await creerNotificationClient(tx, {
+          clienteId: commande.clienteId,
+          commandeId,
+          type: "LIVRAISON_ENREGISTREE",
+          message: `Votre commande ${commande.numero} a été livrée.`,
+        });
 
         return {
           livraison,

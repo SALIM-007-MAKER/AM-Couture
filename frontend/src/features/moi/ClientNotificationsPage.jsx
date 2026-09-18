@@ -1,10 +1,17 @@
 import { Link } from "react-router-dom";
-import { Bell } from "lucide-react";
-import { useMesNotificationsQuery } from "./hooks.js";
-import { NOTIFICATION_LABELS, NOTIFICATION_ICONS, NOTIFICATION_TONES, notificationMessage } from "../notifications/constants.js";
+import { Bell, Check } from "lucide-react";
+import { useMesNotificationsQuery, useMarquerNotificationLuMutation } from "./hooks.js";
+import { NOTIFICATION_CLIENT_LABELS, NOTIFICATION_CLIENT_ICONS, NOTIFICATION_CLIENT_TONES } from "./constants.js";
+import {
+  NOTIFICATION_LABELS,
+  NOTIFICATION_ICONS,
+  NOTIFICATION_TONES,
+  notificationMessage,
+} from "../notifications/constants.js";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
+import Button from "../../components/Button.jsx";
 
 const TONE_CLASSES = {
   danger: "text-red-600 dark:text-red-400",
@@ -16,17 +23,19 @@ function formatDateHeure(iso) {
   return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-// Lecture seule (pas de "marquer lu"/suppression — voir GET /api/moi/notifications,
-// qui ne filtre qu'aux types pertinents pour un client final : PRET et
-// LIVRAISON_PROCHE, jamais RETARD/IMPAYE, alertes de gestion interne à
-// l'atelier — voir backend/src/routes/moi.routes.js).
+// Fusionne DEUX sources (voir GET /api/moi/notifications, moi.routes.js) :
+// "etat" (commande prête/bientôt à livrer, recalculé — jamais marquable lu
+// depuis ici, Notification.lu est partagé avec l'ADMIN) et "evenement" (fil
+// d'activité — commande créée, paiement, demande acceptée/refusée...,
+// marquable lu, propre au client).
 export default function ClientNotificationsPage() {
   const query = useMesNotificationsQuery();
+  const marquerLuMutation = useMarquerNotificationLuMutation();
   const data = query.data?.data ?? [];
 
   return (
     <div className="max-w-2xl space-y-6">
-      <PageHeader icon={Bell} title="Notifications" subtitle="Vos commandes prêtes ou bientôt à livrer." />
+      <PageHeader icon={Bell} title="Notifications" subtitle="Tout ce qui se passe entre vous et votre atelier." />
 
       {query.isPending && <LoadingState label="Chargement des notifications…" />}
       {query.isError && <ErrorState error={query.error} onRetry={query.refetch} />}
@@ -35,23 +44,42 @@ export default function ClientNotificationsPage() {
       {query.data && data.length > 0 && (
         <ul className="space-y-2">
           {data.map((notif) => {
-            const Icon = NOTIFICATION_ICONS[notif.type];
-            const tone = TONE_CLASSES[NOTIFICATION_TONES[notif.type]];
+            const estEvenement = notif.source === "evenement";
+            const Icon = estEvenement ? NOTIFICATION_CLIENT_ICONS[notif.type] : NOTIFICATION_ICONS[notif.type];
+            const tone = TONE_CLASSES[estEvenement ? NOTIFICATION_CLIENT_TONES[notif.type] : NOTIFICATION_TONES[notif.type]];
+            const label = estEvenement ? NOTIFICATION_CLIENT_LABELS[notif.type] : NOTIFICATION_LABELS[notif.type];
+            const message = estEvenement ? notif.message : notificationMessage(notif);
             return (
               <li key={notif.id}>
-                <Card variant="outlined" className="flex items-start gap-3">
+                <Card variant="outlined" className={`flex items-start gap-3 ${notif.lu ? "opacity-60" : ""}`}>
                   <span className={`shrink-0 mt-0.5 ${tone}`}>
                     <Icon className="size-4" aria-hidden="true" />
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`text-xs font-semibold ${tone}`}>{NOTIFICATION_LABELS[notif.type]}</span>
+                      <span className={`text-xs font-semibold ${tone}`}>{label}</span>
                       <span className="text-xs text-neutral-400">{formatDateHeure(notif.createdAt)}</span>
                     </div>
-                    <Link to={`/client/commandes/${notif.commande.id}`} className="text-sm text-neutral-900 dark:text-neutral-100 hover:underline">
-                      {notificationMessage(notif)}
-                    </Link>
+                    {notif.commande ? (
+                      <Link to={`/client/commandes/${notif.commande.id}`} className="text-sm text-neutral-900 dark:text-neutral-100 hover:underline">
+                        {message}
+                      </Link>
+                    ) : (
+                      <p className="text-sm text-neutral-900 dark:text-neutral-100">{message}</p>
+                    )}
                   </div>
+                  {estEvenement && !notif.lu && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={Check}
+                      className="shrink-0"
+                      loading={marquerLuMutation.isPending && marquerLuMutation.variables?.id === notif.id}
+                      onClick={() => marquerLuMutation.mutate({ id: notif.id, lu: true })}
+                    >
+                      Lu
+                    </Button>
+                  )}
                 </Card>
               </li>
             );

@@ -26,7 +26,27 @@ export function useMesPaiementsQuery() {
 }
 
 export function useMesNotificationsQuery() {
-  return useQuery({ queryKey: ["moi", "notifications"], queryFn: moiApi.notifications });
+  return useQuery({ queryKey: ["moi", "notifications", "list"], queryFn: moiApi.notifications.list });
+}
+
+// Pastille de la cloche (voir ClientLayout.jsx) — même intervalle que côté
+// ADMIN (useNombreNonLuesQuery, features/notifications/hooks.js).
+export function useMesNombreNonLuesQuery() {
+  return useQuery({
+    queryKey: ["moi", "notifications", "non-lues"],
+    queryFn: moiApi.notifications.nombreNonLues,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useMarquerNotificationLuMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, lu }) => moiApi.notifications.marquerLu(id, lu),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["moi", "notifications"] });
+    },
+  });
 }
 
 export function useMesDemandesQuery() {

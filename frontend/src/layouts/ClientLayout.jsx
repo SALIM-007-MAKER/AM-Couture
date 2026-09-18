@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { Scissors, User, Ruler, ClipboardList, Wallet, FileText, Inbox, Bell, Menu, LogOut } from "lucide-react";
 import { useLogoutMutation } from "../hooks/useAuth.js";
-import { useMonProfilQuery } from "../features/moi/hooks.js";
+import { useMonProfilQuery, useMesNombreNonLuesQuery } from "../features/moi/hooks.js";
 
 // Espace client final (§ plan rôle USER, Phase 3) — mêmes conventions que
 // AppLayout.jsx : 5 destinations principales dans la barre du bas (mobile)
@@ -45,14 +45,25 @@ function Logo({ logoUrl, nom }) {
   );
 }
 
+// Pastille = nombre de notifications non lues (fusion des deux sources,
+// voir GET /api/moi/notifications/non-lues) — même pattern que la cloche
+// ADMIN (NotificationBell, AppLayout.jsx). isPending/isError ignorés
+// volontairement : un compteur absent reste un détail décoratif.
 function NotificationBell() {
+  const { data } = useMesNombreNonLuesQuery();
+  const count = data?.count ?? 0;
   return (
     <NavLink
       to="/client/notifications"
-      className="rounded-lg p-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-      aria-label="Notifications"
+      className="relative rounded-lg p-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+      aria-label={count > 0 ? `${count} notifications non lues` : "Notifications"}
     >
       <Bell className="size-4" aria-hidden="true" />
+      {count > 0 && (
+        <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-4 h-4 px-0.5 rounded-full bg-red-600 text-white text-[10px] font-semibold leading-none">
+          {count > 9 ? "9+" : count}
+        </span>
+      )}
     </NavLink>
   );
 }

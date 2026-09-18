@@ -9,6 +9,7 @@ import { computeSolde, statutPaiement } from "../lib/money.js";
 import { streamFicheCommandePdf } from "../lib/recuPdf.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { buildCsv, envoyerCsv } from "../lib/csv.js";
+import { creerNotificationClient, STATUT_COMMANDE_LABELS } from "../lib/notificationsClient.js";
 import {
   createCommandeSchema,
   updateCommandeSchema,
@@ -96,11 +97,23 @@ router.post("/", async (req, res) => {
       const commande = await tx.commande.create({
         data: { ...commandeInput, numero, atelierId: req.user.atelierId },
       });
+      await creerNotificationClient(tx, {
+        clienteId: commande.clienteId,
+        commandeId: commande.id,
+        type: "COMMANDE_CREEE",
+        message: `Votre commande ${numero} a été enregistrée.`,
+      });
 
       let paiement = null;
       if (paiementInitial) {
         paiement = await tx.paiement.create({
           data: { ...paiementInitial, commandeId: commande.id },
+        });
+        await creerNotificationClient(tx, {
+          clienteId: commande.clienteId,
+          commandeId: commande.id,
+          type: "PAIEMENT_ENREGISTRE",
+          message: `Paiement de ${paiement.montant} enregistré sur votre commande ${numero}.`,
         });
       }
       return { commande, paiement };
@@ -356,7 +369,7 @@ router.post("/:id/statut", async (req, res) => {
 
   const current = await prisma.commande.findFirst({
     where: { id, atelierId: req.user.atelierId },
-    select: { statut: true },
+    select: { statut: true, numero: true, clienteId: true },
   });
   if (!current) throw new HttpError(404, "Commande introuvable.");
 
@@ -378,6 +391,16 @@ router.post("/:id/statut", async (req, res) => {
   if (result.count === 0) {
     throw new HttpError(409, "Le statut de la commande a changé entre-temps, réessayez.");
   }
+
+  await creerNotificationClient(prisma, {
+    clienteId: current.clienteId,
+    commandeId: id,
+    type: nextStatut === "ANNULEE" ? "COMMANDE_ANNULEE" : "COMMANDE_STATUT_CHANGE",
+    message:
+      nextStatut === "ANNULEE"
+        ? `Votre commande ${current.numero} a été annulée.`
+        : `Votre commande ${current.numero} est maintenant : ${STATUT_COMMANDE_LABELS[nextStatut] ?? nextStatut}.`,
+  });
 
   const commande = await prisma.commande.findUnique({ where: { id } });
   res.json(commande);

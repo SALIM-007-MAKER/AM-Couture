@@ -9,6 +9,7 @@ import { nextNumero } from "../lib/numero.js";
 import { streamRecuPdf } from "../lib/recuPdf.js";
 import { RECU_INCLUDE } from "../lib/recuInclude.js";
 import { createRecuSchema, listRecusQuerySchema, listRecusGlobalQuerySchema } from "../schemas/recu.schema.js";
+import { creerNotificationClient } from "../lib/notificationsClient.js";
 
 // ───────────────────────────────────────────────────────────────────────
 // Routeur imbriqué — monté sous /api/commandes/:commandeId/recus.
@@ -46,7 +47,10 @@ recusCommandeRouter.post("/", async (req, res) => {
 
   const recu = await prisma.$transaction(
     async (tx) => {
-      const commande = await tx.commande.findUnique({ where: { id: commandeId }, select: { id: true } });
+      const commande = await tx.commande.findUnique({
+        where: { id: commandeId },
+        select: { id: true, numero: true, clienteId: true },
+      });
       if (!commande) throw new HttpError(404, "Commande introuvable.");
 
       // annuleAt: null — un paiement annulé n'a jamais eu lieu pour la
@@ -68,10 +72,17 @@ recusCommandeRouter.post("/", async (req, res) => {
       }
 
       const numero = await nextNumero(tx, "REC");
-      return tx.recu.create({
+      const nouveauRecu = await tx.recu.create({
         data: { commandeId, montantPaye: montantPaye.toString(), numero },
         include: RECU_INCLUDE,
       });
+      await creerNotificationClient(tx, {
+        clienteId: commande.clienteId,
+        commandeId,
+        type: "RECU_EMIS",
+        message: `Un reçu est disponible pour votre commande ${commande.numero}.`,
+      });
+      return nouveauRecu;
     },
     // Même ajustement que Commandes/Paiements/Livraisons (voir leurs
     // routes) : le défaut Prisma (5s) s'est révélé insuffisant sous latence

@@ -12,7 +12,11 @@ export const moiApi = {
     get: (id) => api.get(`/moi/commandes/${id}`),
   },
   paiements: () => api.get("/moi/paiements"),
-  notifications: () => api.get("/moi/notifications"),
+  notifications: {
+    list: () => api.get("/moi/notifications"),
+    nombreNonLues: () => api.get("/moi/notifications/non-lues"),
+    marquerLu: (id, lu) => api.patch(`/moi/notifications/${id}`, { lu }),
+  },
   demandes: {
     list: () => api.get("/moi/demandes"),
     create: (data) => api.post("/moi/demandes", data),

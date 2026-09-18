@@ -16,6 +16,7 @@ import {
 } from "../schemas/paiement.schema.js";
 import { createRecuSchema } from "../schemas/recu.schema.js";
 import { annulerSchema } from "../schemas/annulation.schema.js";
+import { creerNotificationClient } from "../lib/notificationsClient.js";
 
 // mergeParams: true — monté sous /api/commandes/:commandeId/paiements, a
 // besoin de req.params.commandeId. requireAuth est déjà appliqué par le
@@ -34,7 +35,7 @@ router.param("paiementId", requireValidIdParam);
 router.use(async (req, res, next) => {
   const commande = await prisma.commande.findFirst({
     where: { id: req.params.commandeId, atelierId: req.user.atelierId },
-    select: { id: true, prixTotal: true },
+    select: { id: true, prixTotal: true, numero: true, clienteId: true },
   });
   if (!commande) return next(new HttpError(404, "Commande introuvable."));
   req.commande = commande;
@@ -91,7 +92,14 @@ router.post("/", async (req, res) => {
         });
       }
 
-      return tx.paiement.create({ data: { ...data, commandeId } });
+      const nouveauPaiement = await tx.paiement.create({ data: { ...data, commandeId } });
+      await creerNotificationClient(tx, {
+        clienteId: req.commande.clienteId,
+        commandeId,
+        type: "PAIEMENT_ENREGISTRE",
+        message: `Paiement de ${nouveauPaiement.montant} enregistré sur votre commande ${req.commande.numero}.`,
+      });
+      return nouveauPaiement;
     },
     { maxWait: 10_000, timeout: 15_000 },
   );
@@ -233,10 +241,17 @@ router.post("/:paiementId/recu", async (req, res) => {
   try {
     recu = await prisma.$transaction(async (tx) => {
       const numero = await nextNumero(tx, "REC");
-      return tx.recu.create({
+      const nouveauRecu = await tx.recu.create({
         data: { commandeId, paiementId, montantPaye: paiement.montant, numero },
         include: RECU_INCLUDE,
       });
+      await creerNotificationClient(tx, {
+        clienteId: req.commande.clienteId,
+        commandeId,
+        type: "RECU_EMIS",
+        message: `Un reçu est disponible pour votre commande ${req.commande.numero}.`,
+      });
+      return nouveauRecu;
     });
   } catch (err) {
     if (isUniqueConstraintViolation(err, "paiementId")) {

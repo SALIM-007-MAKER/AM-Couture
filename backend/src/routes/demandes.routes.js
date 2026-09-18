@@ -5,6 +5,7 @@ import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewa
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { refuserDemandeSchema, accepterDemandeSchema, listDemandesQuerySchema } from "../schemas/demandeCommande.schema.js";
+import { creerNotificationClient } from "../lib/notificationsClient.js";
 
 // Demandes de commande envoyées par des clients USER (§ plan rôle client,
 // voir routes/moi.routes.js POST /api/moi/demandes) — gestion côté ADMIN.
@@ -77,7 +78,7 @@ router.post("/:id/accepter", async (req, res) => {
 
   const commande = await prisma.commande.findFirst({
     where: { id: parsed.data.commandeId, atelierId: req.user.atelierId, clienteId: demande.clienteId },
-    select: { id: true },
+    select: { id: true, numero: true },
   });
   if (!commande) {
     throw new HttpError(404, "Commande introuvable pour ce client.", { commandeId: ["Commande introuvable pour ce client."] });
@@ -88,10 +89,19 @@ router.post("/:id/accepter", async (req, res) => {
     throw new HttpError(409, "Cette commande est déjà liée à une autre demande.");
   }
 
-  const misAJour = await prisma.demandeCommande.update({
-    where: { id: demande.id },
-    data: { statut: "ACCEPTEE", commandeId: commande.id },
-    select: DEMANDE_SELECT,
+  const misAJour = await prisma.$transaction(async (tx) => {
+    const demandeMiseAJour = await tx.demandeCommande.update({
+      where: { id: demande.id },
+      data: { statut: "ACCEPTEE", commandeId: commande.id },
+      select: DEMANDE_SELECT,
+    });
+    await creerNotificationClient(tx, {
+      clienteId: demande.clienteId,
+      commandeId: commande.id,
+      type: "DEMANDE_ACCEPTEE",
+      message: `Votre demande a été acceptée et liée à la commande ${commande.numero}.`,
+    });
+    return demandeMiseAJour;
   });
   res.json(misAJour);
 });
@@ -116,6 +126,12 @@ router.post("/:id/refuser", async (req, res) => {
   }
 
   const demande = await prisma.demandeCommande.findUnique({ where: { id: req.params.id }, select: DEMANDE_SELECT });
+  await creerNotificationClient(prisma, {
+    clienteId: demande.cliente.id,
+    commandeId: null,
+    type: "DEMANDE_REFUSEE",
+    message: demande.motifRefus ? `Votre demande a été refusée : ${demande.motifRefus}` : "Votre demande a été refusée.",
+  });
   res.json(demande);
 });
 

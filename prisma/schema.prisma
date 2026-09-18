@@ -259,9 +259,10 @@ model Cliente {
   userId String? @unique
   user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  mesures          Mesure[]
-  commandes        Commande[]
-  demandesCommande DemandeCommande[]
+  mesures             Mesure[]
+  commandes           Commande[]
+  demandesCommande    DemandeCommande[]
+  notificationsClient NotificationClient[]
 
   @@index([atelierId])
   @@index([nom, prenom])
@@ -368,7 +369,8 @@ model Commande {
   notifications Notification[]
   // Présente UNIQUEMENT si cette commande est née d'une demande envoyée par
   // le client (§ plan rôle USER) — voir DemandeCommande.commandeId.
-  demandeOrigine DemandeCommande?
+  demandeOrigine      DemandeCommande?
+  notificationsClient NotificationClient[]
 
   // atelierId : index déjà présent en base depuis la migration Phase 8
   // (20260913051222_multi_tenant_ateliers, ajouté en SQL brut) mais jusqu'ici
@@ -505,6 +507,43 @@ model Notification {
   createdAt  DateTime         @default(now())
 
   @@unique([type, commandeId])
+  @@index([lu])
+}
+
+enum TypeNotificationClient {
+  COMMANDE_CREEE
+  COMMANDE_STATUT_CHANGE
+  COMMANDE_ANNULEE
+  PAIEMENT_ENREGISTRE
+  LIVRAISON_ENREGISTREE
+  RECU_EMIS
+  DEMANDE_ACCEPTEE
+  DEMANDE_REFUSEE
+}
+
+/// Fil d'activité du CLIENT final (§ notifications atelier <-> client) —
+/// délibérément un modèle SÉPARÉ de Notification ci-dessus, pas une
+/// extension : Notification reflète un ÉTAT recalculable à tout moment
+/// (jamais de texte stocké, voir son commentaire) — mais "5000 FCFA
+/// encaissés le 18/09" ou "refusée : motif X" sont des ÉVÉNEMENTS ponctuels,
+/// impossibles à reconstituer depuis l'état courant une fois qu'un autre
+/// paiement est venu s'ajouter. `message` est donc figé à la création,
+/// jamais recalculé — seul cas du schéma où un texte de notification est
+/// stocké tel quel. `lu` ici n'a aucun rapport avec Notification.lu (compte
+/// ADMIN) : deux publics, deux drapeaux de lecture indépendants sur la même
+/// commande.
+model NotificationClient {
+  id         String                 @id @default(cuid())
+  clienteId  String
+  cliente    Cliente                @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  commandeId String?
+  commande   Commande?              @relation(fields: [commandeId], references: [id], onDelete: SetNull)
+  type       TypeNotificationClient
+  message    String
+  lu         Boolean                @default(false)
+  createdAt  DateTime               @default(now())
+
+  @@index([clienteId])
   @@index([lu])
 }
 

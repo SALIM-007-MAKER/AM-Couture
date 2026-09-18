@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth, requireClient } from "../middlewares/auth.middleware.js";
@@ -111,40 +112,114 @@ router.get("/paiements", async (req, res) => {
   res.json({ data });
 });
 
-// GET /api/moi/notifications — réutilise la table Notification existante
-// (voir lib/notifications.js), réconciliée pour TOUT l'atelier (comme côté
-// ADMIN — la réconciliation ne fait que recalculer l'état réel, jamais une
-// fuite : le filtre clienteId ci-dessous protège la LECTURE), puis filtrée
-// aux commandes de CE client et aux types pertinents pour un client final.
-// RETARD/IMPAYE restent des alertes de gestion interne à l'atelier, jamais
-// affichées ici (une commande "en retard" ou "impayée" est un problème à
-// gérer par l'ADMIN, pas quelque chose à notifier tel quel au client).
+// GET /api/moi/notifications — fusionne DEUX sources distinctes (§
+// notifications atelier <-> client) :
+//  - "etat" : la table Notification existante (voir lib/notifications.js),
+//    réconciliée pour TOUT l'atelier (la réconciliation ne fait que
+//    recalculer l'état réel, jamais une fuite : le filtre clienteId
+//    ci-dessous protège la LECTURE), filtrée aux types pertinents pour un
+//    client final — RETARD/IMPAYE restent des alertes de gestion interne à
+//    l'atelier, jamais affichées ici. `message` vaut null : le frontend le
+//    calcule lui-même à partir de `commande` (voir notificationMessage(),
+//    features/notifications/constants.js), pour ne jamais dupliquer ce texte.
+//  - "evenement" : NotificationClient (voir schema.prisma et
+//    lib/notificationsClient.js) — un fil d'activité (commande créée,
+//    paiement encaissé, demande acceptée/refusée...) posé à chaque écriture
+//    concernée. `message` est déjà figé en base, jamais recalculé.
+// `canMarkLu` distingue les deux pour le frontend : jamais pour "etat"
+// (Notification.lu est PARTAGÉ avec l'ADMIN — le client ne doit jamais
+// pouvoir affecter SON tableau de bord en marquant lu de son côté).
 const TYPES_VISIBLES_CLIENT = ["PRET", "LIVRAISON_PROCHE"];
 router.get("/notifications", async (req, res) => {
   const cliente = await prisma.cliente.findUnique({ where: { id: req.user.clienteId }, select: { atelierId: true } });
   if (!cliente) throw new HttpError(404, "Profil introuvable.");
   await reconcilierNotifications(prisma, cliente.atelierId);
 
-  const data = await prisma.notification.findMany({
-    where: { commande: { clienteId: req.user.clienteId }, type: { in: TYPES_VISIBLES_CLIENT } },
-    orderBy: { createdAt: "desc" },
-    // Mêmes champs que côté ADMIN (notifications.routes.js) — nécessaires à
-    // notificationMessage() côté frontend (features/notifications/constants.js),
-    // réutilisé tel quel ici pour ne pas dupliquer le texte des notifications.
-    include: {
-      commande: {
-        select: {
-          id: true,
-          numero: true,
-          statut: true,
-          typeVetement: true,
-          dateLivraisonPrevue: true,
-          modele: { select: { id: true, nom: true } },
+  const [etats, evenements] = await Promise.all([
+    prisma.notification.findMany({
+      where: { commande: { clienteId: req.user.clienteId }, type: { in: TYPES_VISIBLES_CLIENT } },
+      orderBy: { createdAt: "desc" },
+      include: {
+        commande: {
+          select: {
+            id: true,
+            numero: true,
+            statut: true,
+            typeVetement: true,
+            dateLivraisonPrevue: true,
+            modele: { select: { id: true, nom: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.notificationClient.findMany({
+      where: { clienteId: req.user.clienteId },
+      orderBy: { createdAt: "desc" },
+      include: { commande: { select: { id: true, numero: true } } },
+    }),
+  ]);
+
+  const data = [
+    ...etats.map((n) => ({
+      id: n.id,
+      type: n.type,
+      createdAt: n.createdAt,
+      lu: n.lu,
+      source: "etat",
+      message: null,
+      commande: n.commande,
+      canMarkLu: false,
+    })),
+    ...evenements.map((n) => ({
+      id: n.id,
+      type: n.type,
+      createdAt: n.createdAt,
+      lu: n.lu,
+      source: "evenement",
+      message: n.message,
+      commande: n.commande,
+      canMarkLu: true,
+    })),
+  ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
   res.json({ data });
+});
+
+// GET /api/moi/notifications/non-lues — pastille de l'en-tête (voir
+// ClientLayout.jsx), somme des deux sources ci-dessus. Déclarée avant
+// "/notifications/:id" pour ne pas être capturée comme un identifiant
+// (même précaution que /derniere sur Mesures).
+router.get("/notifications/non-lues", async (req, res) => {
+  const cliente = await prisma.cliente.findUnique({ where: { id: req.user.clienteId }, select: { atelierId: true } });
+  if (!cliente) throw new HttpError(404, "Profil introuvable.");
+  await reconcilierNotifications(prisma, cliente.atelierId);
+
+  const [etatsNonLus, evenementsNonLus] = await Promise.all([
+    prisma.notification.count({
+      where: { commande: { clienteId: req.user.clienteId }, type: { in: TYPES_VISIBLES_CLIENT }, lu: false },
+    }),
+    prisma.notificationClient.count({ where: { clienteId: req.user.clienteId, lu: false } }),
+  ]);
+  res.json({ count: etatsNonLus + evenementsNonLus });
+});
+
+const marquerLuSchema = z.object({ lu: z.boolean() }).strict();
+
+// PATCH /api/moi/notifications/:id — UNIQUEMENT les événements
+// (NotificationClient) : jamais les "etat" (Notification.lu partagé avec
+// l'ADMIN, voir commentaire au-dessus de GET /notifications) — un id
+// d'"etat" fourni ici ne matche simplement aucune ligne NotificationClient
+// et renvoie 404, sans distinction supplémentaire nécessaire.
+router.patch("/notifications/:id", async (req, res) => {
+  const parsed = marquerLuSchema.safeParse(req.body);
+  if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
+
+  const result = await prisma.notificationClient.updateMany({
+    where: { id: req.params.id, clienteId: req.user.clienteId },
+    data: { lu: parsed.data.lu },
+  });
+  if (result.count === 0) throw new HttpError(404, "Notification introuvable.");
+  res.json({ ok: true });
 });
 
 // POST /api/moi/demandes — envoie une PROPOSITION de nouvelle commande à
