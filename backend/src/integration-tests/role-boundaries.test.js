@@ -183,6 +183,16 @@ describe("Invitation client de bout en bout", () => {
     assert.equal(profil.status, 200);
     assert.equal(profil.body.id, cliente.id);
   });
+
+  test("inviter une cliente AVEC email n'échoue jamais si l'envoi automatique échoue (RESEND_API_KEY absent en CI)", async () => {
+    const clienteAvecEmail = await creerCliente(atelier.id, { telephone: "92000002", email: "test@example.com" });
+    const adminApi = client(baseUrl);
+    await adminApi.post("/api/auth/login", { identifiant: identifiantAdmin, password: passwordAdmin });
+
+    const invitation = await adminApi.post(`/api/clientes/${clienteAvecEmail.id}/inviter`);
+    assert.equal(invitation.status, 201);
+    assert.ok(invitation.body.lienActivation);
+  });
 });
 
 describe("Décompte des comptes ADMIN insensible aux comptes USER", () => {

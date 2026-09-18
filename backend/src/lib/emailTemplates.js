@@ -21,6 +21,24 @@ export function emailVerificationTemplate({ prenom, lienVerification }) {
   `;
 }
 
+// Invitation d'un client (§ plan rôle USER, Phase 3) — voir POST
+// /clientes/:id/inviter (routes/clientes.routes.js). `identifiant` rappelle
+// le numéro de téléphone (identifiant de connexion réel, jamais cet email)
+// pour éviter toute confusion au moment de se connecter.
+export function emailInvitationClientTemplate({ prenom, identifiant, lienActivation }) {
+  return `
+    <div style="${STYLE_CORPS}">
+      <h2>Bonjour${prenom ? ` ${prenom}` : ""} !</h2>
+      <p>Votre atelier vous invite à créer votre espace client, où vous pourrez suivre vos commandes, vos mesures et vos paiements.</p>
+      <a href="${lienActivation}" style="${STYLE_BOUTON}">Créer mon compte</a>
+      <p style="${STYLE_PIED}">
+        Ce lien expire dans 7 jours. Votre identifiant de connexion sera votre numéro de téléphone (${identifiant}).
+        Si vous ne vous attendiez pas à cette invitation, ignorez cet email.
+      </p>
+    </div>
+  `;
+}
+
 export function emailReinitialisationTemplate({ lienReinitialisation }) {
   return `
     <div style="${STYLE_CORPS}">

@@ -82,6 +82,7 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
         <Card className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <InfoRow label="Téléphone" value={cliente.telephone} />
           <InfoRow label="Téléphone 2" value={cliente.telephone2} />
+          <InfoRow label="Email" value={cliente.email} />
           <InfoRow label="Sexe" value={SEXE_OPTIONS.find((o) => o.value === cliente.sexe)?.label} />
           <InfoRow label="Adresse" value={cliente.adresse} />
           <InfoRow label="Client depuis" value={formatDate(cliente.createdAt)} />
@@ -99,7 +100,7 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
                 Compte client actif — {cliente.prenom} peut suivre ses commandes en ligne.
               </p>
             ) : (
-              <InviterClientButton clienteId={id} />
+              <InviterClientButton clienteId={id} clienteEmail={cliente.email} />
             )}
           </div>
         )}

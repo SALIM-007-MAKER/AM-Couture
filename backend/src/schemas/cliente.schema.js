@@ -25,6 +25,11 @@ const optionalTrimmed = (max) =>
 
 const sexeField = z.preprocess(emptyToUndefined, z.enum(["FEMME", "HOMME", "AUTRE"]).optional());
 
+// Optionnel — uniquement pour l'invitation automatique par email (voir
+// POST /clientes/:id/inviter) : l'identifiant de connexion reste le
+// téléphone (voir routes/clientes.routes.js), jamais cet email.
+const emailField = z.preprocess(emptyToUndefined, z.string().trim().toLowerCase().max(190).email("Email invalide.").optional());
+
 // Un même numéro ne doit pas servir à la fois de téléphone principal et secondaire
 // sur une même fiche — garde-fou simple contre la saisie en double dans un même formulaire.
 function refineDistinctPhones(data, ctx) {
@@ -43,6 +48,7 @@ export const createClienteSchema = z
     prenom: nameField,
     telephone: phoneField,
     telephone2: optionalPhoneField,
+    email: emailField,
     adresse: optionalTrimmed(255),
     sexe: sexeField,
     notes: optionalTrimmed(2000),
@@ -56,6 +62,7 @@ export const updateClienteSchema = z
     prenom: nameField.optional(),
     telephone: phoneField.optional(),
     telephone2: optionalPhoneField,
+    email: emailField,
     adresse: optionalTrimmed(255),
     sexe: sexeField,
     notes: optionalTrimmed(2000),

@@ -236,6 +236,10 @@ model Cliente {
   prenom     String
   telephone  String
   telephone2 String?
+  // Optionnel — sert UNIQUEMENT à l'envoi automatique du lien d'invitation
+  // (voir POST /clientes/:id/inviter) : l'identifiant de connexion du compte
+  // USER reste le téléphone, jamais cet email (pas d'unicité imposée ici).
+  email      String?
   adresse    String?
   sexe       Sexe?
   notes      String?

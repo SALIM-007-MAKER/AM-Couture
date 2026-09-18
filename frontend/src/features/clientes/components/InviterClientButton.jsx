@@ -12,7 +12,7 @@ import Card from "../../../components/Card.jsx";
  * son choix (WhatsApp, appel...), exactement comme le mot de passe généré
  * par le SUPERADMIN (voir ReinitialiserMotDePasseForm, AtelierDetailPage.jsx).
  */
-export default function InviterClientButton({ clienteId }) {
+export default function InviterClientButton({ clienteId, clienteEmail }) {
   const mutation = useInviterClienteMutation(clienteId);
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -43,7 +43,9 @@ export default function InviterClientButton({ clienteId }) {
       <Card variant="outlined" className="w-full space-y-2">
         <p className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
           <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
-          Compte créé — transmettez ce lien au client pour qu'il choisisse son mot de passe (valable 7 jours).
+          {clienteEmail
+            ? `Compte créé — un email vient d'être envoyé à ${clienteEmail}. Vous pouvez aussi transmettre ce lien vous-même (valable 7 jours).`
+            : "Compte créé — transmettez ce lien au client pour qu'il choisisse son mot de passe (valable 7 jours)."}
         </p>
         <div className="flex items-center gap-2">
           <code className="flex-1 min-w-0 truncate rounded-lg bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs font-mono select-all">

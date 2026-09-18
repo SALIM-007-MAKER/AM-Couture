@@ -16,6 +16,7 @@ function formStateFrom(cliente) {
     prenom: cliente?.prenom ?? "",
     telephone: cliente?.telephone ?? "",
     telephone2: cliente?.telephone2 ?? "",
+    email: cliente?.email ?? "",
     adresse: cliente?.adresse ?? "",
     sexe: cliente?.sexe ?? "",
     notes: cliente?.notes ?? "",
@@ -70,6 +71,7 @@ function ClienteForm({ mode, initial }) {
       prenom: form.prenom,
       telephone: form.telephone,
       telephone2: form.telephone2 || undefined,
+      email: form.email || undefined,
       adresse: form.adresse || undefined,
       sexe: form.sexe || undefined,
       notes: form.notes || undefined,
@@ -123,6 +125,15 @@ function ClienteForm({ mode, initial }) {
               className={inputClass}
             />
             <FieldError messages={details?.telephone2} />
+          </Field>
+          <Field label="Email" hint="Optionnel — permet d'envoyer automatiquement le lien d'invitation.">
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => update("email", e.target.value)}
+              className={inputClass}
+            />
+            <FieldError messages={details?.email} />
           </Field>
           <Field label="Sexe">
             <select value={form.sexe} onChange={(e) => update("sexe", e.target.value)} className={inputClass}>

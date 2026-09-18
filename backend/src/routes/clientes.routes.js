@@ -15,6 +15,8 @@ import {
 import mesuresRouter from "./mesures.routes.js";
 import { buildCsv, envoyerCsv } from "../lib/csv.js";
 import { creerToken } from "../lib/tokenAction.js";
+import { envoyerEmail } from "../lib/resend.js";
+import { emailInvitationClientTemplate } from "../lib/emailTemplates.js";
 
 const router = Router();
 
@@ -163,6 +165,7 @@ router.get("/export", async (req, res) => {
     { header: "Prénom", accessor: "prenom" },
     { header: "Téléphone", accessor: "telephone" },
     { header: "Téléphone 2", accessor: "telephone2" },
+    { header: "Email", accessor: "email" },
     { header: "Adresse", accessor: "adresse" },
     { header: "Sexe", accessor: "sexe" },
     { header: "Notes", accessor: "notes" },
@@ -303,11 +306,12 @@ router.post("/:id/restaurer", async (req, res) => {
 // passe temporaire ALÉATOIRE ET INUTILISABLE (jamais communiqué, jamais
 // devinable) : sans activation, ce compte ne permet jamais de se connecter.
 //
-// Aucune infrastructure SMS dans ce projet à ce stade (voir Resend, réservé
-// à l'email) : le lien est renvoyé tel quel dans la réponse, à charge de
-// l'ADMIN de le transmettre au client par le canal de son choix (WhatsApp,
-// appel...) — même décision déjà prise pour la réinitialisation de mot de
-// passe par le SUPERADMIN (voir ateliers.routes.js).
+// Aucune infrastructure SMS dans ce projet à ce stade : si la cliente a un
+// email, on tente un envoi automatique (best effort, voir plus bas) ; sinon
+// (ou en cas d'échec d'envoi) le lien reste renvoyé tel quel dans la
+// réponse, à charge de l'ADMIN de le transmettre par le canal de son choix
+// (WhatsApp, appel...) — même repli que la réinitialisation de mot de passe
+// par le SUPERADMIN (voir ateliers.routes.js).
 router.post("/:id/inviter", async (req, res) => {
   const cliente = await prisma.cliente.findFirst({ where: { id: req.params.id, atelierId: req.user.atelierId } });
   if (!cliente) throw new HttpError(404, "Client introuvable.");
@@ -344,7 +348,23 @@ router.post("/:id/inviter", async (req, res) => {
   });
 
   const origin = `${req.protocol}://${req.get("host")}`;
-  res.status(201).json({ lienActivation: `${origin}/client/activer?token=${token}` });
+  const lienActivation = `${origin}/client/activer?token=${token}`;
+
+  // Best effort, jamais bloquant (voir même pattern pour l'email de
+  // vérification à l'inscription, auth.routes.js) : la réponse renvoie de
+  // toute façon le lien, l'ADMIN peut toujours le transmettre lui-même si
+  // l'envoi échoue ou si la cliente n'a pas d'email.
+  if (cliente.email) {
+    envoyerEmail({
+      to: cliente.email,
+      subject: "Créez votre compte client — Gestion d'Atelier",
+      html: emailInvitationClientTemplate({ prenom: cliente.prenom, identifiant, lienActivation }),
+    }).catch((err) => {
+      console.error(`[clientes:inviter] Échec de l'envoi de l'invitation à ${cliente.email} :`, err.message);
+    });
+  }
+
+  res.status(201).json({ lienActivation });
 });
 
 export default router;
