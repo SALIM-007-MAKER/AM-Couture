@@ -14,6 +14,8 @@
 // être vérifié avant d'afficher cette option, jamais supposé disponible.
 
 import { categorieLabel } from "../features/modeles/constants.js";
+import { dateLocale } from "../features/commandes/constants.js";
+import { translate } from "../i18n/index.js";
 
 // Règle validée avec l'atelier (Phase 3) : les numéros sont enregistrés
 // localement, sans indicatif, au format Niger à 8 chiffres (ex: "89758811").
@@ -66,16 +68,16 @@ export function peutPartagerFichier() {
  */
 export async function partagerPdfNatif({ pdfUrl, nomFichier, texte }) {
   if (!peutPartagerFichier()) {
-    throw new Error("Le partage de fichier n'est pas pris en charge sur cet appareil/navigateur.");
+    throw new Error(translate("wa.partageNonSupporte"));
   }
   const res = await fetch(pdfUrl, { credentials: "include" });
   if (!res.ok) {
-    throw new Error("Impossible de récupérer le PDF à partager.");
+    throw new Error(translate("wa.pdfIntrouvable"));
   }
   const blob = await res.blob();
   const fichier = new File([blob], nomFichier, { type: "application/pdf" });
   if (!navigator.canShare({ files: [fichier] })) {
-    throw new Error("Ce fichier ne peut pas être partagé sur cet appareil.");
+    throw new Error(translate("wa.fichierNonPartageable"));
   }
   await navigator.share({ files: [fichier], text: texte });
 }
@@ -85,7 +87,7 @@ function formatMontant(montant, devise) {
 }
 
 function formatDateFr(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+  return new Date(iso).toLocaleDateString(dateLocale(), { year: "numeric", month: "long", day: "numeric" });
 }
 
 // Date de livraison non pertinente une fois la commande soldée (livrée) ou
@@ -97,39 +99,45 @@ function livraisonPertinente(statut) {
 
 export function buildStatutMessage({ commande, cliente, atelier, statutLabel }) {
   const modele = commande.modele?.nom || categorieLabel(commande.typeVetement);
+  const nomAtelier = atelier?.nom || translate("wa.lAtelier");
   const lignes = [
-    `Bonjour ${cliente.prenom},`,
-    `Concernant votre commande ${commande.numero} (${modele}) chez ${atelier?.nom || "l'atelier"} :`,
-    `Statut actuel : ${statutLabel}.`,
+    translate("wa.bonjour", { prenom: cliente.prenom }),
+    translate("wa.concernant", { numero: commande.numero, modele, atelier: nomAtelier }),
+    translate("wa.statutActuel", { statut: statutLabel }),
   ];
   if (livraisonPertinente(commande.statut)) {
-    lignes.push(`Livraison prévue le ${formatDateFr(commande.dateLivraisonPrevue)}.`);
+    lignes.push(translate("wa.livraisonPrevue", { date: formatDateFr(commande.dateLivraisonPrevue) }));
   }
-  lignes.push("Merci !");
+  lignes.push(translate("wa.merci"));
   return lignes.join("\n");
 }
 
 export function buildPretMessage({ cliente, atelier }) {
-  return `Bonjour ${cliente.prenom}, votre commande chez ${atelier?.nom || "l'atelier"} est prête ! Vous pouvez venir la récupérer. Merci 🙏`;
+  return translate("wa.pret", { prenom: cliente.prenom, atelier: atelier?.nom || translate("wa.lAtelier") });
 }
 
 export function buildRecuMessage({ commande, cliente, atelier, totalPaye, solde }) {
   const devise = atelier?.devise || "FCFA";
   return [
-    `Reçu — commande ${commande.numero}`,
-    `Client : ${cliente.prenom} ${cliente.nom}`,
-    `Total : ${formatMontant(commande.prixTotal, devise)}`,
-    `Payé : ${formatMontant(totalPaye, devise)}`,
-    `Solde restant : ${formatMontant(solde, devise)}`,
-    `— ${atelier?.nom || "L'atelier"}`,
+    translate("wa.recuTitre", { numero: commande.numero }),
+    translate("wa.recuClient", { prenom: cliente.prenom, nom: cliente.nom }),
+    translate("wa.recuTotal", { montant: formatMontant(commande.prixTotal, devise) }),
+    translate("wa.recuPaye", { montant: formatMontant(totalPaye, devise) }),
+    translate("wa.recuSolde", { montant: formatMontant(solde, devise) }),
+    `— ${atelier?.nom || translate("wa.lAtelierMaj")}`,
   ].join("\n");
 }
 
 // Rappel générique fiche cliente (voir ClienteDetailPage.jsx) : priorité à la
 // commande prête à récupérer si elle existe, sinon rappel du solde global.
 export function buildRappelMessage({ cliente, atelier, commandePrete, totalRestant, devise }) {
+  const nomAtelier = atelier?.nom || translate("wa.lAtelier");
   if (commandePrete) {
-    return `Bonjour ${cliente.prenom}, pour rappel votre commande ${commandePrete.numero} chez ${atelier?.nom || "l'atelier"} est prête ! Vous pouvez venir la récupérer. Merci 🙏`;
+    return translate("wa.rappelPret", { prenom: cliente.prenom, numero: commandePrete.numero, atelier: nomAtelier });
   }
-  return `Bonjour ${cliente.prenom}, pour rappel il reste un solde de ${formatMontant(totalRestant, devise || "FCFA")} sur votre/vos commande(s) chez ${atelier?.nom || "l'atelier"}. Merci de votre compréhension.`;
+  return translate("wa.rappelSolde", {
+    prenom: cliente.prenom,
+    montant: formatMontant(totalRestant, devise || "FCFA"),
+    atelier: nomAtelier,
+  });
 }

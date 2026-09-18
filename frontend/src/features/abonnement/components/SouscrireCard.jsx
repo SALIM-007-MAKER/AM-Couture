@@ -8,6 +8,7 @@ import { Field, inputClass } from "../../../components/FormField.jsx";
 import Card from "../../../components/Card.jsx";
 import Button from "../../../components/Button.jsx";
 import { ApiError } from "../../../lib/apiClient.js";
+import { useTranslation } from "../../../i18n/index.js";
 
 /**
  * Choix de formule + moyen de paiement + souscription. WAVE redirige vers
@@ -20,6 +21,7 @@ import { ApiError } from "../../../lib/apiClient.js";
  * TransactionsEnAttente.jsx) — jamais activé tout seul, mode test ou pas.
  */
 export default function SouscrireCard() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const formulesQuery = useFormulesQuery();
   const configQuery = useAbonnementConfigQuery();
@@ -29,7 +31,7 @@ export default function SouscrireCard() {
   const [referenceExterne, setReferenceExterne] = useState("");
   const [envoye, setEnvoye] = useState(false);
 
-  if (formulesQuery.isPending) return <LoadingState label="Chargement des formules…" />;
+  if (formulesQuery.isPending) return <LoadingState label={t("abo.loadingPlans")} />;
   if (formulesQuery.isError) return <ErrorState error={formulesQuery.error} onRetry={formulesQuery.refetch} />;
 
   const formules = formulesQuery.data;
@@ -70,8 +72,7 @@ export default function SouscrireCard() {
       {configQuery.data?.mockActif && (
         <div className="flex items-center gap-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-xs px-3 py-2">
           <FlaskConical className="size-4 shrink-0" aria-hidden="true" />
-          Mode test — aucune vraie clé API n'est configurée. Les paiements sont simulés, aucun argent réel n'est
-          déplacé.
+          {t("abo.mockBanner")}
         </div>
       )}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -96,12 +97,12 @@ export default function SouscrireCard() {
       {formuleChoisie && !envoye && (
         <Card as="form" onSubmit={handleSouscrire} variant="outlined" className="space-y-4">
           <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Formule <strong>{formuleChoisie.nom}</strong> — {formuleChoisie.prix} FCFA
+            {t("abo.selectedPlan")} <strong>{formuleChoisie.nom}</strong> — {formuleChoisie.prix} FCFA
           </p>
           <GlobalFormError error={mutation.error} />
 
           <div>
-            <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Moyen de paiement</p>
+            <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">{t("abo.paymentMethod")}</p>
             <div className="flex gap-2 flex-wrap">
               {MOYENS_PAIEMENT.map((m) => (
                 <button
@@ -124,16 +125,14 @@ export default function SouscrireCard() {
           {moyenPaiement && moyenPaiement !== "WAVE" && (
             <>
               <div className="rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-xs px-3 py-2">
-                Confirmation manuelle : effectuez le transfert vers le compte {moyenPaiement} de l'atelier, puis
-                indiquez la référence ci-dessous. L'abonnement ne sera activé qu'après vérification manuelle — ce
-                n'est pas une vérification automatique.
+                {t("abo.manualNotice", { moyen: moyenPaiement })}
               </div>
-              <Field label="Référence du transfert" required>
+              <Field label={t("abo.transferRef")} required>
                 <input
                   required
                   value={referenceExterne}
                   onChange={(e) => setReferenceExterne(e.target.value)}
-                  placeholder={`Référence ${moyenPaiement}`}
+                  placeholder={t("abo.refPlaceholder", { moyen: moyenPaiement })}
                   className={inputClass}
                 />
                 <FieldError messages={details?.referenceExterne} />
@@ -148,7 +147,7 @@ export default function SouscrireCard() {
               icon={CreditCard}
               loading={mutation.isPending}
             >
-              {moyenPaiement === "WAVE" ? "Payer avec Wave" : "Envoyer pour confirmation"}
+              {moyenPaiement === "WAVE" ? t("abo.payWithWave") : t("abo.sendForConfirmation")}
             </Button>
           )}
         </Card>
@@ -156,7 +155,7 @@ export default function SouscrireCard() {
 
       {envoye && (
         <Card variant="outlined" className="text-sm text-neutral-600 dark:text-neutral-400">
-          Demande envoyée — en attente de confirmation manuelle une fois le paiement vérifié.
+          {t("abo.requestSent")}
         </Card>
       )}
     </div>

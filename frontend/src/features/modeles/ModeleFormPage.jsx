@@ -10,6 +10,7 @@ import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import ImageUploadField from "../../components/ImageUploadField.jsx";
 import { ApiError } from "../../lib/apiClient.js";
+import { useTranslation } from "../../i18n/index.js";
 
 function formStateFrom(modele) {
   return {
@@ -22,17 +23,18 @@ function formStateFrom(modele) {
 }
 
 export default function ModeleFormPage({ mode }) {
+  const { t } = useTranslation();
   const { id } = useParams();
   const isEdit = mode === "edit";
   const modeleQuery = useModeleQuery(isEdit ? id : undefined);
 
-  if (isEdit && modeleQuery.isPending) return <LoadingState label="Chargement du modèle…" />;
+  if (isEdit && modeleQuery.isPending) return <LoadingState label={t("modele.detail.loading")} />;
   if (isEdit && modeleQuery.isError) return <ErrorState error={modeleQuery.error} onRetry={modeleQuery.refetch} />;
   // Un modèle archivé ne peut pas être modifié (règle backend, voir
   // modeles.routes.js PATCH) — affiché clairement plutôt que de laisser
   // l'utilisateur remplir un formulaire pour se heurter à un 409.
   if (isEdit && modeleQuery.data?.archivedAt) {
-    return <ErrorState error={new ApiError(409, "Ce modèle est archivé : restaurez-le avant de le modifier.")} />;
+    return <ErrorState error={new ApiError(409, t("modele.form.archivedError"))} />;
   }
 
   // `key` force un nouveau montage (donc un nouvel état initial dérivé
@@ -43,6 +45,7 @@ export default function ModeleFormPage({ mode }) {
 }
 
 function ModeleForm({ mode, initial }) {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = mode === "edit";
@@ -74,17 +77,17 @@ function ModeleForm({ mode, initial }) {
 
   return (
     <div className="max-w-xl space-y-5">
-      <PageHeader icon={Shirt} title={isEdit ? "Modifier le modèle" : "Nouveau modèle"} />
+      <PageHeader icon={Shirt} title={isEdit ? t("modele.form.editTitle") : t("modele.list.new")} />
 
       <Card as="form" onSubmit={handleSubmit} className="space-y-4">
         <GlobalFormError error={mutation.error} />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Nom" required>
+          <Field label={t("modele.list.colName")} required>
             <input required value={form.nom} onChange={(e) => update("nom", e.target.value)} className={inputClass} />
             <FieldError messages={details?.nom} />
           </Field>
-          <Field label="Catégorie" required>
+          <Field label={t("modele.list.colCategory")} required>
             <select
               required
               value={form.categorie}
@@ -92,7 +95,7 @@ function ModeleForm({ mode, initial }) {
               className={inputClass}
             >
               <option value="" disabled>
-                Choisir…
+                {t("modele.form.choose")}
               </option>
               {CATEGORIES_VETEMENT.map((c) => (
                 <option key={c.value} value={c.value}>
@@ -102,7 +105,7 @@ function ModeleForm({ mode, initial }) {
             </select>
             <FieldError messages={details?.categorie} />
           </Field>
-          <Field label="Prix indicatif">
+          <Field label={t("modele.list.colPrice")}>
             <input
               type="text"
               inputMode="decimal"
@@ -112,13 +115,13 @@ function ModeleForm({ mode, initial }) {
             />
             <FieldError messages={details?.prixIndicatif} />
           </Field>
-          <Field label="Photo">
+          <Field label={t("modele.form.photo")}>
             <ImageUploadField value={form.photoUrl} onChange={(v) => update("photoUrl", v)} previewClassName="h-24 w-20 object-cover" />
             <FieldError messages={details?.photoUrl} />
           </Field>
         </div>
 
-        <Field label="Description">
+        <Field label={t("client.fieldDescription")}>
           <textarea
             rows={4}
             value={form.description}
@@ -130,10 +133,10 @@ function ModeleForm({ mode, initial }) {
 
         <div className="flex gap-2 pt-1">
           <Button type="submit" variant="primary" icon={Save} loading={mutation.isPending}>
-            Enregistrer
+            {t("common.save")}
           </Button>
           <Button type="button" variant="secondary" icon={X} onClick={() => navigate(-1)}>
-            Annuler
+            {t("common.cancel")}
           </Button>
         </div>
       </Card>

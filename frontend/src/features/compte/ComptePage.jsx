@@ -13,18 +13,20 @@ import SectionTitle from "../../components/SectionTitle.jsx";
 import { ApiError } from "../../lib/apiClient.js";
 
 export default function ComptePage() {
+  const { t } = useTranslation();
   const meQuery = useMeQuery();
 
-  if (meQuery.isPending) return <LoadingState label="Chargement du compte…" />;
+  if (meQuery.isPending) return <LoadingState label={t("account.loading")} />;
   if (meQuery.isError) return <ErrorState error={meQuery.error} onRetry={meQuery.refetch} />;
 
   return <ComptePageContent user={meQuery.data} />;
 }
 
 function ComptePageContent({ user }) {
+  const { t } = useTranslation();
   return (
     <div className="max-w-xl space-y-6">
-      <PageHeader icon={UserCircle} title="Mon compte" subtitle={`Connecté en tant que ${user.identifiant}.`} />
+      <PageHeader icon={UserCircle} title={t("nav.myAccount")} subtitle={t("account.connectedAs", { identifiant: user.identifiant })} />
       <LangueSection user={user} />
       <MotDePasseSection />
     </div>
@@ -39,7 +41,7 @@ function LangueSection({ user }) {
 
   return (
     <div className="space-y-3">
-      <SectionTitle icon={Languages}>Langue</SectionTitle>
+      <SectionTitle icon={Languages}>{t("account.language")}</SectionTitle>
       <Card className="space-y-3">
         <p className="text-xs text-neutral-500">{t("compte.langueNote")}</p>
         <div className="flex items-center gap-3">
@@ -54,7 +56,7 @@ function LangueSection({ user }) {
               </option>
             ))}
           </select>
-          {mutation.isPending && <span className="text-xs text-neutral-400">Enregistrement…</span>}
+          {mutation.isPending && <span className="text-xs text-neutral-400">{t("account.saving")}</span>}
           {mutation.isSuccess && !mutation.isPending && (
             <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" aria-hidden="true" />
           )}
@@ -66,6 +68,7 @@ function LangueSection({ user }) {
 }
 
 function MotDePasseSection() {
+  const { t } = useTranslation();
   const mutation = useChangerMotDePasseMutation();
   const [form, setForm] = useState({ motDePasseActuel: "", nouveauMotDePasse: "", confirmation: "" });
   const [savedMessage, setSavedMessage] = useState(false);
@@ -80,7 +83,7 @@ function MotDePasseSection() {
     setSavedMessage(false);
     setConfirmationError("");
     if (form.nouveauMotDePasse !== form.confirmation) {
-      setConfirmationError("La confirmation ne correspond pas au nouveau mot de passe.");
+      setConfirmationError(t("account.confirmMismatch"));
       return;
     }
     mutation.mutate(
@@ -98,16 +101,16 @@ function MotDePasseSection() {
 
   return (
     <div className="space-y-3">
-      <SectionTitle icon={KeyRound}>Mot de passe</SectionTitle>
+      <SectionTitle icon={KeyRound}>{t("activation.password")}</SectionTitle>
       <Card as="form" onSubmit={handleSubmit} className="space-y-4">
         <GlobalFormError error={mutation.error} />
         {savedMessage && !mutation.isPending && (
           <p className="flex items-center gap-2 rounded-xl bg-green-50 dark:bg-green-950/60 text-green-700 dark:text-green-400 text-sm px-3 py-2">
             <CheckCircle2 className="size-4" aria-hidden="true" />
-            Mot de passe modifié.
+            {t("account.passwordChanged")}
           </p>
         )}
-        <Field label="Mot de passe actuel" required>
+        <Field label={t("account.currentPassword")} required>
           <input
             type="password"
             required
@@ -118,7 +121,7 @@ function MotDePasseSection() {
           />
           <FieldError messages={details?.motDePasseActuel} />
         </Field>
-        <Field label="Nouveau mot de passe" required>
+        <Field label={t("auth.reset.newPassword")} required>
           <input
             type="password"
             required
@@ -130,7 +133,7 @@ function MotDePasseSection() {
           />
           <FieldError messages={details?.nouveauMotDePasse} />
         </Field>
-        <Field label="Confirmer le nouveau mot de passe" required>
+        <Field label={t("account.confirmNewPassword")} required>
           <input
             type="password"
             required
@@ -143,7 +146,7 @@ function MotDePasseSection() {
           {confirmationError && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{confirmationError}</p>}
         </Field>
         <Button type="submit" variant="primary" icon={Save} loading={mutation.isPending}>
-          Enregistrer
+          {t("common.save")}
         </Button>
       </Card>
     </div>

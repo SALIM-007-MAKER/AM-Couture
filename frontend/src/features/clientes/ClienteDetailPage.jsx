@@ -6,7 +6,8 @@ import {
   useRestoreClienteMutation,
   useClienteTotauxQuery,
 } from "./hooks.js";
-import { SEXE_OPTIONS } from "./constants.js";
+import { SEXE_OPTIONS, formatDate } from "./constants.js";
+import { useTranslation } from "../../i18n/index.js";
 import { LoadingState, ErrorState } from "../../components/QueryState.jsx";
 import StatutBadge from "../../components/StatutBadge.jsx";
 import ArchiveRestoreControl from "../../components/ArchiveRestoreControl.jsx";
@@ -19,11 +20,8 @@ import ClienteCommandesHistory from "./components/ClienteCommandesHistory.jsx";
 import RappelButton from "./components/RappelButton.jsx";
 import InviterClientButton from "./components/InviterClientButton.jsx";
 
-function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
-}
-
 export default function ClienteDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const clienteQuery = useClienteQuery(id);
   const archiveMutation = useArchiveClienteMutation(id);
@@ -36,7 +34,7 @@ export default function ClienteDetailPage() {
   // isPending, lui, reste vrai tant que data === undefined (invariant
   // garanti par la lib), quel que soit fetchStatus. Bug réel trouvé en
   // testant une fiche via un id invalide (voir rapport du module Clientes).
-  if (clienteQuery.isPending) return <LoadingState label="Chargement de la fiche…" />;
+  if (clienteQuery.isPending) return <LoadingState label={t("cli.detail.loading")} />;
   if (clienteQuery.isError) return <ErrorState error={clienteQuery.error} onRetry={clienteQuery.refetch} />;
 
   const cliente = clienteQuery.data;
@@ -45,6 +43,7 @@ export default function ClienteDetailPage() {
 }
 
 function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation }) {
+  const { t } = useTranslation();
   // isPending/isError volontairement peu mis en avant : un total agrégé
   // reste un complément d'information, jamais bloquant pour le reste de la
   // fiche (même logique que le logo dans AppLayout.jsx) — l'historique
@@ -57,12 +56,12 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
       <PageHeader
         icon={User}
         title={`${cliente.nom} ${cliente.prenom}`}
-        subtitle={<StatutBadge archivedAt={cliente.archivedAt} activeLabel="Actif" archivedLabel="Archivé" />}
+        subtitle={<StatutBadge archivedAt={cliente.archivedAt} activeLabel={t("common.active")} archivedLabel={t("common.archived")} />}
         actions={
           <>
             {!cliente.archivedAt && (
               <Button as={Link} to={`/clientes/${id}/modifier`} variant="secondary" icon={Pencil}>
-                Modifier
+                {t("common.edit")}
               </Button>
             )}
             <ArchiveRestoreControl
@@ -71,24 +70,24 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
               onRestore={(onSuccess) => restoreMutation.mutate(undefined, { onSuccess })}
               isPending={archiveMutation.isPending || restoreMutation.isPending}
               error={archiveMutation.error || restoreMutation.error}
-              confirmQuestion={cliente.archivedAt ? "Restaurer ce client ?" : "Archiver ce client ?"}
+              confirmQuestion={cliente.archivedAt ? t("cli.detail.confirmRestore") : t("cli.detail.confirmArchive")}
             />
           </>
         }
       />
 
       <div className="space-y-2">
-        <SectionTitle icon={User}>Informations</SectionTitle>
+        <SectionTitle icon={User}>{t("cli.detail.information")}</SectionTitle>
         <Card className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <InfoRow label="Téléphone" value={cliente.telephone} />
-          <InfoRow label="Téléphone 2" value={cliente.telephone2} />
-          <InfoRow label="Email" value={cliente.email} />
-          <InfoRow label="Sexe" value={SEXE_OPTIONS.find((o) => o.value === cliente.sexe)?.label} />
-          <InfoRow label="Adresse" value={cliente.adresse} />
-          <InfoRow label="Client depuis" value={formatDate(cliente.createdAt)} />
+          <InfoRow label={t("client.fieldTelephone")} value={cliente.telephone} />
+          <InfoRow label={t("client.fieldTelephone2")} value={cliente.telephone2} />
+          <InfoRow label={t("client.fieldEmail")} value={cliente.email} />
+          <InfoRow label={t("client.fieldSexe")} value={SEXE_OPTIONS.find((o) => o.value === cliente.sexe)?.label} />
+          <InfoRow label={t("client.fieldAdresse")} value={cliente.adresse} />
+          <InfoRow label={t("client.fieldClientDepuis")} value={formatDate(cliente.createdAt)} />
           {cliente.notes && (
             <div className="sm:col-span-2">
-              <p className="text-neutral-500 text-xs mb-0.5">Notes</p>
+              <p className="text-neutral-500 text-xs mb-0.5">{t("cli.detail.notes")}</p>
               <p className="text-neutral-900 dark:text-neutral-100 whitespace-pre-wrap">{cliente.notes}</p>
             </div>
           )}
@@ -97,7 +96,7 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
           <div className="sm:col-span-2">
             {cliente.userId ? (
               <p className="inline-flex items-center gap-1.5 rounded-full bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400 text-xs font-medium px-2.5 py-1">
-                Compte client actif — {cliente.prenom} peut suivre ses commandes en ligne.
+                {t("cli.detail.accountActive", { prenom: cliente.prenom })}
               </p>
             ) : (
               <InviterClientButton clienteId={id} clienteEmail={cliente.email} />
@@ -114,30 +113,30 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
               <div className="flex flex-wrap gap-2 justify-end">
                 {totauxQuery.data && <RappelButton cliente={cliente} totalRestant={totauxQuery.data.totalRestant} />}
                 <Button as={Link} to={`/commandes/nouvelle?clienteId=${id}`} variant="secondary" size="sm" icon={Plus}>
-                  Nouvelle commande
+                  {t("cli.detail.newOrder")}
                 </Button>
               </div>
             )
           }
         >
-          Commandes
+          {t("nav.orders")}
         </SectionTitle>
         {totauxQuery.data && (
           <Card className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-center">
             <div>
-              <p className="text-neutral-500 text-xs">Total commandes</p>
+              <p className="text-neutral-500 text-xs">{t("cli.detail.totalOrders")}</p>
               <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">
                 {totauxQuery.data.totalCommandes}
               </p>
             </div>
             <div>
-              <p className="text-neutral-500 text-xs">Total payé</p>
+              <p className="text-neutral-500 text-xs">{t("cli.detail.totalPaid")}</p>
               <p className="text-lg font-semibold tabular-nums text-green-600 dark:text-green-400 mt-0.5">
                 {totauxQuery.data.totalPaye}
               </p>
             </div>
             <div>
-              <p className="text-neutral-500 text-xs">Total restant</p>
+              <p className="text-neutral-500 text-xs">{t("cli.detail.totalRemaining")}</p>
               <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">
                 {totauxQuery.data.totalRestant}
               </p>
@@ -153,12 +152,12 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
           actions={
             !cliente.archivedAt && (
               <Button as={Link} to={`/clientes/${id}/mesures/nouvelle`} variant="secondary" size="sm" icon={Plus}>
-                Nouvelle mesure
+                {t("cli.detail.newMeasure")}
               </Button>
             )
           }
         >
-          Mesures
+          {t("nav.measurements")}
         </SectionTitle>
         <MesuresHistory clienteId={id} />
       </div>

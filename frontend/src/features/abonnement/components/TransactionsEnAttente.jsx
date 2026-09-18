@@ -4,6 +4,7 @@ import { moyenPaiementInfo } from "../constants.js";
 import { LoadingState, ErrorState, EmptyState, GlobalFormError } from "../../../components/QueryState.jsx";
 import Card from "../../../components/Card.jsx";
 import Button from "../../../components/Button.jsx";
+import { useTranslation } from "../../../i18n/index.js";
 
 /**
  * Paiements NITA/AMANA en attente de confirmation MANUELLE — jamais WAVE
@@ -12,19 +13,20 @@ import Button from "../../../components/Button.jsx";
  * filtre côté client sur transactions.statut === "EN_ATTENTE".
  */
 export default function TransactionsEnAttente() {
+  const { t: tr } = useTranslation();
   const query = useAbonnementsQuery({ page: 1, pageSize: 100 });
   const confirmerMutation = useConfirmerManuelMutation();
   const rejeterMutation = useRejeterManuelMutation();
 
-  if (query.isPending) return <LoadingState label="Chargement…" />;
+  if (query.isPending) return <LoadingState label={tr("common.loading")} />;
   if (query.isError) return <ErrorState error={query.error} onRetry={query.refetch} />;
 
   const enAttente = (query.data.data ?? [])
-    .flatMap((a) => a.transactions.map((t) => ({ ...t, abonnement: a })))
-    .filter((t) => t.statut === "EN_ATTENTE" && t.moyenPaiement !== "WAVE");
+    .flatMap((a) => a.transactions.map((trx) => ({ ...trx, abonnement: a })))
+    .filter((trx) => trx.statut === "EN_ATTENTE" && trx.moyenPaiement !== "WAVE");
 
   if (enAttente.length === 0) {
-    return <EmptyState icon={Inbox}>Aucun paiement en attente de confirmation manuelle.</EmptyState>;
+    return <EmptyState icon={Inbox}>{tr("abo.noPendingManual")}</EmptyState>;
   }
 
   return (
@@ -38,7 +40,7 @@ export default function TransactionsEnAttente() {
               <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
                 {t.abonnement.formule?.nom ?? t.abonnement.numero} — {info?.label ?? t.moyenPaiement} — {t.montant} FCFA
               </p>
-              <p className="text-xs text-neutral-500">Référence : {t.referenceExterne ?? "—"}</p>
+              <p className="text-xs text-neutral-500">{tr("abo.reference")} : {t.referenceExterne ?? "—"}</p>
             </div>
             <div className="flex gap-2">
               <Button
@@ -48,7 +50,7 @@ export default function TransactionsEnAttente() {
                 loading={confirmerMutation.isPending && confirmerMutation.variables === t.id}
                 onClick={() => confirmerMutation.mutate(t.id)}
               >
-                Confirmer
+                {tr("notif.confirm")}
               </Button>
               <Button
                 variant="danger-ghost"
@@ -57,7 +59,7 @@ export default function TransactionsEnAttente() {
                 loading={rejeterMutation.isPending && rejeterMutation.variables === t.id}
                 onClick={() => rejeterMutation.mutate(t.id)}
               >
-                Rejeter
+                {tr("abo.reject")}
               </Button>
             </div>
           </Card>

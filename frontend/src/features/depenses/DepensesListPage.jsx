@@ -11,32 +11,35 @@ import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import { inputClass } from "../../components/FormField.jsx";
+import { dateLocale } from "../commandes/constants.js";
+import { useTranslation } from "../../i18n/index.js";
 
 const PAGE_SIZE = 20;
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString(dateLocale(), { year: "numeric", month: "short", day: "numeric" });
 }
 
 function StatsPanel({ filters }) {
+  const { t } = useTranslation();
   const { data, isPending, isError } = useDepensesStatsQuery(filters);
   if (isPending || isError || !data) return null;
 
   return (
     <Card className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
       <div>
-        <p className="text-neutral-500 text-xs">Total</p>
+        <p className="text-neutral-500 text-xs">{t("dep.total")}</p>
         <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">{data.total}</p>
       </div>
       <div>
-        <p className="text-neutral-500 text-xs">Nombre de dépenses</p>
+        <p className="text-neutral-500 text-xs">{t("dep.nombre")}</p>
         <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">{data.nombre}</p>
       </div>
       {data.parCategorie.length > 0 && (
         <div className="col-span-2 sm:col-span-1">
           <p className="flex items-center gap-1.5 text-neutral-500 text-xs mb-1">
             <PieChart className="size-3.5" aria-hidden="true" />
-            Par catégorie
+            {t("dep.parCategorie")}
           </p>
           <ul className="space-y-0.5">
             {data.parCategorie.map((c) => (
@@ -53,6 +56,7 @@ function StatsPanel({ filters }) {
 }
 
 export default function DepensesListPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page") ?? "1");
   const categorie = searchParams.get("categorie") ?? "";
@@ -90,8 +94,8 @@ export default function DepensesListPage() {
     <div className="space-y-5">
       <PageHeader
         icon={Receipt}
-        title="Dépenses"
-        subtitle="Suivi des dépenses de l'atelier (achats de tissu, fournitures, charges...)."
+        title={t("nav.expenses")}
+        subtitle={t("dep.subtitle")}
         actions={
           <div className="flex items-center gap-2 flex-wrap">
             <Button
@@ -99,12 +103,12 @@ export default function DepensesListPage() {
               href={depensesExportUrl(filters)}
               variant="secondary"
               icon={Download}
-              title="Exporte les dépenses correspondant aux filtres actuels"
+              title={t("dep.exportTitle")}
             >
-              Exporter (CSV)
+              {t("common.exportCsv")}
             </Button>
             <Button as={Link} to="/depenses/nouvelle" variant="primary" icon={Plus}>
-              Nouvelle dépense
+              {t("dep.newDepense")}
             </Button>
           </div>
         }
@@ -117,7 +121,7 @@ export default function DepensesListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-neutral-400" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Rechercher (catégorie, description)…"
+            placeholder={t("dep.searchPlaceholder")}
             value={qInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className={`${inputClass} pl-9`}
@@ -125,13 +129,13 @@ export default function DepensesListPage() {
         </div>
         <input
           type="text"
-          placeholder="Catégorie exacte"
+          placeholder={t("dep.categorieExacte")}
           value={categorie}
           onChange={(e) => updateParams({ categorie: e.target.value, page: undefined })}
           className={`${inputClass} w-40`}
         />
         <label className="flex items-center gap-1.5 text-sm text-neutral-500">
-          Du
+          {t("dep.du")}
           <input
             type="date"
             value={dateFrom}
@@ -140,7 +144,7 @@ export default function DepensesListPage() {
           />
         </label>
         <label className="flex items-center gap-1.5 text-sm text-neutral-500">
-          Au
+          {t("dep.au")}
           <input
             type="date"
             value={dateTo}
@@ -150,14 +154,14 @@ export default function DepensesListPage() {
         </label>
       </div>
 
-      {isPending && <LoadingState label="Chargement des dépenses…" />}
+      {isPending && <LoadingState label={t("dep.loading")} />}
       {isError && <ErrorState error={error} onRetry={refetch} />}
 
       {data && data.data.length === 0 && (
         <EmptyState icon={Receipt}>
           {q || categorie || dateFrom || dateTo
-            ? "Aucune dépense ne correspond à ces critères."
-            : "Aucune dépense pour l'instant."}
+            ? t("dep.emptyFiltered")
+            : t("dep.emptyAll")}
         </EmptyState>
       )}
 
@@ -168,10 +172,10 @@ export default function DepensesListPage() {
             <table className="w-full text-sm">
               <thead className="text-left text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Date</th>
-                  <th className="px-4 py-3 font-medium">Catégorie</th>
-                  <th className="px-4 py-3 font-medium">Description</th>
-                  <th className="px-4 py-3 font-medium text-right">Montant</th>
+                  <th className="px-4 py-3 font-medium">{t("dep.colDate")}</th>
+                  <th className="px-4 py-3 font-medium">{t("dep.colCategorie")}</th>
+                  <th className="px-4 py-3 font-medium">{t("dep.colDescription")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("dep.colMontant")}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -198,7 +202,7 @@ export default function DepensesListPage() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button as={Link} to={`/depenses/${depense.id}`} variant="ghost" size="sm" icon={Eye}>
-                        Voir
+                        {t("common.view")}
                       </Button>
                     </td>
                   </tr>

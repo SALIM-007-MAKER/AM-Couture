@@ -11,6 +11,7 @@ import {
   partagerPdfNatif,
 } from "../../../lib/whatsapp.js";
 import Button from "../../../components/Button.jsx";
+import { useTranslation } from "../../../i18n/index.js";
 
 /**
  * Actions WhatsApp de la fiche commande (Phase 3, étendu ensuite) — voir
@@ -30,6 +31,7 @@ import Button from "../../../components/Button.jsx";
  * partager un fichier sans le faire réellement.
  */
 export default function WhatsAppActions({ commande, atelier }) {
+  const { t } = useTranslation();
   const [partageEnCours, setPartageEnCours] = useState(false);
   const [erreurPartage, setErreurPartage] = useState(null);
 
@@ -65,7 +67,7 @@ export default function WhatsAppActions({ commande, atelier }) {
       // AbortError : l'utilisateur a simplement fermé la feuille de partage
       // sans rien choisir — pas une vraie erreur à afficher.
       if (err?.name !== "AbortError") {
-        setErreurPartage(err.message || "Le partage a échoué.");
+        setErreurPartage(err.message || t("cmd.waPartageEchoue"));
       }
     } finally {
       setPartageEnCours(false);
@@ -79,7 +81,7 @@ export default function WhatsAppActions({ commande, atelier }) {
       <div className="flex flex-wrap gap-2">
         {lienStatut && (
           <Button as="a" href={lienStatut} target="_blank" rel="noreferrer" variant="whatsapp" size="sm" icon={MessageCircle}>
-            {estPrete ? "Prêt — WhatsApp" : "Envoyer le statut au client"}
+            {estPrete ? t("cmd.waPretBtn") : t("cmd.waStatutBtn")}
           </Button>
         )}
         {partageFichierSupporte ? (
@@ -90,7 +92,7 @@ export default function WhatsAppActions({ commande, atelier }) {
             loading={partageEnCours}
             onClick={handlePartagerRecu}
           >
-            Partager le reçu (PDF)
+            {t("cmd.waPartagerPdf")}
           </Button>
         ) : (
           lienRecuTexteSeul && (
@@ -102,9 +104,9 @@ export default function WhatsAppActions({ commande, atelier }) {
               variant="secondary"
               size="sm"
               icon={Share2}
-              title="Partage de fichier non pris en charge sur cet appareil — résumé texte uniquement"
+              title={t("cmd.waPartageNonSupporte")}
             >
-              Partager le reçu (résumé texte)
+              {t("cmd.waPartagerTexte")}
             </Button>
           )
         )}

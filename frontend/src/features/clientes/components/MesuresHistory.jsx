@@ -4,20 +4,22 @@ import { useMesuresQuery } from "../hooks.js";
 import { LoadingState, ErrorState, EmptyState } from "../../../components/QueryState.jsx";
 import Pagination from "../../../components/Pagination.jsx";
 import MesureCard from "./MesureCard.jsx";
+import { useTranslation } from "../../../i18n/index.js";
 
 const PAGE_SIZE = 5;
 
 export default function MesuresHistory({ clienteId }) {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const { data, isPending, isError, error, refetch } = useMesuresQuery(clienteId, { page, pageSize: PAGE_SIZE });
 
   // isPending, pas isLoading — voir le commentaire détaillé dans
   // ClienteDetailPage.jsx (`data.data.length` plus bas planterait sinon sur
   // un faux négatif de isLoading sous TanStack Query v5).
-  if (isPending) return <LoadingState label="Chargement des mesures…" />;
+  if (isPending) return <LoadingState label={t("client.mesuresLoading")} />;
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
   if (data.data.length === 0)
-    return <EmptyState icon={Ruler}>Aucune mesure enregistrée pour ce client.</EmptyState>;
+    return <EmptyState icon={Ruler}>{t("mesure.history.empty")}</EmptyState>;
 
   return (
     <div className="space-y-3">

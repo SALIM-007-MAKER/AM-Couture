@@ -1,7 +1,8 @@
 import { Link, useParams } from "react-router-dom";
 import { ClipboardList, Pencil, User, Shirt, Ruler, Banknote, Wallet, Truck, FileText, Download } from "lucide-react";
 import { useCommandeQuery } from "./hooks.js";
-import { prioriteLabel } from "./constants.js";
+import { prioriteLabel, dateLocale } from "./constants.js";
+import { useTranslation } from "../../i18n/index.js";
 import { fichePdfUrl } from "./api.js";
 import { CATEGORIES_VETEMENT } from "../modeles/constants.js";
 import { MESURE_FIELDS } from "../clientes/constants.js";
@@ -27,14 +28,15 @@ function categorieLabelLocal(value) {
 }
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+  return new Date(iso).toLocaleDateString(dateLocale(), { year: "numeric", month: "long", day: "numeric" });
 }
 
 export default function CommandeDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const commandeQuery = useCommandeQuery(id);
 
-  if (commandeQuery.isPending) return <LoadingState label="Chargement de la commande…" />;
+  if (commandeQuery.isPending) return <LoadingState label={t("cmd.loadingCommande")} />;
   if (commandeQuery.isError) return <ErrorState error={commandeQuery.error} onRetry={commandeQuery.refetch} />;
 
   const commande = commandeQuery.data;
@@ -43,6 +45,7 @@ export default function CommandeDetailPage() {
 }
 
 function CommandeDetailContent({ id, commande }) {
+  const { t } = useTranslation();
   // Chargée une seule fois ici, partagée entre PaiementsSection (lien "voir
   // le reçu" par ligne) et RecusSection (liste + émission récapitulative) —
   // pas de requête dupliquée.
@@ -79,10 +82,10 @@ function CommandeDetailContent({ id, commande }) {
         actions={
           <>
             <Button as="a" href={fichePdfUrl(id)} target="_blank" rel="noreferrer" variant="secondary" icon={Download}>
-              Fiche PDF
+              {t("cmd.fichePdf")}
             </Button>
             <Button as={Link} to={`/commandes/${id}/modifier`} variant="secondary" icon={Pencil}>
-              Modifier
+              {t("common.edit")}
             </Button>
           </>
         }
@@ -92,7 +95,7 @@ function CommandeDetailContent({ id, commande }) {
       <WhatsAppActions commande={commande} atelier={atelier} />
 
       <div className="space-y-2">
-        <SectionTitle icon={User}>Client</SectionTitle>
+        <SectionTitle icon={User}>{t("cmd.sectionClient")}</SectionTitle>
         <Card>
           <Link
             to={`/clientes/${commande.cliente.id}`}
@@ -105,7 +108,7 @@ function CommandeDetailContent({ id, commande }) {
       </div>
 
       <div className="space-y-2">
-        <SectionTitle icon={Shirt}>Modèle</SectionTitle>
+        <SectionTitle icon={Shirt}>{t("cmd.sectionModele")}</SectionTitle>
         <Card className="text-sm space-y-3">
           {commande.modele ? (
             <Link
@@ -115,25 +118,25 @@ function CommandeDetailContent({ id, commande }) {
               {commande.modele.nom}
             </Link>
           ) : (
-            <p className="text-neutral-500">Aucun modèle du catalogue associé — commande sur mesure directe.</p>
+            <p className="text-neutral-500">{t("cmd.aucunModele")}</p>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
-            <InfoRow label="Type" value={categorieLabelLocal(commande.typeVetement)} />
-            <InfoRow label="Couleur" value={commande.couleur} />
-            <InfoRow label="Tissu" value={commande.tissu} />
-            <InfoRow label="Quantité" value={commande.quantite} />
-            <InfoRow label="Date de commande" value={formatDate(commande.dateCommande)} />
-            <InfoRow label="Livraison prévue" value={formatDate(commande.dateLivraisonPrevue)} />
+            <InfoRow label={t("cmd.fieldType")} value={categorieLabelLocal(commande.typeVetement)} />
+            <InfoRow label={t("cmd.fieldCouleur")} value={commande.couleur} />
+            <InfoRow label={t("cmd.fieldTissu")} value={commande.tissu} />
+            <InfoRow label={t("cmd.fieldQuantite")} value={commande.quantite} />
+            <InfoRow label={t("cmd.fieldDateCommande")} value={formatDate(commande.dateCommande)} />
+            <InfoRow label={t("cmd.fieldLivraisonPrevue")} value={formatDate(commande.dateLivraisonPrevue)} />
           </div>
           {commande.description && (
             <div>
-              <p className="text-neutral-500 text-xs mb-0.5">Description</p>
+              <p className="text-neutral-500 text-xs mb-0.5">{t("cmd.fieldDescription")}</p>
               <p className="text-neutral-900 dark:text-neutral-100 whitespace-pre-wrap">{commande.description}</p>
             </div>
           )}
           {commande.observations && (
             <div>
-              <p className="text-neutral-500 text-xs mb-0.5">Observations</p>
+              <p className="text-neutral-500 text-xs mb-0.5">{t("cmd.fieldObservations")}</p>
               <p className="text-neutral-900 dark:text-neutral-100 whitespace-pre-wrap">{commande.observations}</p>
             </div>
           )}
@@ -141,20 +144,20 @@ function CommandeDetailContent({ id, commande }) {
             <div className="flex gap-4 pt-3 border-t border-neutral-200 dark:border-neutral-800">
               {commande.photoTissuUrl && (
                 <div>
-                  <p className="text-neutral-500 text-xs mb-1">Photo du tissu</p>
+                  <p className="text-neutral-500 text-xs mb-1">{t("cmd.photoTissu")}</p>
                   <img
                     src={commande.photoTissuUrl}
-                    alt="Tissu"
+                    alt={t("cmd.photoTissuAlt")}
                     className="h-24 w-20 object-cover rounded-lg border border-neutral-200 dark:border-neutral-800"
                   />
                 </div>
               )}
               {commande.photoModeleUrl && (
                 <div>
-                  <p className="text-neutral-500 text-xs mb-1">Photo du modèle</p>
+                  <p className="text-neutral-500 text-xs mb-1">{t("cmd.photoModele")}</p>
                   <img
                     src={commande.photoModeleUrl}
-                    alt="Modèle souhaité"
+                    alt={t("cmd.photoModeleAlt")}
                     className="h-24 w-20 object-cover rounded-lg border border-neutral-200 dark:border-neutral-800"
                   />
                 </div>
@@ -169,23 +172,23 @@ function CommandeDetailContent({ id, commande }) {
           icon={Ruler}
           actions={
             <Button as={Link} to={`/clientes/${commande.cliente.id}`} variant="ghost" size="sm">
-              Historique complet
+              {t("cmd.historiqueComplet")}
             </Button>
           }
         >
-          Mesures du client
+          {t("cmd.sectionMesures")}
         </SectionTitle>
         <Card className="text-sm">
           {mesureQuery.isPending ? (
-            <LoadingState label="Chargement des mesures…" />
+            <LoadingState label={t("cmd.loadingMesures")} />
           ) : mesureNotFound || populatedMesures.length === 0 ? (
-            <p className="text-neutral-500">Aucune mesure enregistrée pour ce client.</p>
+            <p className="text-neutral-500">{t("cmd.aucuneMesure")}</p>
           ) : (
             <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
               {populatedMesures.map((f) => (
                 <div key={f.name}>
                   <dt className="text-neutral-500 text-xs">{f.label}</dt>
-                  <dd className="text-neutral-900 dark:text-neutral-100 tabular-nums">{mesure[f.name]} cm</dd>
+                  <dd className="text-neutral-900 dark:text-neutral-100 tabular-nums">{t("cmd.cm", { valeur: mesure[f.name] })}</dd>
                 </div>
               ))}
             </dl>
@@ -194,22 +197,22 @@ function CommandeDetailContent({ id, commande }) {
       </div>
 
       <div className="space-y-2">
-        <SectionTitle icon={Banknote}>Finances</SectionTitle>
+        <SectionTitle icon={Banknote}>{t("cmd.sectionFinances")}</SectionTitle>
         <Card className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-center">
           <div>
-            <p className="text-neutral-500 text-xs">Prix total</p>
+            <p className="text-neutral-500 text-xs">{t("cmd.prixTotal")}</p>
             <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">
               {commande.prixTotal}
             </p>
           </div>
           <div>
-            <p className="text-neutral-500 text-xs">Encaissé</p>
+            <p className="text-neutral-500 text-xs">{t("cmd.encaisse")}</p>
             <p className="text-lg font-semibold tabular-nums text-green-600 dark:text-green-400 mt-0.5">
               {commande.totalPaye}
             </p>
           </div>
           <div>
-            <p className="text-neutral-500 text-xs">Reste à payer</p>
+            <p className="text-neutral-500 text-xs">{t("cmd.resteAPayer")}</p>
             <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">
               {commande.solde}
             </p>
@@ -218,7 +221,7 @@ function CommandeDetailContent({ id, commande }) {
       </div>
 
       <div className="space-y-2">
-        <SectionTitle icon={Truck}>Livraison</SectionTitle>
+        <SectionTitle icon={Truck}>{t("cmd.sectionLivraison")}</SectionTitle>
         <LivraisonSection
           commandeId={id}
           statutActuel={commande.statut}
@@ -228,12 +231,12 @@ function CommandeDetailContent({ id, commande }) {
       </div>
 
       <div className="space-y-2">
-        <SectionTitle icon={Wallet}>Paiements</SectionTitle>
+        <SectionTitle icon={Wallet}>{t("cmd.sectionPaiements")}</SectionTitle>
         <PaiementsSection commandeId={id} statutActuel={commande.statut} recus={recus} />
       </div>
 
       <div className="space-y-2">
-        <SectionTitle icon={FileText}>Reçus</SectionTitle>
+        <SectionTitle icon={FileText}>{t("cmd.sectionRecus")}</SectionTitle>
         <RecusSection commandeId={id} recus={recus} isLoading={recusQuery.isPending} />
       </div>
     </div>

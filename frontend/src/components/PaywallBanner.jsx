@@ -3,6 +3,7 @@ import { useLocation, useNavigate, Link } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { useAbonnementStore } from "../stores/abonnementStore.js";
 import Button from "./Button.jsx";
+import { useTranslation } from "../i18n/index.js";
 
 /**
  * Visible sur toute page ADMIN quand l'atelier est bloqué (essai gratuit
@@ -14,6 +15,7 @@ import Button from "./Button.jsx";
  * requireAbonnementActif), donc jamais de boucle de redirection.
  */
 export default function PaywallBanner() {
+  const { t } = useTranslation();
   const bloque = useAbonnementStore((s) => s.bloque);
   const location = useLocation();
   const navigate = useNavigate();
@@ -30,10 +32,10 @@ export default function PaywallBanner() {
     <div className="flex items-center justify-center gap-3 bg-red-600 text-white text-sm px-4 py-2 flex-wrap">
       <span className="flex items-center gap-1.5 font-medium">
         <Lock className="size-4 shrink-0" aria-hidden="true" />
-        Votre période d'essai est terminée — souscrivez à un abonnement pour continuer à utiliser l'application.
+        {t("ui.paywall.message")}
       </span>
       <Button as={Link} to="/abonnement" variant="secondary" size="sm">
-        Voir les formules
+        {t("ui.paywall.viewPlans")}
       </Button>
     </div>
   );

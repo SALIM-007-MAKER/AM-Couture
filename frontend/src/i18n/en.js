@@ -1,7 +1,16 @@
 // Dictionnaire anglais — doit avoir EXACTEMENT les mêmes clés que fr.js (voir
 // i18n/index.js : une clé absente ici retombe silencieusement sur le
 // français, jamais une clé brute affichée à l'écran).
+import shared from "./parts/shared.en.js";
+import commandes from "./parts/commandes.en.js";
+import clientes from "./parts/clientes.en.js";
+import superadmin from "./parts/superadmin.en.js";
+
 export default {
+  ...shared,
+  ...commandes,
+  ...clientes,
+  ...superadmin,
   common: {
     save: "Save",
     cancel: "Cancel",

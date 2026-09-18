@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Truck, PackageCheck } from "lucide-react";
 import { useCreateLivraisonMutation, useAnnulerLivraisonMutation } from "../hooks.js";
-import { MODES_PAIEMENT } from "../constants.js";
+import { MODES_PAIEMENT, dateLocale } from "../constants.js";
+import { useTranslation } from "../../../i18n/index.js";
 import { FieldError, GlobalFormError } from "../../../components/QueryState.jsx";
 import { inputClass } from "../../../components/FormField.jsx";
 import Card from "../../../components/Card.jsx";
@@ -11,10 +12,11 @@ import AnnuleBadge from "../../../components/AnnuleBadge.jsx";
 import { ApiError } from "../../../lib/apiClient.js";
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+  return new Date(iso).toLocaleDateString(dateLocale(), { year: "numeric", month: "long", day: "numeric" });
 }
 
 function LivraisonForm({ commandeId, solde }) {
+  const { t } = useTranslation();
   const [commentaire, setCommentaire] = useState("");
   const [avecPaiementFinal, setAvecPaiementFinal] = useState(false);
   const [montant, setMontant] = useState("");
@@ -33,19 +35,19 @@ function LivraisonForm({ commandeId, solde }) {
   return (
     <Card as="form" onSubmit={handleSubmit} variant="outlined" className="space-y-3">
       <GlobalFormError error={mutation.error} />
-      <p className="text-sm text-neutral-500">Solde restant avant livraison : {solde}</p>
+      <p className="text-sm text-neutral-500">{t("cmd.livrSoldeAvant", { solde })}</p>
       <label className="block space-y-1">
-        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Commentaire</span>
+        <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t("cmd.livrCommentaire")}</span>
         <input value={commentaire} onChange={(e) => setCommentaire(e.target.value)} className={inputClass} />
       </label>
       <label className="flex items-center gap-2 text-sm font-medium text-neutral-700 dark:text-neutral-300">
         <input type="checkbox" checked={avecPaiementFinal} onChange={(e) => setAvecPaiementFinal(e.target.checked)} />
-        Encaisser un paiement final au retrait
+        {t("cmd.livrPaiementFinal")}
       </label>
       {avecPaiementFinal && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="block space-y-1">
-            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Montant *</span>
+            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t("cmd.livrMontant")}</span>
             <input
               type="text"
               inputMode="decimal"
@@ -57,7 +59,7 @@ function LivraisonForm({ commandeId, solde }) {
             <FieldError messages={details?.paiementFinal?.montant} />
           </label>
           <label className="block space-y-1">
-            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Mode</span>
+            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t("cmd.livrMode")}</span>
             <select value={mode} onChange={(e) => setMode(e.target.value)} className={inputClass}>
               {MODES_PAIEMENT.map((m) => (
                 <option key={m.value} value={m.value}>
@@ -69,7 +71,7 @@ function LivraisonForm({ commandeId, solde }) {
         </div>
       )}
       <Button type="submit" variant="primary" icon={Truck} loading={mutation.isPending}>
-        Enregistrer la livraison
+        {t("cmd.livrEnregistrer")}
       </Button>
     </Card>
   );
@@ -84,6 +86,7 @@ function LivraisonForm({ commandeId, solde }) {
 // à la fois — voir livraisons.routes.js. L'historique complet est affiché,
 // annulées comprises, mais seule l'active compte pour le statut/formulaire.
 export default function LivraisonSection({ commandeId, statutActuel, livraisons, solde }) {
+  const { t } = useTranslation();
   const annulerMutation = useAnnulerLivraisonMutation(commandeId);
   const active = livraisons?.find((l) => !l.annuleAt);
   const historique = livraisons ?? [];
@@ -98,14 +101,14 @@ export default function LivraisonSection({ commandeId, statutActuel, livraisons,
                 <div className="flex items-center justify-between gap-2">
                   <p className="flex items-center gap-1.5 text-neutral-900 dark:text-neutral-100">
                     {!l.annuleAt && <PackageCheck className="size-4 text-green-600 dark:text-green-400" aria-hidden="true" />}
-                    Livrée le {formatDate(l.dateLivraison)}
+                    {t("cmd.livrLivreeLe", { date: formatDate(l.dateLivraison) })}
                   </p>
                   {l.annuleAt && <AnnuleBadge />}
                 </div>
-                <p className="text-neutral-500 text-sm">Solde restant au moment de la livraison : {l.montantRestant}</p>
+                <p className="text-neutral-500 text-sm">{t("cmd.livrSoldeAuMoment", { montant: l.montantRestant })}</p>
                 {l.commentaire && <p className="text-neutral-500 text-sm">{l.commentaire}</p>}
                 {l.annuleAt ? (
-                  <p className="text-red-600 dark:text-red-400 text-xs">Motif : {l.annuleMotif}</p>
+                  <p className="text-red-600 dark:text-red-400 text-xs">{t("cmd.livrMotif", { motif: l.annuleMotif })}</p>
                 ) : (
                   <div className="pt-1">
                     <AnnulerControl
@@ -126,7 +129,7 @@ export default function LivraisonSection({ commandeId, statutActuel, livraisons,
           <LivraisonForm commandeId={commandeId} solde={solde} />
         ) : historique.length === 0 ? (
           <p className="text-sm text-neutral-500">
-            La livraison sera possible une fois la commande au statut « Terminée ».
+            {t("cmd.livrPossibleQuand")}
           </p>
         ) : null)}
     </div>

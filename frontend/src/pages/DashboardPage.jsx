@@ -22,9 +22,10 @@ import PeriodSelector from "../components/PeriodSelector.jsx";
 import Card from "../components/Card.jsx";
 import TrialBanner from "../components/TrialBanner.jsx";
 import { LoadingState, ErrorState, EmptyState } from "../components/QueryState.jsx";
+import { useLocaleStore } from "../stores/localeStore.js";
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { year: "numeric", month: "short", day: "numeric" });
 }
 
 function isToday(iso) {

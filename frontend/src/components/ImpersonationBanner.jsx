@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { UserCog, LogOut } from "lucide-react";
 import { useMeQuery, useQuitterImpersonationMutation } from "../hooks/useAuth.js";
 import Button from "./Button.jsx";
+import { useTranslation } from "../i18n/index.js";
 
 /**
  * Bandeau visible sur TOUTE page de l'app quand la session en cours est une
@@ -12,6 +13,7 @@ import Button from "./Button.jsx";
  * SUPERADMIN restaurée, `me.atelierId` redevient null (voir schema.prisma).
  */
 export default function ImpersonationBanner() {
+  const { t } = useTranslation();
   const { data: user } = useMeQuery();
   const navigate = useNavigate();
   const mutation = useQuitterImpersonationMutation();
@@ -29,10 +31,10 @@ export default function ImpersonationBanner() {
     <div className="flex items-center justify-center gap-3 bg-amber-500 text-amber-950 text-sm px-4 py-2 flex-wrap">
       <span className="flex items-center gap-1.5 font-medium">
         <UserCog className="size-4 shrink-0" aria-hidden="true" />
-        Connecté en tant que {user.identifiant} — impersonation par {user.impersonation.superadminIdentifiant}
+        {t("ui.impersonation.banner", { identifiant: user.identifiant, superadmin: user.impersonation.superadminIdentifiant })}
       </span>
       <Button variant="secondary" size="sm" icon={LogOut} loading={mutation.isPending} onClick={handleQuitter}>
-        Quitter l'impersonation
+        {t("ui.impersonation.quit")}
       </Button>
     </div>
   );

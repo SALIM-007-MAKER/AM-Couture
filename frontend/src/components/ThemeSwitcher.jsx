@@ -1,21 +1,23 @@
 import { Sun, Moon } from "lucide-react";
 import { useThemeStore } from "../stores/themeStore.js";
+import { useTranslation } from "../i18n/index.js";
 
 const OPTIONS = [
-  { value: "light", label: "Clair", icon: Sun },
-  { value: "dark", label: "Sombre", icon: Moon },
+  { value: "light", labelKey: "ui.theme.light", icon: Sun },
+  { value: "dark", labelKey: "ui.theme.dark", icon: Moon },
 ];
 
 /** Sélecteur de thème clair/sombre - segmented control à 2 options, voir
  * stores/themeStore.js pour la logique (persistance dans localStorage). */
 export default function ThemeSwitcher() {
+  const { t } = useTranslation();
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
 
   return (
     <div
       role="radiogroup"
-      aria-label="Thème de l'application"
+      aria-label={t("ui.theme.aria")}
       className="inline-flex gap-1 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 p-1"
     >
       {OPTIONS.map((opt) => {
@@ -34,7 +36,7 @@ export default function ThemeSwitcher() {
             }`}
           >
             <opt.icon className="size-4" aria-hidden="true" />
-            {opt.label}
+            {t(opt.labelKey)}
           </button>
         );
       })}

@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Wallet, Search } from "lucide-react";
 import { usePaiementsGlobalQuery } from "./hooks.js";
-import { MODES_PAIEMENT, modeLabel } from "../commandes/constants.js";
+import { MODES_PAIEMENT, modeLabel, dateLocale } from "../commandes/constants.js";
+import { useTranslation } from "../../i18n/index.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
@@ -13,13 +14,14 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/QueryStat
 const PAGE_SIZE = 20;
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString(dateLocale(), { year: "numeric", month: "short", day: "numeric" });
 }
 
 // Page de consultation uniquement : un paiement se crée/s'annule depuis la
 // fiche Commande (features/commandes/components/PaiementsSection.jsx), qui
 // seule connaît le solde disponible — ici, vue d'ensemble transversale.
 export default function PaiementsListPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page") ?? "1");
   const mode = searchParams.get("mode") ?? "";
@@ -56,14 +58,14 @@ export default function PaiementsListPage() {
 
   return (
     <div className="space-y-5 max-w-5xl">
-      <PageHeader icon={Wallet} title="Paiements" subtitle="Tous les encaissements enregistrés, toutes commandes confondues." />
+      <PageHeader icon={Wallet} title={t("nav.payments")} subtitle={t("paie.subtitle")} />
 
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-neutral-400" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Rechercher (commande, client, référence)…"
+            placeholder={t("paie.searchPlaceholder")}
             value={qInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500"
@@ -74,7 +76,7 @@ export default function PaiementsListPage() {
           onChange={(e) => updateParams({ mode: e.target.value, page: undefined })}
           className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm"
         >
-          <option value="">Tous modes</option>
+          <option value="">{t("paie.tousModes")}</option>
           {MODES_PAIEMENT.map((m) => (
             <option key={m.value} value={m.value}>
               {m.label}
@@ -82,7 +84,7 @@ export default function PaiementsListPage() {
           ))}
         </select>
         <label className="flex items-center gap-1.5 text-sm text-neutral-500">
-          Du
+          {t("paie.du")}
           <input
             type="date"
             value={dateFrom}
@@ -91,7 +93,7 @@ export default function PaiementsListPage() {
           />
         </label>
         <label className="flex items-center gap-1.5 text-sm text-neutral-500">
-          Au
+          {t("paie.au")}
           <input
             type="date"
             value={dateTo}
@@ -101,12 +103,12 @@ export default function PaiementsListPage() {
         </label>
       </div>
 
-      {isPending && <LoadingState label="Chargement des paiements…" />}
+      {isPending && <LoadingState label={t("paie.loading")} />}
       {isError && <ErrorState error={error} onRetry={refetch} />}
 
       {data && data.data.length === 0 && (
         <EmptyState icon={Wallet}>
-          {q || mode || dateFrom || dateTo ? "Aucun paiement ne correspond à ces critères." : "Aucun paiement enregistré."}
+          {q || mode || dateFrom || dateTo ? t("paie.emptyFiltered") : t("paie.emptyAll")}
         </EmptyState>
       )}
 
@@ -116,11 +118,11 @@ export default function PaiementsListPage() {
             <table className="w-full text-sm">
               <thead className="text-left text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Date</th>
-                  <th className="px-4 py-3 font-medium">Commande</th>
-                  <th className="px-4 py-3 font-medium">Client</th>
-                  <th className="px-4 py-3 font-medium">Mode</th>
-                  <th className="px-4 py-3 font-medium text-right">Montant</th>
+                  <th className="px-4 py-3 font-medium">{t("paie.colDate")}</th>
+                  <th className="px-4 py-3 font-medium">{t("paie.colCommande")}</th>
+                  <th className="px-4 py-3 font-medium">{t("paie.colClient")}</th>
+                  <th className="px-4 py-3 font-medium">{t("paie.colMode")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("paie.colMontant")}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>

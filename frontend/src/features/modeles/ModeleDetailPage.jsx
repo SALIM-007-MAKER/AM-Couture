@@ -8,14 +8,16 @@ import ArchiveRestoreControl from "../../components/ArchiveRestoreControl.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 export default function ModeleDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const modeleQuery = useModeleQuery(id);
   const archiveMutation = useArchiveModeleMutation(id);
   const restoreMutation = useRestoreModeleMutation(id);
 
-  if (modeleQuery.isPending) return <LoadingState label="Chargement du modèle…" />;
+  if (modeleQuery.isPending) return <LoadingState label={t("modele.detail.loading")} />;
   if (modeleQuery.isError) return <ErrorState error={modeleQuery.error} onRetry={modeleQuery.refetch} />;
 
   const modele = modeleQuery.data;
@@ -27,7 +29,7 @@ export default function ModeleDetailPage() {
         title={modele.nom}
         subtitle={
           <span className="flex items-center gap-2">
-            <StatutBadge archivedAt={modele.archivedAt} activeLabel="Actif" archivedLabel="Archivé" />
+            <StatutBadge archivedAt={modele.archivedAt} activeLabel={t("common.active")} archivedLabel={t("common.archived")} />
             {categorieLabel(modele.categorie)}
           </span>
         }
@@ -35,7 +37,7 @@ export default function ModeleDetailPage() {
           <>
             {!modele.archivedAt && (
               <Button as={Link} to={`/modeles/${id}/modifier`} variant="secondary" icon={Pencil}>
-                Modifier
+                {t("common.edit")}
               </Button>
             )}
             <ArchiveRestoreControl
@@ -44,7 +46,7 @@ export default function ModeleDetailPage() {
               onRestore={(onSuccess) => restoreMutation.mutate(undefined, { onSuccess })}
               isPending={archiveMutation.isPending || restoreMutation.isPending}
               error={archiveMutation.error || restoreMutation.error}
-              confirmQuestion={modele.archivedAt ? "Restaurer ce modèle ?" : "Archiver ce modèle ?"}
+              confirmQuestion={modele.archivedAt ? t("modele.detail.confirmRestore") : t("modele.detail.confirmArchive")}
             />
           </>
         }
@@ -62,11 +64,11 @@ export default function ModeleDetailPage() {
       )}
 
       <Card className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-        <InfoRow label="Catégorie" value={categorieLabel(modele.categorie)} />
-        <InfoRow label="Prix indicatif" value={modele.prixIndicatif} />
+        <InfoRow label={t("modele.list.colCategory")} value={categorieLabel(modele.categorie)} />
+        <InfoRow label={t("modele.list.colPrice")} value={modele.prixIndicatif} />
         {modele.description && (
           <div className="sm:col-span-2">
-            <p className="text-neutral-500 text-xs mb-0.5">Description</p>
+            <p className="text-neutral-500 text-xs mb-0.5">{t("client.fieldDescription")}</p>
             <p className="text-neutral-900 dark:text-neutral-100 whitespace-pre-wrap">{modele.description}</p>
           </div>
         )}

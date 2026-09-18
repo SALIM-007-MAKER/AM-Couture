@@ -12,12 +12,13 @@ import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import { inputClass } from "../../components/FormField.jsx";
+import { useLocaleStore } from "../../stores/localeStore.js";
 
 const PAGE_SIZE = 20;
 
 function formatDate(iso) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { year: "numeric", month: "short", day: "numeric" });
 }
 
 export default function ClientesListPage() {

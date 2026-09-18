@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Image as ImageIcon, Upload, X } from "lucide-react";
 import { fileToResizedDataUrl } from "../lib/imageFile.js";
 import Button from "./Button.jsx";
+import { useTranslation } from "../i18n/index.js";
 
 /**
  * Champ photo par upload (galerie/appareil) — remplace un champ URL texte.
@@ -16,8 +17,9 @@ export default function ImageUploadField({
   maxBytes,
   targetBytes,
   previewClassName = "size-24 object-cover",
-  alt = "Aperçu",
+  alt,
 }) {
+  const { t } = useTranslation();
   const inputRef = useRef(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -32,7 +34,7 @@ export default function ImageUploadField({
       const dataUrl = await fileToResizedDataUrl(file, { maxDimension, maxBytes, targetBytes });
       onChange(dataUrl);
     } catch (err) {
-      setError(err.message || "Impossible de traiter cette image.");
+      setError(err.message || t("ui.imageProcessError"));
     } finally {
       setBusy(false);
     }
@@ -45,7 +47,7 @@ export default function ImageUploadField({
         {value ? (
           <img
             src={value}
-            alt={alt}
+            alt={alt ?? t("ui.imagePreview")}
             className={`rounded-lg border border-neutral-200 dark:border-neutral-800 ${previewClassName}`}
           />
         ) : (
@@ -57,11 +59,11 @@ export default function ImageUploadField({
         )}
         <div className="flex flex-col gap-1.5">
           <Button type="button" variant="secondary" size="sm" icon={Upload} loading={busy} onClick={() => inputRef.current?.click()}>
-            {value ? "Changer" : "Choisir une image"}
+            {value ? t("ui.imageChange") : t("ui.imageChoose")}
           </Button>
           {value && !busy && (
             <Button type="button" variant="danger-ghost" size="sm" icon={X} onClick={() => onChange("")}>
-              Retirer
+              {t("ui.imageRemove")}
             </Button>
           )}
         </div>

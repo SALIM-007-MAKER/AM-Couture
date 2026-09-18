@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ClipboardList, Plus, Search, Eye, Download } from "lucide-react";
 import { useCommandesQuery } from "./hooks.js";
 import { commandesExportUrl } from "./api.js";
-import { STATUTS_COMMANDE, PRIORITES, prioriteLabel } from "./constants.js";
+import { STATUTS_COMMANDE, PRIORITES, prioriteLabel, dateLocale } from "./constants.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { useTranslation } from "../../i18n/index.js";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
@@ -18,7 +18,7 @@ import { inputClass } from "../../components/FormField.jsx";
 const PAGE_SIZE = 20;
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString(dateLocale(), { year: "numeric", month: "short", day: "numeric" });
 }
 
 export default function CommandesListPage() {

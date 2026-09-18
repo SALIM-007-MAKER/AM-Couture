@@ -1,3 +1,5 @@
+import { translate } from "../../i18n/index.js";
+import { useLocaleStore } from "../../stores/localeStore.js";
 import { Sparkles, Scissors, UserCheck, Wrench, CheckCircle2, PackageCheck, Ban, CircleOff, Clock } from "lucide-react";
 
 // Libellés de PRÉSENTATION uniquement — les valeurs et transitions reflètent
@@ -6,26 +8,32 @@ import { Sparkles, Scissors, UserCheck, Wrench, CheckCircle2, PackageCheck, Ban,
 // ici : l'affichage des boutons de transition n'est qu'un confort d'usage,
 // le backend reste l'unique source de vérité et revalide tout côté serveur.
 
+// Locale des dates affichées dans la zone commandes/paiements/livraisons/
+// reçus/dépenses : suit la langue de l'interface (fr-FR / en-GB).
+export function dateLocale() {
+  return useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR";
+}
+
 export const STATUTS_COMMANDE = [
-  { value: "NOUVELLE", label: "Nouvelle" },
-  { value: "EN_CONFECTION", label: "En confection" },
-  { value: "ESSAYAGE", label: "Essayage" },
-  { value: "RETOUCHES", label: "Retouches" },
-  { value: "TERMINEE", label: "Terminée" },
-  { value: "LIVREE", label: "Livrée" },
-  { value: "ANNULEE", label: "Annulée" },
+  { value: "NOUVELLE", get label() { return translate("cmdConst.statut.NOUVELLE"); } },
+  { value: "EN_CONFECTION", get label() { return translate("cmdConst.statut.EN_CONFECTION"); } },
+  { value: "ESSAYAGE", get label() { return translate("cmdConst.statut.ESSAYAGE"); } },
+  { value: "RETOUCHES", get label() { return translate("cmdConst.statut.RETOUCHES"); } },
+  { value: "TERMINEE", get label() { return translate("cmdConst.statut.TERMINEE"); } },
+  { value: "LIVREE", get label() { return translate("cmdConst.statut.LIVREE"); } },
+  { value: "ANNULEE", get label() { return translate("cmdConst.statut.ANNULEE"); } },
 ];
 
 export const PRIORITES = [
-  { value: "NORMALE", label: "Normale" },
-  { value: "URGENTE", label: "Urgente" },
+  { value: "NORMALE", get label() { return translate("cmdConst.priorite.NORMALE"); } },
+  { value: "URGENTE", get label() { return translate("cmdConst.priorite.URGENTE"); } },
 ];
 
 export const MODES_PAIEMENT = [
-  { value: "ESPECES", label: "Espèces" },
-  { value: "MOBILE_MONEY", label: "Mobile Money" },
-  { value: "VIREMENT", label: "Virement" },
-  { value: "AUTRE", label: "Autre" },
+  { value: "ESPECES", get label() { return translate("cmdConst.mode.ESPECES"); } },
+  { value: "MOBILE_MONEY", get label() { return translate("cmdConst.mode.MOBILE_MONEY"); } },
+  { value: "VIREMENT", get label() { return translate("cmdConst.mode.VIREMENT"); } },
+  { value: "AUTRE", get label() { return translate("cmdConst.mode.AUTRE"); } },
 ];
 
 // Contrairement aux listes ci-dessus, `tissu` (Commande.tissu, voir
@@ -80,9 +88,9 @@ export const STATUT_ICONS = {
 // backend/src/lib/money.js) à partir de prixTotal/totalPaye, jamais stocké :
 // cette liste ne reflète qu'un affichage, pas une valeur saisissable.
 export const STATUTS_PAIEMENT = [
-  { value: "NON_PAYE", label: "Non payé" },
-  { value: "PARTIELLEMENT_PAYE", label: "Partiellement payé" },
-  { value: "PAYE", label: "Payé" },
+  { value: "NON_PAYE", get label() { return translate("cmdConst.statutPaiement.NON_PAYE"); } },
+  { value: "PARTIELLEMENT_PAYE", get label() { return translate("cmdConst.statutPaiement.PARTIELLEMENT_PAYE"); } },
+  { value: "PAYE", get label() { return translate("cmdConst.statutPaiement.PAYE"); } },
 ];
 
 export const STATUT_PAIEMENT_ICONS = {

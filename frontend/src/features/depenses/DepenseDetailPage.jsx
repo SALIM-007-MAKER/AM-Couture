@@ -6,9 +6,11 @@ import AnnulerControl from "../../components/AnnulerControl.jsx";
 import AnnuleBadge from "../../components/AnnuleBadge.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
+import { dateLocale } from "../commandes/constants.js";
+import { useTranslation } from "../../i18n/index.js";
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+  return new Date(iso).toLocaleDateString(dateLocale(), { year: "numeric", month: "long", day: "numeric" });
 }
 
 // Page volontairement sans "Modifier" : le backend n'expose aucun PATCH pour
@@ -16,11 +18,12 @@ function formatDate(iso) {
 // LOGIQUE est possible (ci-dessous) — jamais de modification/suppression de
 // la ligne d'origine.
 export default function DepenseDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const depenseQuery = useDepenseQuery(id);
   const annulerMutation = useAnnulerDepenseMutation(id);
 
-  if (depenseQuery.isPending) return <LoadingState label="Chargement de la dépense…" />;
+  if (depenseQuery.isPending) return <LoadingState label={t("dep.detailLoading")} />;
   if (depenseQuery.isError) return <ErrorState error={depenseQuery.error} onRetry={depenseQuery.refetch} />;
 
   const depense = depenseQuery.data;
@@ -30,7 +33,7 @@ export default function DepenseDetailPage() {
       <PageHeader
         icon={Receipt}
         title={depense.categorie}
-        subtitle={depense.annuleAt ? `Motif de l'annulation : ${depense.annuleMotif}` : undefined}
+        subtitle={depense.annuleAt ? t("dep.motifAnnulation", { motif: depense.annuleMotif }) : undefined}
         actions={
           depense.annuleAt ? (
             <AnnuleBadge />
@@ -45,11 +48,11 @@ export default function DepenseDetailPage() {
       />
 
       <Card className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-        <InfoRow label="Montant" value={depense.montant} />
-        <InfoRow label="Date" value={formatDate(depense.date)} />
+        <InfoRow label={t("dep.fieldMontant")} value={depense.montant} />
+        <InfoRow label={t("dep.fieldDate")} value={formatDate(depense.date)} />
         {depense.justificatifUrl && (
           <div className="sm:col-span-2">
-            <p className="text-neutral-500 text-xs mb-0.5">Justificatif</p>
+            <p className="text-neutral-500 text-xs mb-0.5">{t("dep.fieldJustificatif")}</p>
             <a
               href={depense.justificatifUrl}
               target="_blank"
@@ -63,7 +66,7 @@ export default function DepenseDetailPage() {
         )}
         {depense.description && (
           <div className="sm:col-span-2">
-            <p className="text-neutral-500 text-xs mb-0.5">Description</p>
+            <p className="text-neutral-500 text-xs mb-0.5">{t("dep.fieldDescription")}</p>
             <p className="text-neutral-900 dark:text-neutral-100 whitespace-pre-wrap">{depense.description}</p>
           </div>
         )}

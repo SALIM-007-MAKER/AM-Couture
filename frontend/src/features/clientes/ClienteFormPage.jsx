@@ -9,6 +9,7 @@ import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import { ApiError } from "../../lib/apiClient.js";
+import { useTranslation } from "../../i18n/index.js";
 
 function formStateFrom(cliente) {
   return {
@@ -24,6 +25,7 @@ function formStateFrom(cliente) {
 }
 
 export default function ClienteFormPage({ mode }) {
+  const { t } = useTranslation();
   const { id } = useParams();
   const isEdit = mode === "edit";
   const clienteQuery = useClienteQuery(isEdit ? id : undefined);
@@ -31,13 +33,13 @@ export default function ClienteFormPage({ mode }) {
   // isPending, pas isLoading — voir le commentaire détaillé dans
   // ClienteDetailPage.jsx (bug réel de "flash de formulaire vide" trouvé
   // avec isLoading sous TanStack Query v5).
-  if (isEdit && clienteQuery.isPending) return <LoadingState label="Chargement de la fiche…" />;
+  if (isEdit && clienteQuery.isPending) return <LoadingState label={t("cli.detail.loading")} />;
   if (isEdit && clienteQuery.isError) return <ErrorState error={clienteQuery.error} onRetry={clienteQuery.refetch} />;
   // Une fiche archivée ne peut pas être modifiée (règle backend, voir
   // clientes.routes.js PATCH) — on l'affiche clairement plutôt que de
   // laisser l'utilisateur remplir un formulaire pour se heurter à un 409.
   if (isEdit && clienteQuery.data?.archivedAt) {
-    return <ErrorState error={new ApiError(409, "Ce client est archivé : restaurez-le avant de le modifier.")} />;
+    return <ErrorState error={new ApiError(409, t("cli.form.archivedError"))} />;
   }
 
   // `key` force un nouveau montage (donc un nouvel état initial) une fois la
@@ -48,6 +50,7 @@ export default function ClienteFormPage({ mode }) {
 }
 
 function ClienteForm({ mode, initial }) {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const isEdit = mode === "edit";
@@ -85,13 +88,13 @@ function ClienteForm({ mode, initial }) {
 
   return (
     <div className="max-w-xl space-y-5">
-      <PageHeader icon={User} title={isEdit ? "Modifier le client" : "Nouveau client"} />
+      <PageHeader icon={User} title={isEdit ? t("cli.form.editTitle") : t("clientes.newCliente")} />
 
       <Card as="form" onSubmit={handleSubmit} className="space-y-4">
         <GlobalFormError error={mutation.error} />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Nom" required>
+          <Field label={t("cli.form.lastName")} required>
             <input
               required
               value={form.nom}
@@ -100,7 +103,7 @@ function ClienteForm({ mode, initial }) {
             />
             <FieldError messages={details?.nom} />
           </Field>
-          <Field label="Prénom" required>
+          <Field label={t("cli.form.firstName")} required>
             <input
               required
               value={form.prenom}
@@ -109,7 +112,7 @@ function ClienteForm({ mode, initial }) {
             />
             <FieldError messages={details?.prenom} />
           </Field>
-          <Field label="Téléphone" required>
+          <Field label={t("client.fieldTelephone")} required>
             <input
               required
               value={form.telephone}
@@ -118,7 +121,7 @@ function ClienteForm({ mode, initial }) {
             />
             <FieldError messages={details?.telephone} />
           </Field>
-          <Field label="Téléphone 2">
+          <Field label={t("client.fieldTelephone2")}>
             <input
               value={form.telephone2}
               onChange={(e) => update("telephone2", e.target.value)}
@@ -126,7 +129,7 @@ function ClienteForm({ mode, initial }) {
             />
             <FieldError messages={details?.telephone2} />
           </Field>
-          <Field label="Email" hint="Optionnel — permet d'envoyer automatiquement le lien d'invitation.">
+          <Field label={t("client.fieldEmail")} hint={t("cli.form.emailHint")}>
             <input
               type="email"
               value={form.email}
@@ -135,9 +138,9 @@ function ClienteForm({ mode, initial }) {
             />
             <FieldError messages={details?.email} />
           </Field>
-          <Field label="Sexe">
+          <Field label={t("client.fieldSexe")}>
             <select value={form.sexe} onChange={(e) => update("sexe", e.target.value)} className={inputClass}>
-              <option value="">Non précisé</option>
+              <option value="">{t("cli.form.unspecified")}</option>
               {SEXE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
@@ -146,7 +149,7 @@ function ClienteForm({ mode, initial }) {
             </select>
             <FieldError messages={details?.sexe} />
           </Field>
-          <Field label="Adresse">
+          <Field label={t("client.fieldAdresse")}>
             <input
               value={form.adresse}
               onChange={(e) => update("adresse", e.target.value)}
@@ -156,7 +159,7 @@ function ClienteForm({ mode, initial }) {
           </Field>
         </div>
 
-        <Field label="Notes">
+        <Field label={t("cli.detail.notes")}>
           <textarea
             rows={3}
             value={form.notes}
@@ -168,10 +171,10 @@ function ClienteForm({ mode, initial }) {
 
         <div className="flex gap-2 pt-1">
           <Button type="submit" variant="primary" icon={Save} loading={mutation.isPending}>
-            Enregistrer
+            {t("common.save")}
           </Button>
           <Button type="button" variant="secondary" icon={X} onClick={() => navigate(-1)}>
-            Annuler
+            {t("common.cancel")}
           </Button>
         </div>
       </Card>

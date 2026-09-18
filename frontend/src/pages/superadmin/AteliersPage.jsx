@@ -10,12 +10,14 @@ import Pagination from "../../components/Pagination.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import { ApiError } from "../../lib/apiClient.js";
+import { useTranslation } from "../../i18n/index.js";
+import { useLocaleStore } from "../../stores/localeStore.js";
 
 const PAGE_SIZE = 20;
 const FORM_INITIAL = { nom: "", devise: "FCFA", telephone: "", adresse: "", adminIdentifiant: "", adminPassword: "" };
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { year: "numeric", month: "short", day: "numeric" });
 }
 
 // Formulaire de provisioning : crée l'atelier ET son premier compte ADMIN en
@@ -23,6 +25,7 @@ function formatDate(iso) {
 // la SEULE façon d'ajouter un atelier à la plateforme dans cette phase (pas
 // d'inscription en libre-service, décision Phase 8).
 function CreerAtelierForm({ onCancel, onCreated }) {
+  const { t } = useTranslation();
   const mutation = useCreateAtelierMutation();
   const [form, setForm] = useState(FORM_INITIAL);
   const details = mutation.error instanceof ApiError ? mutation.error.details : undefined;
@@ -51,19 +54,19 @@ function CreerAtelierForm({ onCancel, onCreated }) {
       <GlobalFormError error={mutation.error} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Nom de l'atelier" required>
+        <Field label={t("sa.ateliers.formName")} required>
           <input required value={form.nom} onChange={(e) => update("nom", e.target.value)} className={inputClass} />
           <FieldError messages={details?.nom} />
         </Field>
-        <Field label="Devise">
+        <Field label={t("sa.ateliers.formCurrency")}>
           <input value={form.devise} onChange={(e) => update("devise", e.target.value)} className={inputClass} />
           <FieldError messages={details?.devise} />
         </Field>
-        <Field label="Téléphone">
+        <Field label={t("sa.ateliers.formPhone")}>
           <input value={form.telephone} onChange={(e) => update("telephone", e.target.value)} className={inputClass} />
           <FieldError messages={details?.telephone} />
         </Field>
-        <Field label="Adresse">
+        <Field label={t("sa.ateliers.formAddress")}>
           <input value={form.adresse} onChange={(e) => update("adresse", e.target.value)} className={inputClass} />
           <FieldError messages={details?.adresse} />
         </Field>
@@ -71,10 +74,10 @@ function CreerAtelierForm({ onCancel, onCreated }) {
 
       <div className="border-t border-neutral-200 dark:border-neutral-800 pt-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-600 mb-3">
-          Premier compte ADMIN de cet atelier
+          {t("sa.ateliers.firstAdmin")}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Identifiant" required hint="3 caractères minimum.">
+          <Field label={t("sa.ateliers.formIdentifier")} required hint={t("sa.ateliers.formIdentifierHint")}>
             <input
               required
               value={form.adminIdentifiant}
@@ -83,7 +86,7 @@ function CreerAtelierForm({ onCancel, onCreated }) {
             />
             <FieldError messages={details?.adminIdentifiant} />
           </Field>
-          <Field label="Mot de passe" required hint="8 caractères minimum.">
+          <Field label={t("sa.ateliers.formPassword")} required hint={t("sa.ateliers.formPasswordHint")}>
             <input
               type="text"
               required
@@ -98,10 +101,10 @@ function CreerAtelierForm({ onCancel, onCreated }) {
 
       <div className="flex gap-2 pt-1">
         <Button type="submit" variant="primary" icon={Save} loading={mutation.isPending}>
-          Créer l'atelier
+          {t("sa.ateliers.createWorkshop")}
         </Button>
         <Button type="button" variant="secondary" icon={X} onClick={onCancel}>
-          Annuler
+          {t("common.cancel")}
         </Button>
       </div>
     </Card>
@@ -109,6 +112,7 @@ function CreerAtelierForm({ onCancel, onCreated }) {
 }
 
 export default function AteliersPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page") ?? "1");
   const [qInput, setQInput] = useState(searchParams.get("q") ?? "");
@@ -142,12 +146,12 @@ export default function AteliersPage() {
     <div className="space-y-5">
       <PageHeader
         icon={Building2}
-        title="Ateliers"
-        subtitle="Les ateliers (tenants) de la plateforme Gestion d'Atelier."
+        title={t("sa.ateliers.title")}
+        subtitle={t("sa.ateliers.subtitle")}
         actions={
           !showForm && (
             <Button variant="primary" icon={Plus} onClick={() => setShowForm(true)}>
-              Nouvel atelier
+              {t("sa.ateliers.newWorkshop")}
             </Button>
           )
         }
@@ -156,8 +160,7 @@ export default function AteliersPage() {
       {justCreated && (
         <p className="flex items-center gap-2 rounded-xl bg-green-50 dark:bg-green-950/60 text-green-700 dark:text-green-300 text-sm px-3 py-2 animate-fade-in">
           <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
-          Atelier « {justCreated.atelier.nom} » créé — son admin peut se connecter avec l'identifiant «{" "}
-          {justCreated.admin.identifiant} ».
+          {t("sa.ateliers.createdMessage", { nom: justCreated.atelier.nom, identifiant: justCreated.admin.identifiant })}
         </p>
       )}
 
@@ -175,19 +178,19 @@ export default function AteliersPage() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-neutral-400" aria-hidden="true" />
         <input
           type="search"
-          placeholder="Rechercher un atelier…"
+          placeholder={t("sa.ateliers.searchPlaceholder")}
           value={qInput}
           onChange={(e) => handleSearchChange(e.target.value)}
           className={`${inputClass} pl-9`}
         />
       </div>
 
-      {isPending && <LoadingState label="Chargement des ateliers…" />}
+      {isPending && <LoadingState label={t("sa.ateliers.loading")} />}
       {isError && <ErrorState error={error} onRetry={refetch} />}
 
       {data && data.data.length === 0 && (
         <EmptyState icon={Building2}>
-          {q ? "Aucun atelier ne correspond à cette recherche." : "Aucun atelier pour l'instant — créez le premier."}
+          {q ? t("sa.ateliers.emptySearch") : t("sa.ateliers.emptyAll")}
         </EmptyState>
       )}
 
@@ -198,14 +201,14 @@ export default function AteliersPage() {
             <table className="w-full text-sm">
               <thead className="text-left text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Atelier</th>
-                  <th className="px-4 py-3 font-medium">Statut</th>
-                  <th className="px-4 py-3 font-medium">Devise</th>
-                  <th className="px-4 py-3 font-medium">Téléphone</th>
-                  <th className="px-4 py-3 font-medium text-right">Comptes</th>
-                  <th className="px-4 py-3 font-medium text-right">Clientes</th>
-                  <th className="px-4 py-3 font-medium text-right">Commandes</th>
-                  <th className="px-4 py-3 font-medium">Créé le</th>
+                  <th className="px-4 py-3 font-medium">{t("sa.ateliers.colWorkshop")}</th>
+                  <th className="px-4 py-3 font-medium">{t("sa.ateliers.colStatus")}</th>
+                  <th className="px-4 py-3 font-medium">{t("sa.ateliers.colCurrency")}</th>
+                  <th className="px-4 py-3 font-medium">{t("sa.ateliers.colPhone")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("sa.ateliers.colAccounts")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("sa.ateliers.colClients")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("sa.ateliers.colOrders")}</th>
+                  <th className="px-4 py-3 font-medium">{t("sa.ateliers.colCreated")}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -229,11 +232,11 @@ export default function AteliersPage() {
                     </td>
                     <td className="px-4 py-3">
                       {atelier.actif ? (
-                        <span className="text-xs text-green-700 dark:text-green-400">Actif</span>
+                        <span className="text-xs text-green-700 dark:text-green-400">{t("sa.ateliers.statusActive")}</span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
                           <ShieldOff className="size-3" aria-hidden="true" />
-                          Suspendu
+                          {t("sa.ateliers.statusSuspended")}
                         </span>
                       )}
                     </td>
@@ -251,7 +254,7 @@ export default function AteliersPage() {
                     <td className="px-4 py-3 text-neutral-500">{formatDate(atelier.createdAt)}</td>
                     <td className="px-4 py-3 text-right">
                       <Button as={Link} to={`/ateliers/${atelier.id}`} variant="ghost" size="sm" icon={Eye}>
-                        Gérer
+                        {t("sa.ateliers.manage")}
                       </Button>
                     </td>
                   </tr>
@@ -278,7 +281,7 @@ export default function AteliersPage() {
                       {!atelier.actif && (
                         <span className="inline-flex items-center gap-1 text-xs text-red-600 dark:text-red-400 ml-auto">
                           <ShieldOff className="size-3" aria-hidden="true" />
-                          Suspendu
+                          {t("sa.ateliers.statusSuspended")}
                         </span>
                       )}
                     </div>

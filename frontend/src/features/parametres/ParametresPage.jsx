@@ -10,6 +10,7 @@ import ImageUploadField from "../../components/ImageUploadField.jsx";
 import ThemeSwitcher from "../../components/ThemeSwitcher.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
 import { ApiError } from "../../lib/apiClient.js";
+import { useTranslation } from "../../i18n/index.js";
 
 function formStateFrom(atelier) {
   return {
@@ -29,9 +30,10 @@ function recuConfigRowsFrom(atelier) {
 }
 
 export default function ParametresPage() {
+  const { t } = useTranslation();
   const query = useParametresQuery();
 
-  if (query.isPending) return <LoadingState label="Chargement des paramètres…" />;
+  if (query.isPending) return <LoadingState label={t("param.loading")} />;
   // Un 404 signifie "pas encore configuré" — état normal (première
   // utilisation), pas une erreur à afficher comme telle : le formulaire
   // s'affiche directement en mode création (voir putParametresSchema,
@@ -46,6 +48,7 @@ export default function ParametresPage() {
 }
 
 function ParametresForm({ configured, initial }) {
+  const { t } = useTranslation();
   const putMutation = usePutParametresMutation();
   const patchMutation = usePatchParametresMutation();
   const mutation = configured ? patchMutation : putMutation;
@@ -92,10 +95,10 @@ function ParametresForm({ configured, initial }) {
     <div className="max-w-xl space-y-6">
       <PageHeader
         icon={Settings}
-        title="Paramètres de l'atelier"
+        title={t("param.title")}
         subtitle={
           !configured
-            ? "Aucune configuration existante — remplissez au moins le nom et la devise pour créer la fiche de l'atelier."
+            ? t("param.notConfigured")
             : undefined
         }
       />
@@ -104,12 +107,12 @@ function ParametresForm({ configured, initial }) {
           appliquée immédiatement au clic — sans rapport avec la configuration
           de l'atelier ci-dessous, donc pas soumise avec "Enregistrer". */}
       <div className="space-y-3">
-        <SectionTitle icon={SunMoon}>Apparence</SectionTitle>
+        <SectionTitle icon={SunMoon}>{t("param.appearance")}</SectionTitle>
         <Card className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">Thème</p>
+            <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t("param.theme")}</p>
             <p className="text-xs text-neutral-500">
-              Choisissez l'apparence de l'application, clair ou sombre.
+              {t("param.themeHint")}
             </p>
           </div>
           <ThemeSwitcher />
@@ -121,38 +124,38 @@ function ParametresForm({ configured, initial }) {
         {savedMessage && !mutation.isPending && (
           <p className="flex items-center gap-2 rounded-xl bg-green-50 dark:bg-green-950/60 text-green-700 dark:text-green-400 text-sm px-3 py-2 animate-fade-in">
             <CheckCircle2 className="size-4" aria-hidden="true" />
-            Enregistré.
+            {t("param.saved")}
           </p>
         )}
 
         <div className="space-y-3">
-          <SectionTitle icon={Store}>Atelier</SectionTitle>
+          <SectionTitle icon={Store}>{t("param.workshop")}</SectionTitle>
           <Card className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Nom de l'atelier" required>
+            <Field label={t("param.workshopName")} required>
               <input required value={form.nom} onChange={(e) => update("nom", e.target.value)} className={inputClass} />
               <FieldError messages={details?.nom} />
             </Field>
-            <Field label="Devise" required>
+            <Field label={t("param.currency")} required>
               <input required value={form.devise} onChange={(e) => update("devise", e.target.value)} className={inputClass} />
               <FieldError messages={details?.devise} />
             </Field>
-            <Field label="Téléphone">
+            <Field label={t("client.fieldTelephone")}>
               <input value={form.telephone} onChange={(e) => update("telephone", e.target.value)} className={inputClass} />
               <FieldError messages={details?.telephone} />
             </Field>
-            <Field label="Adresse">
+            <Field label={t("client.fieldAdresse")}>
               <input value={form.adresse} onChange={(e) => update("adresse", e.target.value)} className={inputClass} />
               <FieldError messages={details?.adresse} />
             </Field>
-            <Field label="Slogan">
+            <Field label={t("param.slogan")}>
               <input value={form.slogan} onChange={(e) => update("slogan", e.target.value)} className={inputClass} />
               <FieldError messages={details?.slogan} />
             </Field>
-            <Field label="Logo">
+            <Field label={t("param.logo")}>
               <ImageUploadField
                 value={form.logoUrl}
                 onChange={(v) => update("logoUrl", v)}
-                alt="Logo de l'atelier"
+                alt={t("nav.workshopLogoAlt")}
                 previewClassName="h-16 w-16 object-contain bg-white dark:bg-neutral-800"
               />
               <FieldError messages={details?.logoUrl} />
@@ -165,32 +168,31 @@ function ParametresForm({ configured, initial }) {
             icon={FileText}
             actions={
               <Button type="button" variant="ghost" size="sm" icon={Plus} onClick={addRow}>
-                Ajouter
+                {t("mesure.form.add")}
               </Button>
             }
           >
-            Reçus & informations de paiement
+            {t("param.receiptsTitle")}
           </SectionTitle>
           <Card className="space-y-3">
             <p className="text-xs text-neutral-500">
-              Chaque ligne s'affiche sur le PDF du reçu sous la forme « Clé : Valeur » — mentions légales, Orange
-              Money, RIB, ou tout autre champ utile à faire figurer sur le reçu remis au client.
+              {t("param.receiptsHint")}
             </p>
             {recuConfigRows.length === 0 && (
-              <p className="text-sm text-neutral-400 italic">Aucune information complémentaire configurée.</p>
+              <p className="text-sm text-neutral-400 italic">{t("param.receiptsEmpty")}</p>
             )}
             {recuConfigRows.map((row, i) => (
               <div key={i} className="flex gap-2 items-start">
                 <input
                   type="text"
-                  placeholder="Clé (ex : Orange Money)"
+                  placeholder={t("param.keyPlaceholder")}
                   value={row.key}
                   onChange={(e) => updateRow(i, { key: e.target.value })}
                   className={inputClass}
                 />
                 <input
                   type="text"
-                  placeholder="Valeur"
+                  placeholder={t("mesure.form.valuePlaceholder")}
                   value={row.value}
                   onChange={(e) => updateRow(i, { value: e.target.value })}
                   className={inputClass}
@@ -201,7 +203,7 @@ function ParametresForm({ configured, initial }) {
                   size="sm"
                   icon={Trash2}
                   onClick={() => removeRow(i)}
-                  aria-label="Supprimer cette ligne"
+                  aria-label={t("mesure.form.removeRow")}
                   className="shrink-0"
                 />
               </div>
@@ -211,7 +213,7 @@ function ParametresForm({ configured, initial }) {
         </div>
 
         <Button type="submit" variant="primary" icon={Save} loading={mutation.isPending}>
-          Enregistrer
+          {t("common.save")}
         </Button>
       </form>
     </div>

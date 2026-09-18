@@ -22,6 +22,7 @@ import {
   useModelesStatsQuery,
 } from "./hooks.js";
 import { useTranslation } from "../../i18n/index.js";
+import { useLocaleStore } from "../../stores/localeStore.js";
 import PeriodSelector from "../../components/PeriodSelector.jsx";
 import Pagination from "../../components/Pagination.jsx";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
@@ -33,7 +34,7 @@ import { statutLabel, prioriteLabel } from "../commandes/constants.js";
 import { categorieLabel } from "../modeles/constants.js";
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { year: "numeric", month: "short", day: "numeric" });
 }
 
 const STAT_TONES = {
@@ -139,6 +140,7 @@ function FinancesSection({ period }) {
 }
 
 function EvolutionSection() {
+  const { t } = useTranslation();
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const query = useEvolutionQuery({ from: from || undefined, to: to || undefined });
@@ -147,28 +149,28 @@ function EvolutionSection() {
     <div className="space-y-3">
       <div className="flex items-center gap-3 text-sm flex-wrap">
         <label className="flex items-center gap-1.5">
-          Du
+          {t("reportsMore.from")}
           <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={`${inputClass} w-auto py-1.5`} />
         </label>
         <label className="flex items-center gap-1.5">
-          au
+          {t("reportsMore.to")}
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={`${inputClass} w-auto py-1.5`} />
         </label>
-        <span className="text-neutral-500 text-xs">(12 derniers mois par défaut)</span>
+        <span className="text-neutral-500 text-xs">{t("reportsMore.defaultRange")}</span>
       </div>
-      {query.isPending && <LoadingState label="Chargement de l'évolution…" />}
+      {query.isPending && <LoadingState label={t("common.loading")} />}
       {query.isError && <ErrorState error={query.error} onRetry={query.refetch} />}
       {query.data && (
         <Card variant="outlined" padded={false} className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-neutral-500">
               <tr>
-                <th className="px-3 py-3 font-medium">Mois</th>
-                <th className="px-3 py-3 font-medium text-right">Commandes</th>
-                <th className="px-3 py-3 font-medium text-right">Ventes</th>
-                <th className="px-3 py-3 font-medium text-right">Encaissements</th>
-                <th className="px-3 py-3 font-medium text-right">Dépenses</th>
-                <th className="px-3 py-3 font-medium text-right">Résultat</th>
+                <th className="px-3 py-3 font-medium">{t("reportsMore.colMonth")}</th>
+                <th className="px-3 py-3 font-medium text-right">{t("reportsMore.colOrders")}</th>
+                <th className="px-3 py-3 font-medium text-right">{t("reportsMore.colSales")}</th>
+                <th className="px-3 py-3 font-medium text-right">{t("reportsMore.colCollected")}</th>
+                <th className="px-3 py-3 font-medium text-right">{t("reportsMore.colExpenses")}</th>
+                <th className="px-3 py-3 font-medium text-right">{t("reportsMore.colResult")}</th>
               </tr>
             </thead>
             <tbody>
@@ -191,6 +193,7 @@ function EvolutionSection() {
 }
 
 function RepartitionList({ title, rows, labelFor }) {
+  const { t } = useTranslation();
   const total = rows.reduce((sum, r) => sum + r.nombre, 0);
   return (
     <div>
@@ -203,34 +206,36 @@ function RepartitionList({ title, rows, labelFor }) {
           </li>
         ))}
       </ul>
-      <p className="text-xs text-neutral-500 mt-1">Total : {total}</p>
+      <p className="text-xs text-neutral-500 mt-1">{t("reportsMore.total", { total })}</p>
     </div>
   );
 }
 
 function CommandesStatsSection({ period }) {
+  const { t } = useTranslation();
   const query = useCommandesStatsQuery(period);
-  if (query.isPending) return <LoadingState label="Chargement…" />;
+  if (query.isPending) return <LoadingState label={t("common.loading")} />;
   if (query.isError) return <ErrorState error={query.error} onRetry={query.refetch} />;
   const d = query.data;
   return (
     <div className="space-y-4">
-      <Stat label="Commandes créées sur la période" value={d.creees.nombre} sub={`Valeur : ${d.creees.valeurTotale}`} />
+      <Stat label={t("reportsMore.createdInPeriod")} value={d.creees.nombre} sub={t("reportsMore.value", { valeur: d.creees.valeurTotale })} />
       <Card className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <RepartitionList title="Par statut" rows={d.parStatut} labelFor={(r) => statutLabel(r.statut)} />
-        <RepartitionList title="Par priorité" rows={d.parPriorite} labelFor={(r) => prioriteLabel(r.priorite)} />
-        <RepartitionList title="Par catégorie" rows={d.parCategorie} labelFor={(r) => categorieLabel(r.categorie)} />
+        <RepartitionList title={t("reportsMore.byStatus")} rows={d.parStatut} labelFor={(r) => statutLabel(r.statut)} />
+        <RepartitionList title={t("reportsMore.byPriority")} rows={d.parPriorite} labelFor={(r) => prioriteLabel(r.priorite)} />
+        <RepartitionList title={t("reportsMore.byCategory")} rows={d.parCategorie} labelFor={(r) => categorieLabel(r.categorie)} />
       </Card>
     </div>
   );
 }
 
 function EnRetardSection() {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const query = useCommandesEnRetardQuery({ page, pageSize: 10 });
-  if (query.isPending) return <LoadingState label="Chargement…" />;
+  if (query.isPending) return <LoadingState label={t("common.loading")} />;
   if (query.isError) return <ErrorState error={query.error} onRetry={query.refetch} />;
-  if (query.data.data.length === 0) return <EmptyState icon={AlertTriangle}>Aucune commande en retard.</EmptyState>;
+  if (query.data.data.length === 0) return <EmptyState icon={AlertTriangle}>{t("reportsMore.lateEmpty")}</EmptyState>;
   return (
     <div className="space-y-2">
       <Card variant="outlined" padded={false}>
@@ -240,7 +245,7 @@ function EnRetardSection() {
               <Link to={`/commandes/${c.id}`} className="hover:underline text-neutral-900 dark:text-neutral-100">
                 {c.numero} — {c.cliente.nom} {c.cliente.prenom}
               </Link>
-              <span className="text-red-600 dark:text-red-400 text-xs font-medium">{c.joursDeRetard} j de retard</span>
+              <span className="text-red-600 dark:text-red-400 text-xs font-medium">{t("dashboard.lateOrdersMeta", { jours: c.joursDeRetard })}</span>
             </li>
           ))}
         </ul>
@@ -251,13 +256,14 @@ function EnRetardSection() {
 }
 
 function ALivrerSection() {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const [horizonJours, setHorizonJours] = useState(7);
   const query = useCommandesALivrerQuery({ page, pageSize: 10, horizonJours });
   return (
     <div className="space-y-2">
       <label className="flex items-center gap-2 text-sm text-neutral-500">
-        Horizon (jours)
+        {t("reportsMore.horizon")}
         <input
           type="number"
           min="1"
@@ -270,10 +276,10 @@ function ALivrerSection() {
           className={`${inputClass} w-20 py-1.5`}
         />
       </label>
-      {query.isPending && <LoadingState label="Chargement…" />}
+      {query.isPending && <LoadingState label={t("common.loading")} />}
       {query.isError && <ErrorState error={query.error} onRetry={query.refetch} />}
       {query.data && query.data.data.length === 0 && (
-        <EmptyState icon={Truck}>Aucune commande à livrer dans cet horizon.</EmptyState>
+        <EmptyState icon={Truck}>{t("reportsMore.upcomingEmpty")}</EmptyState>
       )}
       {query.data && query.data.data.length > 0 && (
         <>
@@ -297,28 +303,29 @@ function ALivrerSection() {
 }
 
 function ClientesStatsSection({ period }) {
+  const { t } = useTranslation();
   const query = useClientesStatsQuery(period);
-  if (query.isPending) return <LoadingState label="Chargement…" />;
+  if (query.isPending) return <LoadingState label={t("common.loading")} />;
   if (query.isError) return <ErrorState error={query.error} onRetry={query.refetch} />;
   const d = query.data;
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Stat label="Actives" value={d.actives} />
-        <Stat label="Archivées" value={d.archivees} />
-        <Stat label="Nouvelles (période)" value={d.nouvelles} />
-        <Stat label="Ayant commandé (période)" value={d.ayantCommande} />
+        <Stat label={t("reportsMore.active")} value={d.actives} />
+        <Stat label={t("reportsMore.archived")} value={d.archivees} />
+        <Stat label={t("reportsMore.newInPeriod")} value={d.nouvelles} />
+        <Stat label={t("reportsMore.orderedInPeriod")} value={d.ayantCommande} />
       </div>
       {d.topClientes.length > 0 && (
         <Card>
-          <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Clients les plus actifs</p>
+          <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">{t("reportsMore.topClients")}</p>
           <ul className="space-y-1 text-sm">
             {d.topClientes.map((c) => (
               <li key={c.id} className="flex justify-between gap-2 text-neutral-600 dark:text-neutral-400">
                 <Link to={`/clientes/${c.id}`} className="hover:underline">
                   {c.nom} {c.prenom}
                 </Link>
-                <span className="tabular-nums">{c.nombreCommandes} commande(s)</span>
+                <span className="tabular-nums">{t("reportsMore.ordersCount", { nombre: c.nombreCommandes })}</span>
               </li>
             ))}
           </ul>
@@ -329,26 +336,27 @@ function ClientesStatsSection({ period }) {
 }
 
 function ModelesStatsSection({ period }) {
+  const { t } = useTranslation();
   const query = useModelesStatsQuery(period);
-  if (query.isPending) return <LoadingState label="Chargement…" />;
+  if (query.isPending) return <LoadingState label={t("common.loading")} />;
   if (query.isError) return <ErrorState error={query.error} onRetry={query.refetch} />;
   const d = query.data;
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <Stat label="Modèles actifs" value={d.actifs} />
-        <Stat label="Modèles archivés" value={d.archives} />
+        <Stat label={t("reportsMore.modelsActive")} value={d.actifs} />
+        <Stat label={t("reportsMore.modelsArchived")} value={d.archives} />
       </div>
       {d.plusUtilises.length > 0 && (
         <Card>
-          <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">Modèles les plus utilisés</p>
+          <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">{t("reportsMore.topModels")}</p>
           <ul className="space-y-1 text-sm">
             {d.plusUtilises.map((m) => (
               <li key={m.id} className="flex justify-between gap-2 text-neutral-600 dark:text-neutral-400">
                 <Link to={`/modeles/${m.id}`} className="hover:underline">
                   {m.nom}
                 </Link>
-                <span className="tabular-nums">{m.nombreCommandes} commande(s)</span>
+                <span className="tabular-nums">{t("reportsMore.ordersCount", { nombre: m.nombreCommandes })}</span>
               </li>
             ))}
           </ul>

@@ -11,16 +11,17 @@ import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import { inputClass } from "../../components/FormField.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 const PAGE_SIZE = 20;
 
-const ARCHIVED_OPTIONS = [
-  { value: "false", label: "Actifs" },
-  { value: "true", label: "Archivés" },
-  { value: "all", label: "Tous" },
-];
-
 export default function ModelesListPage() {
+  const { t } = useTranslation();
+  const ARCHIVED_OPTIONS = [
+    { value: "false", label: t("common.activeFilter") },
+    { value: "true", label: t("common.archivedFilter") },
+    { value: "all", label: t("common.all") },
+  ];
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page") ?? "1");
   const archived = searchParams.get("archived") ?? "false";
@@ -51,11 +52,11 @@ export default function ModelesListPage() {
     <div className="space-y-5">
       <PageHeader
         icon={Shirt}
-        title="Modèles"
-        subtitle="Catalogue des modèles proposés par l'atelier."
+        title={t("nav.models")}
+        subtitle={t("modele.list.subtitle")}
         actions={
           <Button as={Link} to="/modeles/nouveau" variant="primary" icon={Plus}>
-            Nouveau modèle
+            {t("modele.list.new")}
           </Button>
         }
       />
@@ -65,7 +66,7 @@ export default function ModelesListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-neutral-400" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Rechercher (nom, description)…"
+            placeholder={t("modele.list.search")}
             value={qInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className={`${inputClass} pl-9`}
@@ -76,7 +77,7 @@ export default function ModelesListPage() {
           onChange={(e) => updateParams({ categorie: e.target.value, page: undefined })}
           className={`${inputClass} w-auto`}
         >
-          <option value="">Toutes catégories</option>
+          <option value="">{t("modele.list.allCategories")}</option>
           {CATEGORIES_VETEMENT.map((c) => (
             <option key={c.value} value={c.value}>
               {c.label}
@@ -96,12 +97,12 @@ export default function ModelesListPage() {
         </select>
       </div>
 
-      {isPending && <LoadingState label="Chargement des modèles…" />}
+      {isPending && <LoadingState label={t("modele.list.loading")} />}
       {isError && <ErrorState error={error} onRetry={refetch} />}
 
       {data && data.data.length === 0 && (
         <EmptyState icon={Shirt}>
-          {q || categorie ? "Aucun modèle ne correspond à ces critères." : "Aucun modèle pour l'instant."}
+          {q || categorie ? t("modele.list.emptyFiltered") : t("modele.list.emptyAll")}
         </EmptyState>
       )}
 
@@ -112,10 +113,10 @@ export default function ModelesListPage() {
             <table className="w-full text-sm">
               <thead className="text-left text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Nom</th>
-                  <th className="px-4 py-3 font-medium">Catégorie</th>
-                  <th className="px-4 py-3 font-medium text-right">Prix indicatif</th>
-                  <th className="px-4 py-3 font-medium">Statut</th>
+                  <th className="px-4 py-3 font-medium">{t("modele.list.colName")}</th>
+                  <th className="px-4 py-3 font-medium">{t("modele.list.colCategory")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("modele.list.colPrice")}</th>
+                  <th className="px-4 py-3 font-medium">{t("commandes.colStatut")}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -133,11 +134,11 @@ export default function ModelesListPage() {
                       {modele.prixIndicatif ?? "—"}
                     </td>
                     <td className="px-4 py-3">
-                      <StatutBadge archivedAt={modele.archivedAt} activeLabel="Actif" archivedLabel="Archivé" />
+                      <StatutBadge archivedAt={modele.archivedAt} activeLabel={t("common.active")} archivedLabel={t("common.archived")} />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button as={Link} to={`/modeles/${modele.id}`} variant="ghost" size="sm" icon={Eye}>
-                        Voir
+                        {t("common.view")}
                       </Button>
                     </td>
                   </tr>
@@ -154,7 +155,7 @@ export default function ModelesListPage() {
                   <Card variant="outlined" className="space-y-1 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-neutral-900 dark:text-neutral-100">{modele.nom}</span>
-                      <StatutBadge archivedAt={modele.archivedAt} activeLabel="Actif" archivedLabel="Archivé" />
+                      <StatutBadge archivedAt={modele.archivedAt} activeLabel={t("common.active")} archivedLabel={t("common.archived")} />
                     </div>
                     <p className="text-neutral-600 dark:text-neutral-400 text-sm">
                       {categorieLabel(modele.categorie)}

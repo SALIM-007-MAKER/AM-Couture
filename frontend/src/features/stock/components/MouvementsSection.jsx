@@ -3,6 +3,7 @@ import { ArrowDownCircle, ArrowUpCircle, History } from "lucide-react";
 import { useMouvementsQuery, useCreateMouvementMutation } from "../hooks.js";
 import { uniteLabel } from "../constants.js";
 import { useTranslation } from "../../../i18n/index.js";
+import { useLocaleStore } from "../../../stores/localeStore.js";
 import { LoadingState, ErrorState, EmptyState, FieldError, GlobalFormError } from "../../../components/QueryState.jsx";
 import { inputClass } from "../../../components/FormField.jsx";
 import Pagination from "../../../components/Pagination.jsx";
@@ -11,10 +12,11 @@ import Button from "../../../components/Button.jsx";
 import { ApiError } from "../../../lib/apiClient.js";
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+  return new Date(iso).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { year: "numeric", month: "long", day: "numeric" });
 }
 
 function MouvementForm({ articleId, unite }) {
+  const { t } = useTranslation();
   const [type, setType] = useState("ENTREE");
   const [quantite, setQuantite] = useState("");
   const [motif, setMotif] = useState("");
@@ -34,15 +36,15 @@ function MouvementForm({ articleId, unite }) {
       <GlobalFormError error={mutation.error} />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Mouvement</span>
+          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t("stockMore.movement")}</span>
           <select value={type} onChange={(e) => setType(e.target.value)} className={inputClass}>
-            <option value="ENTREE">Entrée</option>
-            <option value="SORTIE">Sortie</option>
+            <option value="ENTREE">{t("stockMore.entry")}</option>
+            <option value="SORTIE">{t("stockMore.exit")}</option>
           </select>
         </label>
         <label className="block space-y-1">
           <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            Quantité ({uniteLabel(unite)}) *
+            {t("stockMore.quantity", { unite: uniteLabel(unite) })}
           </span>
           <input
             type="text"
@@ -55,7 +57,7 @@ function MouvementForm({ articleId, unite }) {
           <FieldError messages={details?.quantite} />
         </label>
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Motif</span>
+          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t("stockMore.reason")}</span>
           <input value={motif} onChange={(e) => setMotif(e.target.value)} className={inputClass} />
         </label>
       </div>
@@ -65,7 +67,7 @@ function MouvementForm({ articleId, unite }) {
         icon={type === "ENTREE" ? ArrowUpCircle : ArrowDownCircle}
         loading={mutation.isPending}
       >
-        Enregistrer {type === "ENTREE" ? "l'entrée" : "la sortie"}
+        {type === "ENTREE" ? t("stockMore.recordEntry") : t("stockMore.recordExit")}
       </Button>
     </Card>
   );
@@ -86,10 +88,10 @@ export default function MouvementsSection({ articleId, unite, archived }) {
         <MouvementForm articleId={articleId} unite={unite} />
       )}
 
-      {query.isPending && <LoadingState label="Chargement des mouvements…" />}
+      {query.isPending && <LoadingState label={t("stockMore.loadingMovements")} />}
       {query.isError && <ErrorState error={query.error} onRetry={query.refetch} />}
       {query.data && query.data.data.length === 0 && (
-        <EmptyState icon={History}>Aucun mouvement enregistré.</EmptyState>
+        <EmptyState icon={History}>{t("stockMore.emptyMovements")}</EmptyState>
       )}
       {query.data && query.data.data.length > 0 && (
         <>

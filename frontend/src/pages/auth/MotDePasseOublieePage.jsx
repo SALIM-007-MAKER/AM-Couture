@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Scissors, User, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useMotDePasseOublieMutation } from "../../hooks/useAuth.js";
 import { GlobalFormError } from "../../components/QueryState.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 // Même esthétique que LoginPage.jsx. Le message de succès est TOUJOURS le
 // même quel que soit l'identifiant tapé (voir motDePasseOublieSchema,
@@ -12,6 +13,7 @@ import { GlobalFormError } from "../../components/QueryState.jsx";
 const NOM_PLATEFORME = "Gestion d'Atelier";
 
 export default function MotDePasseOublieePage() {
+  const { t } = useTranslation();
   const [identifiant, setIdentifiant] = useState("");
   const mutation = useMotDePasseOublieMutation();
   const darkInputClass =
@@ -38,24 +40,23 @@ export default function MotDePasseOublieePage() {
 
         <div className="w-full rounded-3xl bg-neutral-900/70 backdrop-blur-xl border border-white/10 shadow-2xl p-6 space-y-5">
           <div className="text-center space-y-1.5">
-            <h1 className="text-2xl font-semibold tracking-tight text-white">Mot de passe oublié ?</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-white">{t("login.forgotPassword")}</h1>
             <p className="text-sm text-neutral-400">
-              Entrez votre identifiant — si un email y est associé, un lien de réinitialisation vous sera envoyé.
+              {t("auth.forgot.intro")}
             </p>
           </div>
 
           {mutation.isSuccess ? (
             <p className="flex items-start gap-2 rounded-xl bg-green-950/60 text-green-300 text-sm px-3 py-3 animate-fade-in">
               <CheckCircle2 className="size-4 shrink-0 mt-0.5" aria-hidden="true" />
-              Si un compte existe avec cet identifiant et un email associé, un lien de réinitialisation vient de lui
-              être envoyé. Vérifiez votre boîte de réception.
+              {t("auth.forgot.success")}
             </p>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <GlobalFormError error={mutation.error} />
               <div className="space-y-1.5">
                 <label htmlFor="identifiant" className="text-sm font-medium text-neutral-300">
-                  Identifiant
+                  {t("login.identifiant")}
                 </label>
                 <div className="relative">
                   <User className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -67,7 +68,7 @@ export default function MotDePasseOublieePage() {
                     value={identifiant}
                     onChange={(e) => setIdentifiant(e.target.value)}
                     className={darkInputClass}
-                    placeholder="Votre identifiant"
+                    placeholder={t("login.identifiantPlaceholder")}
                   />
                 </div>
               </div>
@@ -76,7 +77,7 @@ export default function MotDePasseOublieePage() {
                 disabled={mutation.isPending}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 text-sm font-semibold py-2.5 shadow-lg shadow-amber-900/30 transition disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]"
               >
-                {mutation.isPending ? "Envoi…" : "Envoyer le lien"}
+                {mutation.isPending ? t("auth.forgot.sending") : t("auth.forgot.send")}
                 {!mutation.isPending && <ArrowRight className="size-4" aria-hidden="true" />}
               </button>
             </form>
@@ -84,7 +85,7 @@ export default function MotDePasseOublieePage() {
 
           <p className="text-center text-sm text-neutral-400">
             <Link to="/login" className="text-amber-400 hover:text-amber-300 font-medium transition-colors">
-              Retour à la connexion
+              {t("auth.backToLogin")}
             </Link>
           </p>
         </div>

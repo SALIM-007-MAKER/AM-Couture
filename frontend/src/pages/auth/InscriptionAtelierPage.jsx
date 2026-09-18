@@ -6,6 +6,7 @@ import { LANGUES_DISPONIBLES } from "../../features/compte/constants.js";
 import { ApiError } from "../../lib/apiClient.js";
 import { GlobalFormError, FieldError } from "../../components/QueryState.jsx";
 import ImageUploadField from "../../components/ImageUploadField.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 // Même esthétique que LoginPage.jsx (voir ses commentaires) — un propriétaire
 // d'atelier crée ici SON atelier + son propre compte ADMIN en une seule
@@ -38,6 +39,7 @@ const FORM_INITIAL = {
 };
 
 export default function InscriptionAtelierPage() {
+  const { t } = useTranslation();
   const [form, setForm] = useState(FORM_INITIAL);
   const [confirmationError, setConfirmationError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -58,7 +60,7 @@ export default function InscriptionAtelierPage() {
     e.preventDefault();
     setConfirmationError("");
     if (form.adminPassword !== form.confirmation) {
-      setConfirmationError("La confirmation ne correspond pas au mot de passe.");
+      setConfirmationError(t("activation.confirmMismatch"));
       return;
     }
     mutation.mutate(
@@ -100,16 +102,16 @@ export default function InscriptionAtelierPage() {
         >
           <div className="text-center space-y-1.5">
             <h1 className="text-2xl font-semibold tracking-tight text-white">
-              Créez votre <span className="text-amber-400">atelier</span>
+              {t("auth.signup.headingPre")} <span className="text-amber-400">{t("auth.signup.headingHighlight")}</span>
             </h1>
-            <p className="text-sm text-neutral-400">Rejoignez {NOM_PLATEFORME}</p>
+            <p className="text-sm text-neutral-400">{t("auth.signup.subtitle", { plateforme: NOM_PLATEFORME })}</p>
           </div>
 
           <GlobalFormError error={mutation.error} />
 
           <div className="space-y-1.5">
             <label htmlFor="nom" className="text-sm font-medium text-neutral-300">
-              Nom de l'atelier <span className="text-neutral-500 font-normal">(optionnel)</span>
+              {t("auth.signup.workshopName")} <span className="text-neutral-500 font-normal">{t("auth.signup.optional")}</span>
             </label>
             <div className="relative">
               <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -119,7 +121,7 @@ export default function InscriptionAtelierPage() {
                 value={form.nom}
                 onChange={(e) => update("nom", e.target.value)}
                 className={darkInputClass}
-                placeholder="Ex: Atelier Élégance"
+                placeholder={t("auth.signup.workshopNamePlaceholder")}
               />
             </div>
             <FieldError messages={details?.nom} />
@@ -127,12 +129,12 @@ export default function InscriptionAtelierPage() {
 
           <div className="space-y-1.5">
             <span className="text-sm font-medium text-neutral-300">
-              Logo de l'atelier <span className="text-neutral-500 font-normal">(optionnel)</span>
+              {t("auth.signup.logo")} <span className="text-neutral-500 font-normal">{t("auth.signup.optional")}</span>
             </span>
             <ImageUploadField
               value={form.logoUrl}
               onChange={(v) => update("logoUrl", v)}
-              alt="Logo de l'atelier"
+              alt={t("nav.workshopLogoAlt")}
               previewClassName="h-16 w-16 object-contain bg-white"
             />
             <FieldError messages={details?.logoUrl} />
@@ -141,7 +143,7 @@ export default function InscriptionAtelierPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="prenom" className="text-sm font-medium text-neutral-300">
-                Prénom *
+                {t("auth.signup.firstName")} *
               </label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -159,7 +161,7 @@ export default function InscriptionAtelierPage() {
             </div>
             <div className="space-y-1.5">
               <label htmlFor="nomProprietaire" className="text-sm font-medium text-neutral-300">
-                Nom *
+                {t("auth.signup.lastName")} *
               </label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -179,7 +181,7 @@ export default function InscriptionAtelierPage() {
 
           <div className="space-y-1.5">
             <label htmlFor="email" className="text-sm font-medium text-neutral-300">
-              Email *
+              {t("auth.signup.email")} *
             </label>
             <div className="relative">
               <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -191,17 +193,17 @@ export default function InscriptionAtelierPage() {
                 value={form.email}
                 onChange={(e) => update("email", e.target.value)}
                 className={darkInputClass}
-                placeholder="vous@exemple.com"
+                placeholder={t("auth.signup.emailPlaceholder")}
               />
             </div>
             <FieldError messages={details?.email} />
-            <p className="text-xs text-neutral-500">Sert aussi d'identifiant de connexion.</p>
+            <p className="text-xs text-neutral-500">{t("auth.signup.emailHint")}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="adminPassword" className="text-sm font-medium text-neutral-300">
-                Mot de passe *
+                {t("activation.password")} *
               </label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -213,13 +215,13 @@ export default function InscriptionAtelierPage() {
                   value={form.adminPassword}
                   onChange={(e) => update("adminPassword", e.target.value)}
                   className={`${darkInputClass} pr-10`}
-                  placeholder="8 caractères min."
+                  placeholder={t("auth.signup.passwordPlaceholder")}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors"
-                  aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                  aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
                 >
                   {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
                 </button>
@@ -228,7 +230,7 @@ export default function InscriptionAtelierPage() {
             </div>
             <div className="space-y-1.5">
               <label htmlFor="confirmation" className="text-sm font-medium text-neutral-300">
-                Confirmer *
+                {t("auth.signup.confirm")} *
               </label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -248,7 +250,7 @@ export default function InscriptionAtelierPage() {
 
           <div className="space-y-1.5">
             <label htmlFor="telephone" className="text-sm font-medium text-neutral-300">
-              Téléphone (avec indicatif pays) *
+              {t("auth.signup.phone")} *
             </label>
             <div className="relative">
               <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -269,7 +271,7 @@ export default function InscriptionAtelierPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="ville" className="text-sm font-medium text-neutral-300">
-                Ville <span className="text-neutral-500 font-normal">(optionnel)</span>
+                {t("auth.signup.city")} <span className="text-neutral-500 font-normal">{t("auth.signup.optional")}</span>
               </label>
               <div className="relative">
                 <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -285,7 +287,7 @@ export default function InscriptionAtelierPage() {
             </div>
             <div className="space-y-1.5">
               <label htmlFor="pays" className="text-sm font-medium text-neutral-300">
-                Pays <span className="text-neutral-500 font-normal">(optionnel)</span>
+                {t("auth.signup.country")} <span className="text-neutral-500 font-normal">{t("auth.signup.optional")}</span>
               </label>
               <div className="relative">
                 <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -304,7 +306,7 @@ export default function InscriptionAtelierPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <label htmlFor="devise" className="text-sm font-medium text-neutral-300">
-                Devise *
+                {t("auth.signup.currency")} *
               </label>
               <input
                 id="devise"
@@ -319,7 +321,7 @@ export default function InscriptionAtelierPage() {
             </div>
             <div className="space-y-1.5">
               <label htmlFor="langue" className="text-sm font-medium text-neutral-300">
-                Langue *
+                {t("auth.signup.language")} *
               </label>
               <select
                 id="langue"
@@ -343,14 +345,14 @@ export default function InscriptionAtelierPage() {
             disabled={mutation.isPending}
             className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 text-sm font-semibold py-2.5 shadow-lg shadow-amber-900/30 transition disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]"
           >
-            {mutation.isPending ? "Création…" : "Créer mon compte"}
+            {mutation.isPending ? t("auth.signup.submitting") : t("auth.signup.submit")}
             {!mutation.isPending && <ArrowRight className="size-4" aria-hidden="true" />}
           </button>
 
           <p className="text-center text-sm text-neutral-400">
-            Déjà un compte ?{" "}
+            {t("auth.signup.haveAccount")}{" "}
             <Link to="/login" className="text-amber-400 hover:text-amber-300 font-medium transition-colors">
-              Se connecter
+              {t("login.submit")}
             </Link>
           </p>
         </form>

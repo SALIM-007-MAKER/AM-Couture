@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Archive, RotateCcw, Check, X } from "lucide-react";
 import { GlobalFormError } from "./QueryState.jsx";
 import Button from "./Button.jsx";
+import { useTranslation } from "../i18n/index.js";
 
 /**
  * Contrôle archiver/restaurer partagé (Clientes, Modèles — même comportement
@@ -17,6 +18,7 @@ export default function ArchiveRestoreControl({
   error,
   confirmQuestion,
 }) {
+  const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const action = archived ? onRestore : onArchive;
   const Icon = archived ? RotateCcw : Archive;
@@ -27,10 +29,10 @@ export default function ArchiveRestoreControl({
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm text-neutral-600 dark:text-neutral-400">{confirmQuestion}</span>
           <Button variant="primary" size="sm" icon={Check} loading={isPending} onClick={() => action(() => setConfirming(false))}>
-            Confirmer
+            {t("ui.confirm")}
           </Button>
           <Button variant="secondary" size="sm" icon={X} onClick={() => setConfirming(false)}>
-            Annuler
+            {t("common.cancel")}
           </Button>
         </div>
         <GlobalFormError error={error} />
@@ -40,7 +42,7 @@ export default function ArchiveRestoreControl({
 
   return (
     <Button variant="secondary" size="sm" icon={Icon} onClick={() => setConfirming(true)}>
-      {archived ? "Restaurer" : "Archiver"}
+      {archived ? t("common.restore") : t("common.archive")}
     </Button>
   );
 }

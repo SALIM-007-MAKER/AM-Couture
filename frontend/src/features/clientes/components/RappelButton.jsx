@@ -3,6 +3,7 @@ import { useCommandesQuery } from "../../commandes/hooks.js";
 import { useParametresQuery } from "../../parametres/hooks.js";
 import { waMeLink, buildRappelMessage } from "../../../lib/whatsapp.js";
 import Button from "../../../components/Button.jsx";
+import { useTranslation } from "../../../i18n/index.js";
 
 /**
  * "Envoyer un rappel" (Phase 3, fiche client) — priorité à une commande
@@ -14,6 +15,7 @@ import Button from "../../../components/Button.jsx";
  * clienteId+statut déjà pris en charge, rien à ajouter côté API).
  */
 export default function RappelButton({ cliente, totalRestant }) {
+  const { t } = useTranslation();
   const commandePreteQuery = useCommandesQuery({ clienteId: cliente.id, statut: "TERMINEE", pageSize: 1 });
   const atelierQuery = useParametresQuery();
   const atelier = atelierQuery.data;
@@ -34,7 +36,7 @@ export default function RappelButton({ cliente, totalRestant }) {
 
   return (
     <Button as="a" href={lien} target="_blank" rel="noreferrer" variant="whatsapp" size="sm" icon={MessageCircle}>
-      Envoyer un rappel
+      {t("cli.rappel.send")}
     </Button>
   );
 }

@@ -12,13 +12,14 @@ import SectionTitle from "../../components/SectionTitle.jsx";
 import CommandeStatutBadge from "../commandes/components/CommandeStatutBadge.jsx";
 import PaiementStatutBadge from "../commandes/components/PaiementStatutBadge.jsx";
 import { useTranslation } from "../../i18n/index.js";
+import { useLocaleStore } from "../../stores/localeStore.js";
 
 function categorieLabelLocal(value) {
   return CATEGORIES_VETEMENT.find((c) => c.value === value)?.label ?? value;
 }
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+  return new Date(iso).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { year: "numeric", month: "long", day: "numeric" });
 }
 
 function InfoRow({ label, value }) {

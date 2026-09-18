@@ -4,6 +4,8 @@ import { FileText, Search, Download } from "lucide-react";
 import { useRecusGlobalQuery } from "./hooks.js";
 import { recuPdfUrl } from "./api.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
+import { dateLocale } from "../commandes/constants.js";
+import { useTranslation } from "../../i18n/index.js";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
@@ -13,13 +15,14 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/QueryStat
 const PAGE_SIZE = 20;
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString(dateLocale(), { year: "numeric", month: "short", day: "numeric" });
 }
 
 // Page de consultation uniquement : un reçu se crée depuis la fiche Commande
 // (récapitulatif ou lié à un paiement précis) — ici, on le retrouve
 // rapidement dans son contexte (cliente, commande) et on le télécharge.
 export default function RecusListPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page") ?? "1");
   const dateFrom = searchParams.get("dateFrom") ?? "";
@@ -48,21 +51,21 @@ export default function RecusListPage() {
 
   return (
     <div className="space-y-5 max-w-5xl">
-      <PageHeader icon={FileText} title="Reçus" subtitle="Documents émis pour les paiements et récapitulatifs de commande." />
+      <PageHeader icon={FileText} title={t("nav.receipts")} subtitle={t("recu.subtitle")} />
 
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-neutral-400" aria-hidden="true" />
           <input
             type="search"
-            placeholder="Rechercher (numéro, commande, client)…"
+            placeholder={t("recu.searchPlaceholder")}
             value={qInput}
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500"
           />
         </div>
         <label className="flex items-center gap-1.5 text-sm text-neutral-500">
-          Du
+          {t("recu.du")}
           <input
             type="date"
             value={dateFrom}
@@ -71,7 +74,7 @@ export default function RecusListPage() {
           />
         </label>
         <label className="flex items-center gap-1.5 text-sm text-neutral-500">
-          Au
+          {t("recu.au")}
           <input
             type="date"
             value={dateTo}
@@ -81,12 +84,12 @@ export default function RecusListPage() {
         </label>
       </div>
 
-      {isPending && <LoadingState label="Chargement des reçus…" />}
+      {isPending && <LoadingState label={t("recu.loading")} />}
       {isError && <ErrorState error={error} onRetry={refetch} />}
 
       {data && data.data.length === 0 && (
         <EmptyState icon={FileText}>
-          {q || dateFrom || dateTo ? "Aucun reçu ne correspond à ces critères." : "Aucun reçu émis pour l'instant."}
+          {q || dateFrom || dateTo ? t("recu.emptyFiltered") : t("recu.emptyAll")}
         </EmptyState>
       )}
 
@@ -96,12 +99,12 @@ export default function RecusListPage() {
             <table className="w-full text-sm">
               <thead className="text-left text-neutral-500">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Numéro</th>
-                  <th className="px-4 py-3 font-medium">Client</th>
-                  <th className="px-4 py-3 font-medium">Commande</th>
-                  <th className="px-4 py-3 font-medium">Type</th>
-                  <th className="px-4 py-3 font-medium">Date</th>
-                  <th className="px-4 py-3 font-medium text-right">Montant</th>
+                  <th className="px-4 py-3 font-medium">{t("recu.colNumero")}</th>
+                  <th className="px-4 py-3 font-medium">{t("recu.colClient")}</th>
+                  <th className="px-4 py-3 font-medium">{t("recu.colCommande")}</th>
+                  <th className="px-4 py-3 font-medium">{t("recu.colType")}</th>
+                  <th className="px-4 py-3 font-medium">{t("recu.colDate")}</th>
+                  <th className="px-4 py-3 font-medium text-right">{t("recu.colMontant")}</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -119,14 +122,14 @@ export default function RecusListPage() {
                         {recu.commande.numero}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-neutral-500">{recu.paiementId ? "Paiement" : "Récapitulatif"}</td>
+                    <td className="px-4 py-3 text-neutral-500">{recu.paiementId ? t("recu.typePaiement") : t("recu.typeRecapitulatif")}</td>
                     <td className="px-4 py-3 text-neutral-500">{formatDate(recu.createdAt)}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-neutral-900 dark:text-neutral-100">
                       {recu.montantPaye}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button as="a" href={recuPdfUrl(recu.id)} target="_blank" rel="noreferrer" variant="ghost" size="sm" icon={Download}>
-                        PDF
+                        {t("recu.pdf")}
                       </Button>
                     </td>
                   </tr>

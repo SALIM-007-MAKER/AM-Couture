@@ -14,6 +14,8 @@ import Pagination from "../../components/Pagination.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
+import { useTranslation } from "../../i18n/index.js";
+import { useLocaleStore } from "../../stores/localeStore.js";
 
 const PAGE_SIZE = 20;
 
@@ -24,7 +26,7 @@ const TONE_CLASSES = {
 };
 
 function formatDateHeure(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", {
+  return new Date(iso).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -33,13 +35,13 @@ function formatDateHeure(iso) {
   });
 }
 
-const FILTRES = [
-  { value: "", label: "Toutes" },
-  { value: "false", label: "Non lues" },
-  { value: "true", label: "Lues" },
-];
-
 export default function NotificationsPage() {
+  const { t } = useTranslation();
+  const FILTRES = [
+    { value: "", label: t("notif.filterAll") },
+    { value: "false", label: t("notif.filterUnread") },
+    { value: "true", label: t("notif.filterRead") },
+  ];
   const [filtreLu, setFiltreLu] = useState("");
   const [page, setPage] = useState(1);
   const [selection, setSelection] = useState(new Set());
@@ -89,8 +91,8 @@ export default function NotificationsPage() {
     <div className="max-w-3xl space-y-6">
       <PageHeader
         icon={Bell}
-        title="Notifications"
-        subtitle="Alertes automatiques : retards, commandes prêtes, livraisons proches, impayés."
+        title={t("nav.notifications")}
+        subtitle={t("notif.subtitle")}
       />
 
       {/* Les demandes de commande des clients comptent dans la pastille de la
@@ -107,8 +109,7 @@ export default function NotificationsPage() {
           >
             <span className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
               <Inbox className="size-4 shrink-0" aria-hidden="true" />
-              {nombreQuery.data.demandes} demande{nombreQuery.data.demandes > 1 ? "s" : ""} de commande en attente de
-              traitement.
+              {t("notif.pendingRequests", { nombre: nombreQuery.data.demandes, plural: nombreQuery.data.demandes > 1 ? "s" : "" })}
             </span>
             <ArrowRight className="size-4 shrink-0 text-neutral-400" aria-hidden="true" />
           </Card>
@@ -130,7 +131,7 @@ export default function NotificationsPage() {
         </div>
         {selection.size > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm text-neutral-500">{selection.size} sélectionnée(s)</span>
+            <span className="text-sm text-neutral-500">{t("notif.selected", { nombre: selection.size })}</span>
             <Button
               variant="secondary"
               size="sm"
@@ -138,7 +139,7 @@ export default function NotificationsPage() {
               loading={marquerLuMasseMutation.isPending}
               onClick={handleMarquerLuMasse}
             >
-              Marquer comme lues
+              {t("notif.markSelectedRead")}
             </Button>
             {confirmingDelete ? (
               <>
@@ -149,15 +150,15 @@ export default function NotificationsPage() {
                   loading={supprimerMasseMutation.isPending}
                   onClick={handleSupprimerMasse}
                 >
-                  Confirmer
+                  {t("notif.confirm")}
                 </Button>
                 <Button variant="secondary" size="sm" icon={X} onClick={() => setConfirmingDelete(false)}>
-                  Annuler
+                  {t("common.cancel")}
                 </Button>
               </>
             ) : (
               <Button variant="danger-ghost" size="sm" icon={Trash2} onClick={() => setConfirmingDelete(true)}>
-                Supprimer
+                {t("common.delete")}
               </Button>
             )}
           </div>
@@ -166,15 +167,15 @@ export default function NotificationsPage() {
 
       <GlobalFormError error={marquerLuMasseMutation.error || supprimerMasseMutation.error} />
 
-      {query.isPending && <LoadingState label="Chargement des notifications…" />}
+      {query.isPending && <LoadingState label={t("client.notificationsLoading")} />}
       {query.isError && <ErrorState error={query.error} onRetry={query.refetch} />}
-      {query.data && data.length === 0 && <EmptyState icon={Bell}>Aucune notification pour l'instant.</EmptyState>}
+      {query.data && data.length === 0 && <EmptyState icon={Bell}>{t("client.notificationsEmpty")}</EmptyState>}
 
       {query.data && data.length > 0 && (
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-xs text-neutral-500 px-1">
             <input type="checkbox" checked={selection.size === data.length} onChange={toggleSelectAll} />
-            Tout sélectionner sur cette page
+            {t("notif.selectAll")}
           </label>
           <ul className="space-y-2">
             {data.map((notif) => {
@@ -188,7 +189,7 @@ export default function NotificationsPage() {
                       className="mt-1 shrink-0"
                       checked={selection.has(notif.id)}
                       onChange={() => toggleSelection(notif.id)}
-                      aria-label="Sélectionner cette notification"
+                      aria-label={t("notif.selectOne")}
                     />
                     <span className={`shrink-0 mt-0.5 ${tone}`}>
                       <Icon className="size-4" aria-hidden="true" />
@@ -212,7 +213,7 @@ export default function NotificationsPage() {
                       loading={marquerLuMutation.isPending && marquerLuMutation.variables?.id === notif.id}
                       onClick={() => marquerLuMutation.mutate({ id: notif.id, lu: !notif.lu })}
                     >
-                      {notif.lu ? "Marquer non lue" : "Marquer lue"}
+                      {notif.lu ? t("notif.markUnread") : t("notif.markRead")}
                     </Button>
                   </Card>
                 </li>

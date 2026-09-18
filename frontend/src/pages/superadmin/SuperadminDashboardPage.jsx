@@ -18,6 +18,8 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/QueryStat
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
+import { useTranslation } from "../../i18n/index.js";
+import { useLocaleStore } from "../../stores/localeStore.js";
 
 const KPI_TONES = {
   neutral: "bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400",
@@ -46,7 +48,7 @@ function Kpi({ icon: Icon, label, value, tone = "neutral" }) {
 }
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { year: "numeric", month: "short", day: "numeric" });
 }
 
 // Construites à partir des données déjà existantes (ateliers, abonnements) —
@@ -54,16 +56,17 @@ function formatDate(iso) {
 // rien stocké, recalculé à chaque chargement) : même décision que le fil
 // "Activité récente" de la fiche atelier (voir AtelierDetailPage.jsx).
 function AlertesSection() {
+  const { t } = useTranslation();
   const { data, isPending, isError, error, refetch } = useAteliersAlertesQuery();
 
-  if (isPending) return <LoadingState label="Chargement des alertes…" />;
+  if (isPending) return <LoadingState label={t("sa.dashboard.loadingAlerts")} />;
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
   const { nouveauxAteliers, ateliersSuspendus, abonnementsAlerte } = data;
   const total = nouveauxAteliers.length + ateliersSuspendus.length + abonnementsAlerte.length;
 
   if (total === 0) {
-    return <EmptyState icon={Bell}>Rien à signaler pour l'instant.</EmptyState>;
+    return <EmptyState icon={Bell}>{t("sa.dashboard.nothingToReport")}</EmptyState>;
   }
 
   return (
@@ -79,7 +82,7 @@ function AlertesSection() {
             </span>
             <p className="text-sm text-neutral-900 dark:text-neutral-100">
               <span className="font-medium">{a.nom}</span> —{" "}
-              {a.expire ? "abonnement expiré" : "abonnement expire bientôt"} ({formatDate(a.dateExpiration)})
+              {a.expire ? t("sa.dashboard.subscriptionExpired") : t("sa.dashboard.subscriptionExpiring")} ({formatDate(a.dateExpiration)})
             </p>
           </Card>
         </Link>
@@ -92,7 +95,7 @@ function AlertesSection() {
               <AlertTriangle className="size-4" aria-hidden="true" />
             </span>
             <p className="text-sm text-neutral-900 dark:text-neutral-100">
-              <span className="font-medium">{a.nom}</span> — suspendu le {formatDate(a.suspenduLe)}
+              <span className="font-medium">{a.nom}</span> — {t("sa.dashboard.suspendedOn", { date: formatDate(a.suspenduLe) })}
             </p>
           </Card>
         </Link>
@@ -105,7 +108,7 @@ function AlertesSection() {
               <Sparkles className="size-4" aria-hidden="true" />
             </span>
             <p className="text-sm text-neutral-900 dark:text-neutral-100">
-              <span className="font-medium">{a.nom}</span> — nouvel atelier ({formatDate(a.createdAt)})
+              <span className="font-medium">{a.nom}</span> — {t("sa.dashboard.newWorkshop", { date: formatDate(a.createdAt) })}
             </p>
           </Card>
         </Link>
@@ -116,7 +119,7 @@ function AlertesSection() {
 
 function moisLabel(cle) {
   const [annee, mois] = cle.split("-").map(Number);
-  return new Date(annee, mois - 1, 1).toLocaleDateString("fr-FR", { month: "short" });
+  return new Date(annee, mois - 1, 1).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { month: "short" });
 }
 
 // Un seul axe, une seule teinte par graphique (voir skill dataviz) — deux
@@ -157,14 +160,15 @@ function MiniBarChart({ data, valueKey, colorClass, formatValue }) {
 // atelier, hors de portée du SUPERADMIN). Voir commentaire backend,
 // GET /api/ateliers/tendances.
 function TendancesSection() {
+  const { t } = useTranslation();
   const { data, isPending, isError, error, refetch } = useAteliersTendancesQuery();
-  if (isPending) return <LoadingState label="Chargement des tendances…" />;
+  if (isPending) return <LoadingState label={t("sa.dashboard.loadingTrends")} />;
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <Card variant="outlined">
-        <p className="text-xs font-medium text-neutral-500 mb-3">Nouveaux ateliers par mois</p>
+        <p className="text-xs font-medium text-neutral-500 mb-3">{t("sa.dashboard.newWorkshopsPerMonth")}</p>
         <MiniBarChart
           data={data}
           valueKey="nouveauxAteliers"
@@ -173,12 +177,12 @@ function TendancesSection() {
         />
       </Card>
       <Card variant="outlined">
-        <p className="text-xs font-medium text-neutral-500 mb-3">Revenus de la plateforme par mois</p>
+        <p className="text-xs font-medium text-neutral-500 mb-3">{t("sa.dashboard.revenuePerMonth")}</p>
         <MiniBarChart
           data={data}
           valueKey="revenus"
           colorClass="bg-amber-500 dark:bg-amber-400"
-          formatValue={(v) => v.toLocaleString("fr-FR")}
+          formatValue={(v) => v.toLocaleString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR")}
         />
       </Card>
     </div>
@@ -186,42 +190,43 @@ function TendancesSection() {
 }
 
 export default function SuperadminDashboardPage() {
+  const { t } = useTranslation();
   const { data, isPending, isError, error, refetch } = useAteliersResumeQuery();
 
   return (
     <div className="space-y-6">
       <PageHeader
         icon={LayoutDashboard}
-        title="Vue d'ensemble"
-        subtitle="Totaux de la plateforme Gestion d'Atelier, tous ateliers confondus."
+        title={t("sa.dashboard.title")}
+        subtitle={t("sa.dashboard.subtitle")}
       />
 
-      {isPending && <LoadingState label="Chargement des statistiques…" />}
+      {isPending && <LoadingState label={t("sa.dashboard.loadingStats")} />}
       {isError && <ErrorState error={error} onRetry={refetch} />}
 
       {data && (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-          <Kpi icon={Building2} label="Ateliers" value={data.nombreAteliers} />
-          <Kpi icon={ShieldCheck} label="Ateliers actifs" value={data.nombreAteliersActifs} tone="success" />
+          <Kpi icon={Building2} label={t("sa.dashboard.kpiWorkshops")} value={data.nombreAteliers} />
+          <Kpi icon={ShieldCheck} label={t("sa.dashboard.kpiActive")} value={data.nombreAteliersActifs} tone="success" />
           <Kpi
             icon={ShieldOff}
-            label="Ateliers suspendus"
+            label={t("sa.dashboard.kpiSuspended")}
             value={data.nombreAteliersSuspendus}
             tone={data.nombreAteliersSuspendus > 0 ? "danger" : "neutral"}
           />
-          <Kpi icon={UserCircle} label="Comptes admin" value={data.nombreComptes} />
-          <Kpi icon={Users} label="Clientes (toutes plateformes)" value={data.nombreClientes} />
-          <Kpi icon={ClipboardList} label="Commandes (toutes plateformes)" value={data.nombreCommandes} />
+          <Kpi icon={UserCircle} label={t("sa.dashboard.kpiAccounts")} value={data.nombreComptes} />
+          <Kpi icon={Users} label={t("sa.dashboard.kpiClients")} value={data.nombreClientes} />
+          <Kpi icon={ClipboardList} label={t("sa.dashboard.kpiOrders")} value={data.nombreCommandes} />
         </div>
       )}
 
       <div className="space-y-3">
-        <SectionTitle icon={TrendingUp}>Tendances (6 derniers mois)</SectionTitle>
+        <SectionTitle icon={TrendingUp}>{t("sa.dashboard.trends")}</SectionTitle>
         <TendancesSection />
       </div>
 
       <div className="space-y-3">
-        <SectionTitle icon={Bell}>Alertes</SectionTitle>
+        <SectionTitle icon={Bell}>{t("sa.dashboard.alerts")}</SectionTitle>
         <AlertesSection />
       </div>
     </div>

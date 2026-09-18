@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { Scissors, LayoutDashboard, Building2, CreditCard, Tag, UserCircle, Menu, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { useUiStore } from "../stores/uiStore.js";
+import { useTranslation } from "../i18n/index.js";
 
 // Shell dédié au SUPERADMIN — délibérément distinct d'AppLayout (Phase 8) :
 // AppLayout suppose partout un atelier courant (cloche de notifications,
@@ -16,14 +17,15 @@ import { useUiStore } from "../stores/uiStore.js";
 // entièrement générique (langue + mot de passe), aucune dépendance à un
 // atelier.
 const NAV_ITEMS = [
-  { label: "Vue d'ensemble", to: "/vue-ensemble", icon: LayoutDashboard, end: true },
-  { label: "Ateliers", to: "/ateliers", icon: Building2 },
-  { label: "Abonnements", to: "/gestion-abonnements", icon: CreditCard },
-  { label: "Tarifs", to: "/tarifs-abonnement", icon: Tag },
-  { label: "Mon compte", to: "/mon-compte", icon: UserCircle },
+  { labelKey: "sa.layout.overview", to: "/vue-ensemble", icon: LayoutDashboard, end: true },
+  { labelKey: "sa.layout.workshops", to: "/ateliers", icon: Building2 },
+  { labelKey: "sa.layout.subscriptions", to: "/gestion-abonnements", icon: CreditCard },
+  { labelKey: "sa.layout.pricing", to: "/tarifs-abonnement", icon: Tag },
+  { labelKey: "nav.myAccount", to: "/mon-compte", icon: UserCircle },
 ];
 
 function NavContent({ collapsed, onNavigate }) {
+  const { t } = useTranslation();
   return (
     <nav className="flex flex-col gap-0.5 p-3">
       {NAV_ITEMS.map((item) => (
@@ -32,7 +34,7 @@ function NavContent({ collapsed, onNavigate }) {
           to={item.to}
           end={item.end}
           onClick={onNavigate}
-          title={collapsed ? item.label : undefined}
+          title={collapsed ? t(item.labelKey) : undefined}
           className={({ isActive }) =>
             `flex items-center gap-2.5 rounded-lg border-l-2 pl-2.5 pr-3 py-2 text-sm font-medium transition-colors ${
               collapsed ? "justify-center border-l-0 pl-3" : ""
@@ -44,7 +46,7 @@ function NavContent({ collapsed, onNavigate }) {
           }
         >
           <item.icon className="size-4 shrink-0" aria-hidden="true" />
-          {!collapsed && item.label}
+          {!collapsed && t(item.labelKey)}
         </NavLink>
       ))}
     </nav>
@@ -52,6 +54,7 @@ function NavContent({ collapsed, onNavigate }) {
 }
 
 function Logo({ collapsed }) {
+  const { t } = useTranslation();
   return (
     <div
       className={`flex items-center gap-2 px-4 py-4 border-b border-neutral-200 dark:border-neutral-800 ${collapsed ? "justify-center px-0" : ""}`}
@@ -62,10 +65,10 @@ function Logo({ collapsed }) {
       {!collapsed && (
         <div className="min-w-0">
           <p className="text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 truncate">
-            Gestion d'Atelier
+            {t("sa.layout.platformName")}
           </p>
           <p className="text-[10px] font-medium uppercase tracking-wider text-brand-600 dark:text-brand-400">
-            Superadmin
+            {t("sa.layout.role")}
           </p>
         </div>
       )}
@@ -78,6 +81,7 @@ function useCurrentNavItem(pathname) {
 }
 
 export default function SuperadminLayout() {
+  const { t } = useTranslation();
   const { data: user } = useMeQuery();
   const logoutMutation = useLogoutMutation();
   const { sidebarOpen, closeSidebar, toggleSidebar, sidebarCollapsed, toggleSidebarCollapsed } = useUiStore();
@@ -100,14 +104,14 @@ export default function SuperadminLayout() {
           type="button"
           onClick={toggleSidebarCollapsed}
           className="flex items-center gap-2 border-t border-neutral-200 dark:border-neutral-800 px-3 py-3 text-xs font-medium text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
-          title={sidebarCollapsed ? "Développer" : "Réduire"}
+          title={sidebarCollapsed ? t("nav.expand") : t("nav.collapse")}
         >
           {sidebarCollapsed ? (
             <ChevronsRight className="size-4 mx-auto" aria-hidden="true" />
           ) : (
             <>
               <ChevronsLeft className="size-4" aria-hidden="true" />
-              Réduire
+              {t("nav.collapse")}
             </>
           )}
         </button>
@@ -116,7 +120,7 @@ export default function SuperadminLayout() {
       {/* Tiroir mobile */}
       <button
         type="button"
-        aria-label="Fermer le menu"
+        aria-label={t("nav.closeMenu")}
         tabIndex={sidebarOpen ? 0 : -1}
         onClick={closeSidebar}
         className={`md:hidden fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 ${
@@ -142,7 +146,7 @@ export default function SuperadminLayout() {
               type="button"
               onClick={toggleSidebar}
               className="md:hidden rounded-lg p-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
-              aria-label="Ouvrir le menu"
+              aria-label={t("nav.openMenu")}
             >
               <Menu className="size-4" aria-hidden="true" />
             </button>
@@ -150,7 +154,7 @@ export default function SuperadminLayout() {
               <div className="flex items-center gap-2 min-w-0 text-sm text-neutral-500">
                 <currentNavItem.icon className="size-4 shrink-0 hidden sm:block" aria-hidden="true" />
                 <span className="truncate font-medium text-neutral-900 dark:text-neutral-100">
-                  {currentNavItem.label}
+                  {t(currentNavItem.labelKey)}
                 </span>
               </div>
             )}
@@ -170,10 +174,10 @@ export default function SuperadminLayout() {
               onClick={() => logoutMutation.mutate()}
               disabled={logoutMutation.isPending}
               className="inline-flex items-center gap-1.5 text-sm rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
-              title="Déconnexion"
+              title={t("nav.logout")}
             >
               <LogOut className="size-3.5" aria-hidden="true" />
-              <span className="hidden sm:inline">Déconnexion</span>
+              <span className="hidden sm:inline">{t("nav.logout")}</span>
             </button>
           </div>
         </header>

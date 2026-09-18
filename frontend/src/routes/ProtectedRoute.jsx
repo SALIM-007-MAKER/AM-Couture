@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useMeQuery } from "../hooks/useAuth.js";
+import { useTranslation } from "../i18n/index.js";
 
 /**
  * `!data` (plutôt que `isError`) couvre volontairement DEUX cas identiques
@@ -18,6 +19,7 @@ import { useMeQuery } from "../hooks/useAuth.js";
  * des tests réels, voir rapport du module Clientes).
  */
 export default function ProtectedRoute() {
+  const { t } = useTranslation();
   const { data, isPending } = useMeQuery();
   const location = useLocation();
 
@@ -25,7 +27,7 @@ export default function ProtectedRoute() {
     return (
       <div className="min-h-svh flex items-center justify-center gap-2 text-sm text-neutral-500">
         <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        Chargement…
+        {t("common.loading")}
       </div>
     );
   }

@@ -3,6 +3,7 @@ import { useChangeStatutMutation } from "../hooks.js";
 import { STATUT_TRANSITIONS, statutLabel, STATUT_ICONS } from "../constants.js";
 import { GlobalFormError } from "../../../components/QueryState.jsx";
 import Button from "../../../components/Button.jsx";
+import { useTranslation } from "../../../i18n/index.js";
 
 // LIVREE est volontairement EXCLU des transitions génériques proposées ici,
 // même si STATUT_TRANSITIONS l'autorise depuis TERMINEE : passer par
@@ -14,6 +15,7 @@ import Button from "../../../components/Button.jsx";
 // cette route (409, voir commandes.routes.js) — ce filtre frontend évite
 // juste à l'utilisateur de se heurter à cette erreur pour rien.
 export default function StatutTransitions({ commandeId, statutActuel }) {
+  const { t } = useTranslation();
   const [target, setTarget] = useState(null);
   const mutation = useChangeStatutMutation(commandeId);
   const transitions = (STATUT_TRANSITIONS[statutActuel] ?? []).filter((s) => s !== "LIVREE");
@@ -38,7 +40,7 @@ export default function StatutTransitions({ commandeId, statutActuel }) {
                 mutation.mutate(statut);
               }}
             >
-              Passer à « {statutLabel(statut)} »
+              {t("cmd.passerA", { statut: statutLabel(statut) })}
             </Button>
           );
         })}

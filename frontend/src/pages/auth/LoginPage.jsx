@@ -71,7 +71,7 @@ export default function LoginPage() {
           {logoUrl ? (
             <img
               src={logoUrl}
-              alt={`Logo ${nomAtelier}`}
+              alt={t("auth.logoAlt", { nom: nomAtelier })}
               className="size-24 rounded-2xl object-contain bg-white/5 border border-white/10 p-2 shadow-[0_0_50px_-5px_rgba(217,158,63,0.35)]"
             />
           ) : (

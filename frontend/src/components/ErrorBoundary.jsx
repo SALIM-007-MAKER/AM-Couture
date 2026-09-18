@@ -1,5 +1,6 @@
 import { Component } from "react";
 import { AlertTriangle, Home } from "lucide-react";
+import { translate } from "../i18n/index.js";
 
 /**
  * Filet de sécurité applicatif : sans lui, toute exception de rendu React
@@ -27,17 +28,17 @@ export default class ErrorBoundary extends Component {
           <div className="max-w-sm text-center space-y-3">
             <AlertTriangle className="mx-auto size-10 text-amber-500" aria-hidden="true" />
             <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-              Une erreur inattendue est survenue
+              {translate("ui.errorBoundary.title")}
             </h1>
             <p className="text-sm text-neutral-500">
-              L'équipe technique a été notifiée. Vous pouvez essayer de revenir à l'accueil.
+              {translate("ui.errorBoundary.message")}
             </p>
             <a
               href="/"
               className="inline-flex items-center gap-1.5 rounded-md bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-sm font-medium px-4 py-2 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
             >
               <Home className="size-4" aria-hidden="true" />
-              Retour à l'accueil
+              {translate("ui.errorBoundary.home")}
             </a>
           </div>
         </div>

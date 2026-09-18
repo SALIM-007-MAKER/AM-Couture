@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "../../i18n/index.js";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { ClipboardList, Wallet, Save, X, Ruler } from "lucide-react";
 import { useCommandeQuery, useCreateCommandeMutation, useUpdateCommandeMutation } from "./hooks.js";
@@ -59,17 +60,19 @@ function editFormStateFrom(commande) {
 }
 
 export default function CommandeFormPage({ mode }) {
+  const { t } = useTranslation();
   const { id } = useParams();
   const isEdit = mode === "edit";
   const commandeQuery = useCommandeQuery(isEdit ? id : undefined);
 
-  if (isEdit && commandeQuery.isPending) return <LoadingState label="Chargement de la commande…" />;
+  if (isEdit && commandeQuery.isPending) return <LoadingState label={t("cmd.loadingCommande")} />;
   if (isEdit && commandeQuery.isError) return <ErrorState error={commandeQuery.error} onRetry={commandeQuery.refetch} />;
 
   return <CommandeForm key={isEdit ? id : "create"} mode={mode} initial={isEdit ? commandeQuery.data : undefined} />;
 }
 
 function CommandeForm({ mode, initial }) {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -159,13 +162,13 @@ function CommandeForm({ mode, initial }) {
 
   return (
     <div className="max-w-2xl space-y-5">
-      <PageHeader icon={ClipboardList} title={isEdit ? "Modifier la commande" : "Nouvelle commande"} />
+      <PageHeader icon={ClipboardList} title={isEdit ? t("cmd.formEditTitle") : t("cmd.formNewTitle")} />
 
       <Card as="form" onSubmit={handleSubmit} className="space-y-4">
         <GlobalFormError error={mutation.error} />
 
         {!isEdit && (
-          <Field label="Client" required>
+          <Field label={t("cmd.formClient")} required>
             <ClientePicker value={form.clienteId} onChange={(v) => update("clienteId", v)} required />
             <FieldError messages={details?.clienteId} />
           </Field>
@@ -175,20 +178,20 @@ function CommandeForm({ mode, initial }) {
           <Card variant="outlined" className="flex items-center justify-between gap-3 flex-wrap border-amber-200 dark:border-amber-900">
             <span className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
               <Ruler className="size-4 shrink-0" aria-hidden="true" />
-              Ce client n'a aucune mesure enregistrée — impossible de créer une commande tant qu'aucune n'est prise.
+              {t("cmd.formClienteSansMesure")}
             </span>
             <Button as={Link} to={`/clientes/${form.clienteId}/mesures/nouvelle`} variant="secondary" size="sm" icon={Ruler}>
-              Prendre ses mesures
+              {t("cmd.formPrendreMesures")}
             </Button>
           </Card>
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Modèle (facultatif)">
+          <Field label={t("cmd.formModele")}>
             <ModelePicker value={form.modeleId} onChange={(v) => update("modeleId", v)} />
             <FieldError messages={details?.modeleId} />
           </Field>
-          <Field label="Type de vêtement" required>
+          <Field label={t("cmd.formTypeVetement")} required>
             <select
               required
               value={form.typeVetement}
@@ -196,7 +199,7 @@ function CommandeForm({ mode, initial }) {
               className={inputClass}
             >
               <option value="" disabled>
-                Choisir…
+                {t("cmd.formChoisir")}
               </option>
               {CATEGORIES_VETEMENT.map((c) => (
                 <option key={c.value} value={c.value}>
@@ -206,11 +209,11 @@ function CommandeForm({ mode, initial }) {
             </select>
             <FieldError messages={details?.typeVetement} />
           </Field>
-          <Field label="Couleur">
+          <Field label={t("cmd.formCouleur")}>
             <input value={form.couleur} onChange={(e) => update("couleur", e.target.value)} className={inputClass} />
             <FieldError messages={details?.couleur} />
           </Field>
-          <Field label="Tissu">
+          <Field label={t("cmd.formTissu")}>
             <select
               value={tissuLibre ? "AUTRE" : form.tissu}
               onChange={(e) => {
@@ -224,18 +227,18 @@ function CommandeForm({ mode, initial }) {
               }}
               className={inputClass}
             >
-              <option value="">Non précisé</option>
+              <option value="">{t("cmd.formTissuNonPrecise")}</option>
               {TISSUS_SUGGERES.map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
               ))}
-              <option value="AUTRE">Autre…</option>
+              <option value="AUTRE">{t("cmd.formTissuAutre")}</option>
             </select>
             {tissuLibre && (
               <input
                 type="text"
-                placeholder="Précisez le tissu"
+                placeholder={t("cmd.formTissuPrecisez")}
                 value={form.tissu}
                 onChange={(e) => update("tissu", e.target.value)}
                 className={`${inputClass} mt-2`}
@@ -243,7 +246,7 @@ function CommandeForm({ mode, initial }) {
             )}
             <FieldError messages={details?.tissu} />
           </Field>
-          <Field label="Quantité">
+          <Field label={t("cmd.formQuantite")}>
             <input
               type="number"
               min="1"
@@ -255,7 +258,7 @@ function CommandeForm({ mode, initial }) {
             <FieldError messages={details?.quantite} />
           </Field>
           {!isEdit && (
-            <Field label="Prix total" required>
+            <Field label={t("cmd.formPrixTotal")} required>
               <input
                 type="text"
                 inputMode="decimal"
@@ -267,7 +270,7 @@ function CommandeForm({ mode, initial }) {
               <FieldError messages={details?.prixTotal} />
             </Field>
           )}
-          <Field label="Priorité">
+          <Field label={t("cmd.formPriorite")}>
             <select value={form.priorite} onChange={(e) => update("priorite", e.target.value)} className={inputClass}>
               {PRIORITES.map((p) => (
                 <option key={p.value} value={p.value}>
@@ -277,7 +280,7 @@ function CommandeForm({ mode, initial }) {
             </select>
             <FieldError messages={details?.priorite} />
           </Field>
-          <Field label="Date de livraison prévue" required>
+          <Field label={t("cmd.formDateLivraison")} required>
             <input
               type="date"
               required
@@ -289,7 +292,7 @@ function CommandeForm({ mode, initial }) {
           </Field>
         </div>
 
-        <Field label="Description">
+        <Field label={t("cmd.formDescription")}>
           <textarea
             rows={3}
             value={form.description}
@@ -299,7 +302,7 @@ function CommandeForm({ mode, initial }) {
           <FieldError messages={details?.description} />
         </Field>
 
-        <Field label="Observations">
+        <Field label={t("cmd.formObservations")}>
           <textarea
             rows={2}
             value={form.observations}
@@ -310,7 +313,7 @@ function CommandeForm({ mode, initial }) {
         </Field>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Photo du tissu">
+          <Field label={t("cmd.formPhotoTissu")}>
             <ImageUploadField
               value={form.photoTissuUrl}
               onChange={(v) => update("photoTissuUrl", v)}
@@ -318,7 +321,7 @@ function CommandeForm({ mode, initial }) {
             />
             <FieldError messages={details?.photoTissuUrl} />
           </Field>
-          <Field label="Photo du modèle">
+          <Field label={t("cmd.formPhotoModele")}>
             <ImageUploadField
               value={form.photoModeleUrl}
               onChange={(v) => update("photoModeleUrl", v)}
@@ -337,11 +340,11 @@ function CommandeForm({ mode, initial }) {
                 onChange={(e) => update("avecPaiementInitial", e.target.checked)}
               />
               <Wallet className="size-4" aria-hidden="true" />
-              Encaisser un paiement initial maintenant
+              {t("cmd.formPaiementInitial")}
             </label>
             {form.avecPaiementInitial && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Field label="Montant" required>
+                <Field label={t("cmd.formMontant")} required>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -352,7 +355,7 @@ function CommandeForm({ mode, initial }) {
                   />
                   <FieldError messages={details?.paiementInitial?.montant} />
                 </Field>
-                <Field label="Mode de paiement">
+                <Field label={t("cmd.formModePaiement")}>
                   <select
                     value={form.paiementMode}
                     onChange={(e) => update("paiementMode", e.target.value)}
@@ -365,7 +368,7 @@ function CommandeForm({ mode, initial }) {
                     ))}
                   </select>
                 </Field>
-                <Field label="Référence">
+                <Field label={t("cmd.formReference")}>
                   <input
                     value={form.paiementReference}
                     onChange={(e) => update("paiementReference", e.target.value)}
@@ -379,10 +382,10 @@ function CommandeForm({ mode, initial }) {
 
         <div className="flex gap-2 pt-1">
           <Button type="submit" variant="primary" icon={Save} loading={mutation.isPending} disabled={clienteSansMesure}>
-            Enregistrer
+            {t("cmd.formEnregistrer")}
           </Button>
           <Button type="button" variant="secondary" icon={X} onClick={() => navigate(-1)}>
-            Annuler
+            {t("cmd.formAnnuler")}
           </Button>
         </div>
       </Card>

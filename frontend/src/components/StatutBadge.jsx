@@ -1,4 +1,5 @@
 import { CheckCircle2, Archive } from "lucide-react";
+import { useTranslation } from "../i18n/index.js";
 
 /**
  * Badge actif/archivé générique — partagé entre toutes les entités
@@ -6,7 +7,8 @@ import { CheckCircle2, Archive } from "lucide-react";
  * permettent l'accord grammatical correct selon le genre de l'entité
  * ("Active"/"Archivée" pour une cliente, "Actif"/"Archivé" pour un modèle).
  */
-export default function StatutBadge({ archivedAt, activeLabel = "Active", archivedLabel = "Archivée" }) {
+export default function StatutBadge({ archivedAt, activeLabel, archivedLabel }) {
+  const { t } = useTranslation();
   const archived = Boolean(archivedAt);
   const Icon = archived ? Archive : CheckCircle2;
   return (
@@ -18,7 +20,7 @@ export default function StatutBadge({ archivedAt, activeLabel = "Active", archiv
       }`}
     >
       <Icon className="size-3" aria-hidden="true" />
-      {archived ? archivedLabel : activeLabel}
+      {archived ? (archivedLabel ?? t("ui.statut.archivedF")) : (activeLabel ?? t("ui.statut.activeF"))}
     </span>
   );
 }

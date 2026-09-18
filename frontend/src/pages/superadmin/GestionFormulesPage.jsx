@@ -11,11 +11,13 @@ import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import { ApiError } from "../../lib/apiClient.js";
+import { useTranslation } from "../../i18n/index.js";
 
 // Formulaire de création — dureeMois n'est PAS modifiable après coup (voir
 // patchFormuleSchema, backend) : une durée différente est une NOUVELLE
 // formule, pas une édition de l'existante.
 function CreerFormuleForm({ onCancel, onCreated }) {
+  const { t } = useTranslation();
   const mutation = useCreerFormuleMutation();
   const [form, setForm] = useState({ dureeMois: "", nom: "", prix: "" });
   const details = mutation.error instanceof ApiError ? mutation.error.details : undefined;
@@ -36,25 +38,25 @@ function CreerFormuleForm({ onCancel, onCreated }) {
     <Card as="form" variant="outlined" onSubmit={handleSubmit} className="space-y-4">
       <GlobalFormError error={mutation.error} />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Field label="Durée (mois)" required>
+        <Field label={t("sa.formules.fieldDuration")} required>
           <input type="number" min="1" required value={form.dureeMois} onChange={(e) => update("dureeMois", e.target.value)} className={inputClass} />
           <FieldError messages={details?.dureeMois} />
         </Field>
-        <Field label="Nom" required hint='Ex: "1 mois"'>
+        <Field label={t("sa.formules.fieldName")} required hint={t("sa.formules.fieldNameHint")}>
           <input required value={form.nom} onChange={(e) => update("nom", e.target.value)} className={inputClass} />
           <FieldError messages={details?.nom} />
         </Field>
-        <Field label="Prix" required>
+        <Field label={t("sa.formules.fieldPrice")} required>
           <input type="text" inputMode="decimal" required value={form.prix} onChange={(e) => update("prix", e.target.value)} className={inputClass} />
           <FieldError messages={details?.prix} />
         </Field>
       </div>
       <div className="flex gap-2">
         <Button type="submit" variant="primary" icon={Save} loading={mutation.isPending}>
-          Créer la formule
+          {t("sa.formules.createPlan")}
         </Button>
         <Button type="button" variant="secondary" icon={X} onClick={onCancel}>
-          Annuler
+          {t("common.cancel")}
         </Button>
       </div>
     </Card>
@@ -62,6 +64,7 @@ function CreerFormuleForm({ onCancel, onCreated }) {
 }
 
 function FormuleRow({ formule }) {
+  const { t } = useTranslation();
   const mutation = useModifierFormuleMutation();
   const [prix, setPrix] = useState(formule.prix);
   const [saved, setSaved] = useState(false);
@@ -80,7 +83,7 @@ function FormuleRow({ formule }) {
   return (
     <tr className={`border-t border-neutral-100 dark:border-neutral-800 ${!formule.actif ? "opacity-60" : ""}`}>
       <td className="px-4 py-3 font-medium text-neutral-900 dark:text-neutral-100">{formule.nom}</td>
-      <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{formule.dureeMois} mois</td>
+      <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{t("sa.formules.months", { nombre: formule.dureeMois })}</td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
           <input
@@ -95,7 +98,7 @@ function FormuleRow({ formule }) {
           />
           {dirty && (
             <Button variant="ghost" size="sm" icon={Save} loading={mutation.isPending} onClick={handleSavePrix}>
-              Enregistrer
+              {t("common.save")}
             </Button>
           )}
           {saved && !dirty && <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" aria-hidden="true" />}
@@ -110,7 +113,7 @@ function FormuleRow({ formule }) {
           loading={mutation.isPending}
           onClick={toggleActif}
         >
-          {formule.actif ? "Désactiver" : "Activer"}
+          {formule.actif ? t("sa.formules.deactivate") : t("sa.formules.activate")}
         </Button>
       </td>
     </tr>
@@ -121,6 +124,7 @@ function FormuleRow({ formule }) {
 // abonnement déjà souscrit garde son propre prix figé (voir commentaire
 // backend, formulesAbonnement.routes.js) : aucune mise à jour rétroactive.
 export default function GestionFormulesPage() {
+  const { t } = useTranslation();
   const { data, isPending, isError, error, refetch } = useFormulesToutesQuery();
   const [showForm, setShowForm] = useState(false);
 
@@ -128,12 +132,12 @@ export default function GestionFormulesPage() {
     <div className="space-y-5">
       <PageHeader
         icon={CreditCard}
-        title="Tarifs d'abonnement"
-        subtitle="Formules proposées aux ateliers pour leur abonnement à la plateforme."
+        title={t("sa.formules.title")}
+        subtitle={t("sa.formules.subtitle")}
         actions={
           !showForm && (
             <Button variant="primary" icon={Plus} onClick={() => setShowForm(true)}>
-              Nouvelle formule
+              {t("sa.formules.newPlan")}
             </Button>
           )
         }
@@ -141,20 +145,20 @@ export default function GestionFormulesPage() {
 
       {showForm && <CreerFormuleForm onCancel={() => setShowForm(false)} onCreated={() => setShowForm(false)} />}
 
-      {isPending && <LoadingState label="Chargement des formules…" />}
+      {isPending && <LoadingState label={t("sa.formules.loading")} />}
       {isError && <ErrorState error={error} onRetry={refetch} />}
 
-      {data && data.length === 0 && <EmptyState icon={CreditCard}>Aucune formule pour l'instant.</EmptyState>}
+      {data && data.length === 0 && <EmptyState icon={CreditCard}>{t("sa.formules.empty")}</EmptyState>}
 
       {data && data.length > 0 && (
         <Card variant="outlined" padded={false} className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-left text-neutral-500">
               <tr>
-                <th className="px-4 py-3 font-medium">Formule</th>
-                <th className="px-4 py-3 font-medium">Durée</th>
-                <th className="px-4 py-3 font-medium">Prix</th>
-                <th className="px-4 py-3 font-medium">Statut</th>
+                <th className="px-4 py-3 font-medium">{t("sa.formules.colPlan")}</th>
+                <th className="px-4 py-3 font-medium">{t("sa.formules.colDuration")}</th>
+                <th className="px-4 py-3 font-medium">{t("sa.formules.colPrice")}</th>
+                <th className="px-4 py-3 font-medium">{t("sa.formules.colStatus")}</th>
               </tr>
             </thead>
             <tbody>

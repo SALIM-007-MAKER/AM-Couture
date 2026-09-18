@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Wallet, Receipt, FileText, ChevronRight } from "lucide-react";
 import PageHeader from "../components/PageHeader.jsx";
 import Card from "../components/Card.jsx";
+import { useTranslation } from "../i18n/index.js";
 
 // Page d'accès rapide — existe uniquement pour donner à "Finances" une
 // destination unique en un clic depuis la bottom navigation mobile (voir
@@ -9,15 +10,16 @@ import Card from "../components/Card.jsx";
 // dans la sidebar desktop (Paiements/Dépenses/Reçus) : aucune nouvelle
 // donnée, aucune logique métier, juste des liens vers les pages existantes.
 const LIENS = [
-  { label: "Paiements", to: "/paiements", icon: Wallet, description: "Historique des encaissements, toutes commandes confondues." },
-  { label: "Dépenses", to: "/depenses", icon: Receipt, description: "Sorties d'argent de l'atelier (fournitures, loyer, etc.)." },
-  { label: "Reçus", to: "/recus", icon: FileText, description: "Reçus émis, à retrouver ou télécharger à nouveau." },
+  { labelKey: "nav.payments", to: "/paiements", icon: Wallet, descriptionKey: "ui.finances.paymentsDesc" },
+  { labelKey: "nav.expenses", to: "/depenses", icon: Receipt, descriptionKey: "ui.finances.expensesDesc" },
+  { labelKey: "nav.receipts", to: "/recus", icon: FileText, descriptionKey: "ui.finances.receiptsDesc" },
 ];
 
 export default function FinancesPage() {
+  const { t } = useTranslation();
   return (
     <div className="max-w-xl space-y-5">
-      <PageHeader icon={Wallet} title="Finances" subtitle="Accès rapide aux paiements, dépenses et reçus." />
+      <PageHeader icon={Wallet} title={t("nav.finances")} subtitle={t("ui.finances.subtitle")} />
 
       <div className="space-y-2">
         {LIENS.map((lien) => (
@@ -32,8 +34,8 @@ export default function FinancesPage() {
               <lien.icon className="size-5" aria-hidden="true" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-neutral-900 dark:text-neutral-100">{lien.label}</p>
-              <p className="text-sm text-neutral-500 truncate">{lien.description}</p>
+              <p className="font-medium text-neutral-900 dark:text-neutral-100">{t(lien.labelKey)}</p>
+              <p className="text-sm text-neutral-500 truncate">{t(lien.descriptionKey)}</p>
             </div>
             <ChevronRight className="size-4 text-neutral-400 shrink-0" aria-hidden="true" />
           </Card>

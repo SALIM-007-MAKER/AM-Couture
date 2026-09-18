@@ -27,6 +27,19 @@ function interpolate(str, vars) {
  * concernés (ex: "commande(s)") sont écrits directement ainsi dans les deux
  * dictionnaires plutôt que d'ajouter un moteur de règles pour si peu de cas.
  */
+/**
+ * Version hors-composant de t() — pour les libellés calculés hors rendu
+ * (constants.js : statuts, catégories, options de select...). Lit la langue
+ * courante dans le store à chaque appel ; App.jsx remonte l'arbre de routes
+ * (key={locale}) quand la langue change, donc aucun composant n'affiche un
+ * libellé périmé même sans appeler useTranslation().
+ */
+export function translate(key, vars) {
+  const locale = useLocaleStore.getState().locale;
+  const value = resolve(DICTIONARIES[locale], key) ?? resolve(DICTIONARIES.fr, key) ?? key;
+  return interpolate(value, vars);
+}
+
 export function useTranslation() {
   const locale = useLocaleStore((s) => s.locale);
   const setLocale = useLocaleStore((s) => s.setLocale);

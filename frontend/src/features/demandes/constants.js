@@ -1,11 +1,12 @@
 import { Clock, CheckCircle2, XCircle } from "lucide-react";
+import { translate } from "../../i18n/index.js";
 
 // Aligné sur l'enum Prisma StatutDemandeCommande (schema.prisma) —
 // présentation uniquement, même convention que statutLabel (commandes).
 export const STATUTS_DEMANDE = [
-  { value: "EN_ATTENTE", label: "En attente" },
-  { value: "ACCEPTEE", label: "Acceptée" },
-  { value: "REFUSEE", label: "Refusée" },
+  { value: "EN_ATTENTE", get label() { return translate("demStatut.EN_ATTENTE"); } },
+  { value: "ACCEPTEE", get label() { return translate("demStatut.ACCEPTEE"); } },
+  { value: "REFUSEE", get label() { return translate("demStatut.REFUSEE"); } },
 ];
 
 export const STATUT_DEMANDE_ICONS = {

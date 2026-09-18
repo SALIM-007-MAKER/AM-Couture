@@ -1,4 +1,5 @@
 import { Routes, Route } from "react-router-dom";
+import { useLocaleStore } from "./stores/localeStore.js";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 import PublicOnlyRoute from "./routes/PublicOnlyRoute.jsx";
 import { RequireAtelier, RequireSuperadmin, RequireClient } from "./routes/RoleGuards.jsx";
@@ -58,8 +59,12 @@ import ClientDemandesPage from "./features/moi/ClientDemandesPage.jsx";
 import ClientDemandeFormPage from "./features/moi/ClientDemandeFormPage.jsx";
 
 export default function App() {
+  // key={locale} : remonte les routes au changement de langue, pour que même
+  // les libellés calculés hors composant (translate(), voir i18n/index.js)
+  // se rafraîchissent partout.
+  const locale = useLocaleStore((s) => s.locale);
   return (
-    <Routes>
+    <Routes key={locale}>
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/inscription" element={<InscriptionAtelierPage />} />

@@ -24,17 +24,18 @@ function formStateFrom(article) {
 }
 
 export default function StockFormPage({ mode }) {
+  const { t } = useTranslation();
   const { id } = useParams();
   const isEdit = mode === "edit";
   const articleQuery = useArticleStockQuery(isEdit ? id : undefined);
 
-  if (isEdit && articleQuery.isPending) return <LoadingState label="Chargement de l'article…" />;
+  if (isEdit && articleQuery.isPending) return <LoadingState label={t("stockMore.loadingArticle")} />;
   if (isEdit && articleQuery.isError) return <ErrorState error={articleQuery.error} onRetry={articleQuery.refetch} />;
   // Un article archivé ne peut pas être modifié (règle backend, voir
   // stock.routes.js PATCH) — affiché clairement plutôt que de laisser
   // l'utilisateur remplir un formulaire pour se heurter à un 409.
   if (isEdit && articleQuery.data?.archivedAt) {
-    return <ErrorState error={new ApiError(409, "Cet article est archivé : restaurez-le avant de le modifier.")} />;
+    return <ErrorState error={new ApiError(409, t("stockMore.archivedError"))} />;
   }
 
   return <StockForm key={isEdit ? id : "create"} mode={mode} initial={isEdit ? articleQuery.data : undefined} />;
@@ -81,20 +82,20 @@ function StockForm({ mode, initial }) {
         <GlobalFormError error={mutation.error} />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Nom" required>
+          <Field label={t("stock.colNom")} required>
             <input required value={form.nom} onChange={(e) => update("nom", e.target.value)} className={inputClass} />
             <FieldError messages={details?.nom} />
           </Field>
-          <Field label="Catégorie">
+          <Field label={t("stock.colCategorie")}>
             <input
               value={form.categorie}
               onChange={(e) => update("categorie", e.target.value)}
-              placeholder="Tissu, fourniture..."
+              placeholder={t("stockMore.categoryPlaceholder")}
               className={inputClass}
             />
             <FieldError messages={details?.categorie} />
           </Field>
-          <Field label="Unité">
+          <Field label={t("stock.unite")}>
             <select value={form.unite} onChange={(e) => update("unite", e.target.value)} className={inputClass}>
               {UNITES_STOCK.map((u) => (
                 <option key={u.value} value={u.value}>
@@ -104,7 +105,7 @@ function StockForm({ mode, initial }) {
             </select>
             <FieldError messages={details?.unite} />
           </Field>
-          <Field label="Seuil d'alerte" hint="Notification quand la quantité descend à ce niveau ou en dessous.">
+          <Field label={t("stock.seuilAlerte")} hint={t("stockMore.alertThresholdHint")}>
             <input
               type="text"
               inputMode="decimal"
@@ -114,7 +115,7 @@ function StockForm({ mode, initial }) {
             />
             <FieldError messages={details?.seuilAlerte} />
           </Field>
-          <Field label="Prix unitaire">
+          <Field label={t("stock.prixUnitaire")}>
             <input
               type="text"
               inputMode="decimal"
@@ -125,7 +126,7 @@ function StockForm({ mode, initial }) {
             <FieldError messages={details?.prixUnitaire} />
           </Field>
           {!isEdit && (
-            <Field label="Quantité initiale" hint="Enregistrée comme premier mouvement (entrée).">
+            <Field label={t("stockMore.initialQty")} hint={t("stockMore.initialQtyHint")}>
               <input
                 type="text"
                 inputMode="decimal"
@@ -138,17 +139,17 @@ function StockForm({ mode, initial }) {
           )}
         </div>
 
-        <Field label="Notes">
+        <Field label={t("stock.notes")}>
           <textarea rows={3} value={form.notes} onChange={(e) => update("notes", e.target.value)} className={inputClass} />
           <FieldError messages={details?.notes} />
         </Field>
 
         <div className="flex gap-2 pt-1">
           <Button type="submit" variant="primary" icon={Save} loading={mutation.isPending}>
-            Enregistrer
+            {t("common.save")}
           </Button>
           <Button type="button" variant="secondary" icon={X} onClick={() => navigate(-1)}>
-            Annuler
+            {t("common.cancel")}
           </Button>
         </div>
       </Card>

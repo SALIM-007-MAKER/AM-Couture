@@ -1,15 +1,10 @@
 import { CalendarDays, ChevronDown } from "lucide-react";
+import { useTranslation } from "../i18n/index.js";
 
 // Reflète exactement PERIODES du backend (lib/period.js) — la résolution
 // réelle des bornes reste 100% côté serveur, ceci ne fait que construire les
 // paramètres `?period=` ou `?from=&to=` envoyés à l'API.
-const PERIODES = [
-  { value: "today", label: "Aujourd'hui" },
-  { value: "week", label: "Cette semaine" },
-  { value: "month", label: "Ce mois" },
-  { value: "quarter", label: "Ce trimestre" },
-  { value: "year", label: "Cette année" },
-];
+const PERIODES = ["today", "week", "month", "quarter", "year"];
 
 /**
  * `value` : { period?: string, from?: string, to?: string } — `from`/`to`
@@ -22,6 +17,7 @@ const PERIODES = [
  * value/onChange qu'avant : aucune page consommatrice à modifier.
  */
 export default function PeriodSelector({ value, onChange }) {
+  const { t } = useTranslation();
   const isCustom = Boolean(value.from || value.to);
   const selectValue = isCustom ? "custom" : (value.period ?? "month");
 
@@ -39,7 +35,7 @@ export default function PeriodSelector({ value, onChange }) {
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
-      <span className="text-sm text-neutral-500 hidden sm:inline">Période</span>
+      <span className="text-sm text-neutral-500 hidden sm:inline">{t("ui.period.label")}</span>
       <div className="relative">
         <CalendarDays
           className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-neutral-400 pointer-events-none"
@@ -51,11 +47,11 @@ export default function PeriodSelector({ value, onChange }) {
           className="appearance-none rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 pl-8 pr-7 py-1.5 text-sm font-medium text-neutral-900 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500"
         >
           {PERIODES.map((p) => (
-            <option key={p.value} value={p.value}>
-              {p.label}
+            <option key={p} value={p}>
+              {t("ui.period." + p)}
             </option>
           ))}
-          <option value="custom">Personnalisée</option>
+          <option value="custom">{t("ui.period.custom")}</option>
         </select>
         <ChevronDown
           className="absolute right-2.5 top-1/2 -translate-y-1/2 size-3.5 text-neutral-400 pointer-events-none"
@@ -71,7 +67,7 @@ export default function PeriodSelector({ value, onChange }) {
             onChange={(e) => setCustom({ from: e.target.value || undefined })}
             className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50"
           />
-          <span className="text-neutral-500">au</span>
+          <span className="text-neutral-500">{t("ui.period.to")}</span>
           <input
             type="date"
             value={value.to ?? ""}

@@ -2,7 +2,16 @@
 // les composants avant l'introduction de l'i18n (voir i18n/index.js), copié
 // ici sans reformulation. Toute nouvelle chaîne de l'app doit être ajoutée
 // ICI D'ABORD, jamais directement en dur dans un composant traduit.
+import shared from "./parts/shared.fr.js";
+import commandes from "./parts/commandes.fr.js";
+import clientes from "./parts/clientes.fr.js";
+import superadmin from "./parts/superadmin.fr.js";
+
 export default {
+  ...shared,
+  ...commandes,
+  ...clientes,
+  ...superadmin,
   common: {
     save: "Enregistrer",
     cancel: "Annuler",

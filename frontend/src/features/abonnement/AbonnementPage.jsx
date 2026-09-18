@@ -10,12 +10,14 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/QueryStat
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 // Essai gratuit (§ plan trial) — dérivé de GET /api/parametres
 // (atelier.trialEndsAt + essaiExpire, jamais recalculé côté client au-delà
 // d'un simple affichage). `trialEndsAt` absent (atelier "légataire", créé
 // avant cette fonctionnalité) -> rien n'est affiché, pas de section.
 function EssaiSection() {
+  const { t } = useTranslation();
   const { data: atelier } = useParametresQuery();
   if (!atelier?.trialEndsAt) return null;
 
@@ -33,8 +35,8 @@ function EssaiSection() {
     >
       <Hourglass className="size-4 shrink-0" aria-hidden="true" />
       {atelier.essaiExpire
-        ? `Essai gratuit terminé le ${formatDateFr(atelier.trialEndsAt)}.`
-        : `Essai gratuit — ${joursRestants} jour(s) restant(s) (jusqu'au ${formatDateFr(atelier.trialEndsAt)}).`}
+        ? t("abo.trialEnded", { date: formatDateFr(atelier.trialEndsAt) })
+        : t("abo.trialLeft", { jours: joursRestants, date: formatDateFr(atelier.trialEndsAt) })}
     </Card>
   );
 }
@@ -47,6 +49,7 @@ const STATUT_TONES = {
 };
 
 export default function AbonnementPage() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   // "succes"/"echec" : purement indicatif (redirection Wave, voir
   // success_url/error_url dans abonnements.routes.js) — jamais la source de
@@ -58,36 +61,35 @@ export default function AbonnementPage() {
 
   useEffect(() => {
     if (!paiement) return;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       const next = new URLSearchParams(searchParams);
       next.delete("paiement");
       setSearchParams(next, { replace: true });
     }, 6000);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
     // eslint-disable-next-line
   }, [paiement]);
 
   return (
     <div className="max-w-2xl space-y-6">
-      <PageHeader icon={CreditCard} title="Abonnement" subtitle="Accès de l'atelier à la plateforme Gestion d'Atelier." />
+      <PageHeader icon={CreditCard} title={t("nav.subscription")} subtitle={t("abo.subtitle")} />
 
       <EssaiSection />
 
       {paiement === "succes" && (
         <Card className="bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 text-sm">
-          Paiement Wave en cours de vérification — le statut ci-dessous se mettra à jour automatiquement dès
-          confirmation (jamais avant une vérification serveur fiable).
+          {t("abo.verifying")}
         </Card>
       )}
       {paiement === "echec" && (
         <Card className="bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-sm">
-          Paiement Wave annulé ou échoué — vous pouvez réessayer ci-dessous.
+          {t("abo.failed")}
         </Card>
       )}
 
       <div className="space-y-2">
-        <SectionTitle icon={Clock3}>Statut actuel</SectionTitle>
-        {actuelQuery.isPending && <LoadingState label="Chargement…" />}
+        <SectionTitle icon={Clock3}>{t("abo.currentStatus")}</SectionTitle>
+        {actuelQuery.isPending && <LoadingState label={t("common.loading")} />}
         {actuelQuery.isError && !isNotFound(actuelQuery.error) && (
           <ErrorState error={actuelQuery.error} onRetry={actuelQuery.refetch} />
         )}
@@ -97,39 +99,40 @@ export default function AbonnementPage() {
               {STATUT_ABONNEMENT_LABELS[actuelQuery.data.statutEffectif]}
             </p>
             <p className="text-sm text-neutral-600 dark:text-neutral-400">
-              Formule {actuelQuery.data.formule.nom} — {actuelQuery.data.prix} FCFA
+              {t("abo.planLine", { nom: actuelQuery.data.formule.nom, prix: actuelQuery.data.prix })}
             </p>
             {actuelQuery.data.dateExpiration && (
               <p className="text-xs text-neutral-500">
-                {actuelQuery.data.statutEffectif === "ACTIF" ? "Expire le " : "Expiré le "}
-                {formatDateFr(actuelQuery.data.dateExpiration)}
+                {actuelQuery.data.statutEffectif === "ACTIF"
+                  ? t("abo.expiresOn", { date: formatDateFr(actuelQuery.data.dateExpiration) })
+                  : t("abo.expiredOn", { date: formatDateFr(actuelQuery.data.dateExpiration) })}
               </p>
             )}
           </Card>
         )}
         {isNotFound(actuelQuery.error) && (
           <Card variant="outlined">
-            <p className="text-sm text-neutral-500">Aucun abonnement souscrit pour l'instant.</p>
+            <p className="text-sm text-neutral-500">{t("abo.none")}</p>
           </Card>
         )}
       </div>
 
       <div className="space-y-2">
-        <SectionTitle icon={CreditCard}>Souscrire / renouveler</SectionTitle>
+        <SectionTitle icon={CreditCard}>{t("abo.subscribeRenew")}</SectionTitle>
         <SouscrireCard />
       </div>
 
       <div className="space-y-2">
-        <SectionTitle icon={Clock3}>Paiements en attente de confirmation manuelle</SectionTitle>
+        <SectionTitle icon={Clock3}>{t("abo.pendingManual")}</SectionTitle>
         <TransactionsEnAttente />
       </div>
 
       <div className="space-y-2">
-        <SectionTitle icon={History}>Historique</SectionTitle>
-        {historiqueQuery.isPending && <LoadingState label="Chargement…" />}
+        <SectionTitle icon={History}>{t("abo.history")}</SectionTitle>
+        {historiqueQuery.isPending && <LoadingState label={t("common.loading")} />}
         {historiqueQuery.isError && <ErrorState error={historiqueQuery.error} onRetry={historiqueQuery.refetch} />}
         {historiqueQuery.data && historiqueQuery.data.data.length === 0 && (
-          <EmptyState icon={History}>Aucun abonnement pour l'instant.</EmptyState>
+          <EmptyState icon={History}>{t("abo.historyEmpty")}</EmptyState>
         )}
         {historiqueQuery.data && historiqueQuery.data.data.length > 0 && (
           <ul className="space-y-2">
@@ -143,8 +146,8 @@ export default function AbonnementPage() {
                     <p className="text-xs text-neutral-500 truncate">
                       {a.transactions
                         .map(
-                          (t) =>
-                            `${moyenPaiementInfo(t.moyenPaiement)?.label ?? t.moyenPaiement} : ${STATUT_TRANSACTION_LABELS[t.statut]}`,
+                          (trx) =>
+                            `${moyenPaiementInfo(trx.moyenPaiement)?.label ?? trx.moyenPaiement} : ${STATUT_TRANSACTION_LABELS[trx.statut]}`,
                         )
                         .join(" · ")}
                     </p>

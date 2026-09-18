@@ -1,11 +1,13 @@
 import { Loader2, AlertCircle, Inbox, RotateCcw } from "lucide-react";
 import { ApiError } from "../lib/apiClient.js";
+import { useTranslation } from "../i18n/index.js";
 
-export function LoadingState({ label = "Chargement…" }) {
+export function LoadingState({ label }) {
+  const { t } = useTranslation();
   return (
     <p className="flex items-center justify-center gap-2 text-sm text-neutral-500 py-8">
       <Loader2 className="size-4 animate-spin text-brand-500 dark:text-brand-400" aria-hidden="true" />
-      {label}
+      {label ?? t("common.loading")}
     </p>
   );
 }
@@ -13,7 +15,8 @@ export function LoadingState({ label = "Chargement…" }) {
 /** `error` vient directement de TanStack Query (donc de apiClient.ApiError) —
  * on affiche son message tel quel, jamais une nouvelle formulation inventée. */
 export function ErrorState({ error, onRetry }) {
-  const message = error instanceof ApiError ? error.message : "Une erreur est survenue.";
+  const { t } = useTranslation();
+  const message = error instanceof ApiError ? error.message : t("ui.errorGeneric");
   return (
     <div className="rounded-2xl bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 text-sm px-4 py-3 flex items-center justify-between gap-3 animate-fade-in">
       <span className="flex items-center gap-2">
@@ -27,7 +30,7 @@ export function ErrorState({ error, onRetry }) {
           className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-red-300 dark:border-red-800 px-2.5 py-1.5 text-xs font-medium hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
         >
           <RotateCcw className="size-3" aria-hidden="true" />
-          Réessayer
+          {t("ui.retry")}
         </button>
       )}
     </div>
@@ -55,6 +58,7 @@ export function FieldError({ messages }) {
 }
 
 export function GlobalFormError({ error }) {
+  const { t } = useTranslation();
   if (!error) return null;
   // Une erreur qui n'est pas une ApiError (requête réseau interrompue,
   // timeout, etc. — jamais vu en pratique avant l'upload d'images, dont les
@@ -65,7 +69,7 @@ export function GlobalFormError({ error }) {
     return (
       <p className="flex items-center gap-2 rounded-xl bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 text-sm px-3 py-2 animate-fade-in">
         <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
-        Une erreur est survenue. Vérifiez votre connexion et réessayez.
+        {t("ui.errorNetwork")}
       </p>
     );
   }

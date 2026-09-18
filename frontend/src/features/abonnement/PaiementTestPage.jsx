@@ -7,12 +7,13 @@ import { LoadingState, ErrorState, GlobalFormError } from "../../components/Quer
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 const RESULTATS = [
-  { value: "REUSSIE", label: "Simuler un paiement réussi", icon: CheckCircle2, variant: "primary" },
-  { value: "ECHOUEE", label: "Simuler un paiement échoué", icon: XCircle, variant: "danger" },
-  { value: "ANNULEE", label: "Simuler une annulation", icon: Ban, variant: "secondary" },
-  { value: "EXPIREE", label: "Simuler une expiration", icon: Hourglass, variant: "secondary" },
+  { value: "REUSSIE", labelKey: "abo.test.REUSSIE", icon: CheckCircle2, variant: "primary" },
+  { value: "ECHOUEE", labelKey: "abo.test.ECHOUEE", icon: XCircle, variant: "danger" },
+  { value: "ANNULEE", labelKey: "abo.test.ANNULEE", icon: Ban, variant: "secondary" },
+  { value: "EXPIREE", labelKey: "abo.test.EXPIREE", icon: Hourglass, variant: "secondary" },
 ];
 
 // Tient lieu de checkout Wave UNIQUEMENT en mode test (PAYMENTS_MODE=mock,
@@ -24,13 +25,14 @@ const RESULTATS = [
 // backend/src/lib/abonnement.js) — le comportement observé ici est donc
 // fidèle à ce qui se passera une fois les vraies clés API branchées.
 export default function PaiementTestPage() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
   const query = useTransactionQuery(id);
   const mutation = useSimulerMockMutation();
   const [resultatEnvoye, setResultatEnvoye] = useState(null);
 
-  if (query.isPending) return <LoadingState label="Chargement de la transaction…" />;
+  if (query.isPending) return <LoadingState label={t("abo.test.loading")} />;
   if (query.isError) return <ErrorState error={query.error} onRetry={query.refetch} />;
 
   const transaction = query.data;
@@ -43,11 +45,11 @@ export default function PaiementTestPage() {
       { id, resultat },
       {
         onSuccess: () => {
-          const t = setTimeout(
+          const timer = setTimeout(
             () => navigate(`/abonnement?paiement=${resultat === "REUSSIE" ? "succes" : "echec"}`, { replace: true }),
             1500,
           );
-          return () => clearTimeout(t);
+          return () => clearTimeout(timer);
         },
         onError: () => setResultatEnvoye(null),
       },
@@ -58,23 +60,23 @@ export default function PaiementTestPage() {
     <div className="max-w-lg space-y-6">
       <PageHeader
         icon={FlaskConical}
-        title="Paiement test"
-        subtitle={`Simulation ${info?.label ?? transaction.moyenPaiement} — aucun argent réel n'est déplacé.`}
+        title={t("abo.test.title")}
+        subtitle={t("abo.test.subtitle", { moyen: info?.label ?? transaction.moyenPaiement })}
       />
 
       <Card className="space-y-3 text-sm">
         <div className="flex items-center justify-between">
-          <span className="text-neutral-500">Formule</span>
+          <span className="text-neutral-500">{t("abo.test.plan")}</span>
           <span className="font-medium text-neutral-900 dark:text-neutral-100">{transaction.abonnement.formule.nom}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-neutral-500">Montant</span>
+          <span className="text-neutral-500">{t("dashboard.colMontant")}</span>
           <span className="font-medium tabular-nums text-neutral-900 dark:text-neutral-100">
             {transaction.montant} FCFA
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-neutral-500">Référence</span>
+          <span className="text-neutral-500">{t("abo.reference")}</span>
           <span className="font-mono text-xs text-neutral-500">{transaction.referenceInterne}</span>
         </div>
       </Card>
@@ -83,7 +85,7 @@ export default function PaiementTestPage() {
         <Card variant="outlined" className="space-y-3">
           <GlobalFormError error={mutation.error} />
           <p className="text-xs text-neutral-500">
-            Choisissez le résultat à simuler pour cette tentative de paiement.
+            {t("abo.test.choose")}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {RESULTATS.map((r) => (
@@ -95,14 +97,14 @@ export default function PaiementTestPage() {
                 disabled={mutation.isPending}
                 onClick={() => handleSimuler(r.value)}
               >
-                {r.label}
+                {t(r.labelKey)}
               </Button>
             ))}
           </div>
         </Card>
       ) : (
         <Card variant="outlined" className="text-sm text-neutral-600 dark:text-neutral-400">
-          Résultat simulé — redirection vers votre abonnement…
+          {t("abo.test.redirecting")}
         </Card>
       )}
     </div>

@@ -13,6 +13,7 @@ import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import { useTranslation } from "../../i18n/index.js";
+import { useLocaleStore } from "../../stores/localeStore.js";
 
 const TONE_CLASSES = {
   danger: "text-red-600 dark:text-red-400",
@@ -21,7 +22,7 @@ const TONE_CLASSES = {
 };
 
 function formatDateHeure(iso) {
-  return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 // Fusionne DEUX sources (voir GET /api/moi/notifications, moi.routes.js) :

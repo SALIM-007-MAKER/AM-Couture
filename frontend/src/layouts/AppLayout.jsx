@@ -177,7 +177,7 @@ function BottomNav() {
   const { t } = useTranslation();
   return (
     <nav
-      aria-label="Navigation principale"
+      aria-label={t("nav.mainNavigation")}
       className="md:hidden fixed inset-x-0 bottom-0 z-30 flex bg-white dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800 pb-[env(safe-area-inset-bottom)]"
     >
       {BOTTOM_NAV_ITEMS.map((item) => (
@@ -217,6 +217,7 @@ function BottomNav() {
 // encore chargée/configurée, on retombe sur un intitulé générique de
 // plateforme plutôt que sur le nom d'un atelier précis.
 function Logo({ collapsed, logoUrl, nom }) {
+  const { t } = useTranslation();
   return (
     <div
       className={`flex items-center gap-2 px-4 py-4 border-b border-neutral-200 dark:border-neutral-800 ${collapsed ? "justify-center px-0" : ""}`}
@@ -224,7 +225,7 @@ function Logo({ collapsed, logoUrl, nom }) {
       {logoUrl ? (
         <img
           src={logoUrl}
-          alt="Logo de l'atelier"
+          alt={t("nav.workshopLogoAlt")}
           className="size-8 shrink-0 rounded-lg object-contain bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 shadow-glow-brand"
         />
       ) : (
