@@ -5,6 +5,7 @@ import { useAbonnementActuelQuery, isNotFound } from "../features/abonnement/hoo
 import { formatDateFr } from "../features/abonnement/constants.js";
 import Card from "./Card.jsx";
 import Button from "./Button.jsx";
+import { useTranslation } from "../i18n/index.js";
 
 /**
  * Bannière d'essai gratuit du Dashboard (§ plan trial) — complète
@@ -24,6 +25,7 @@ import Button from "./Button.jsx";
  * compte à rebours d'essai gratuit.
  */
 export default function TrialBanner() {
+  const { t } = useTranslation();
   const { data: atelier } = useParametresQuery();
   const abonnementQuery = useAbonnementActuelQuery();
 
@@ -45,10 +47,10 @@ export default function TrialBanner() {
       >
         <span className="flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
           <Hourglass className="size-4 shrink-0" aria-hidden="true" />
-          Votre période d'essai est terminée. Veuillez choisir un abonnement pour continuer.
+          {t("trialBanner.expired")}
         </span>
         <Button as={Link} to="/abonnement" variant="secondary" size="sm">
-          Voir les abonnements
+          {t("trialBanner.viewSubscriptions")}
         </Button>
       </Card>
     );
@@ -63,8 +65,11 @@ export default function TrialBanner() {
       className="flex items-center gap-2 text-sm px-5 py-3 bg-gradient-to-r from-amber-500 to-amber-600 text-neutral-950 font-medium"
     >
       <Gift className="size-4 shrink-0" aria-hidden="true" />
-      Période d'essai gratuit — il vous reste {joursRestants} jour{joursRestants > 1 ? "s" : ""} d'utilisation
-      gratuite (jusqu'au {formatDateFr(atelier.trialEndsAt)}).
+      {t("trialBanner.active", {
+        jours: joursRestants,
+        plural: joursRestants > 1 ? "s" : "",
+        date: formatDateFr(atelier.trialEndsAt),
+      })}
     </Card>
   );
 }

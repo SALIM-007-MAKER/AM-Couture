@@ -5,22 +5,24 @@ import { modeLabel } from "../commandes/constants.js";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
 }
 
 export default function ClientPaiementsPage() {
+  const { t } = useTranslation();
   const query = useMesPaiementsQuery();
   const data = query.data?.data ?? [];
 
   return (
     <div className="max-w-2xl space-y-6">
-      <PageHeader icon={Wallet} title="Mes paiements" subtitle="Historique de vos encaissements, toutes commandes confondues." />
+      <PageHeader icon={Wallet} title={t("client.paiementsTitle")} subtitle={t("client.paiementsSubtitle")} />
 
-      {query.isPending && <LoadingState label="Chargement de vos paiements…" />}
+      {query.isPending && <LoadingState label={t("client.paiementsLoading")} />}
       {query.isError && <ErrorState error={query.error} onRetry={query.refetch} />}
-      {query.data && data.length === 0 && <EmptyState icon={Wallet}>Aucun paiement enregistré pour l'instant.</EmptyState>}
+      {query.data && data.length === 0 && <EmptyState icon={Wallet}>{t("client.paiementsEmpty")}</EmptyState>}
 
       {query.data && data.length > 0 && (
         <div className="space-y-2">

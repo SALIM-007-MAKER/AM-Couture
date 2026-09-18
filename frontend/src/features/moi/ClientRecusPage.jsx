@@ -6,22 +6,24 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/QueryStat
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
 }
 
 export default function ClientRecusPage() {
+  const { t } = useTranslation();
   const query = useMesRecusQuery();
   const data = query.data?.data ?? [];
 
   return (
     <div className="max-w-2xl space-y-6">
-      <PageHeader icon={FileText} title="Mes reçus" subtitle="Documents émis pour vos paiements et commandes." />
+      <PageHeader icon={FileText} title={t("client.recusTitle")} subtitle={t("client.recusSubtitle")} />
 
-      {query.isPending && <LoadingState label="Chargement de vos reçus…" />}
+      {query.isPending && <LoadingState label={t("client.recusLoading")} />}
       {query.isError && <ErrorState error={query.error} onRetry={query.refetch} />}
-      {query.data && data.length === 0 && <EmptyState icon={FileText}>Aucun reçu pour l'instant.</EmptyState>}
+      {query.data && data.length === 0 && <EmptyState icon={FileText}>{t("client.recusEmpty")}</EmptyState>}
 
       {query.data && data.length > 0 && (
         <div className="space-y-2">

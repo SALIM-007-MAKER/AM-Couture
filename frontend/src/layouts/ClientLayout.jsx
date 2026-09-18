@@ -3,6 +3,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { Scissors, User, Ruler, ClipboardList, Wallet, FileText, Inbox, Bell, Menu, LogOut } from "lucide-react";
 import { useLogoutMutation } from "../hooks/useAuth.js";
 import { useMonProfilQuery, useMesNombreNonLuesQuery } from "../features/moi/hooks.js";
+import { useTranslation } from "../i18n/index.js";
 
 // Espace client final (§ plan rôle USER, Phase 3) — mêmes conventions que
 // AppLayout.jsx : 5 destinations principales dans la barre du bas (mobile)
@@ -11,26 +12,27 @@ import { useMonProfilQuery, useMesNombreNonLuesQuery } from "../features/moi/hoo
 // AppLayout — voir NotificationBell), et un tiroir "Plus" pour le reste
 // (ici, seulement Reçus — moins consulté que les autres destinations).
 const NAV_ITEMS = [
-  { label: "Profil", to: "/client", icon: User, end: true },
-  { label: "Commandes", to: "/client/commandes", icon: ClipboardList },
-  { label: "Mesures", to: "/client/mesures", icon: Ruler },
-  { label: "Paiements", to: "/client/paiements", icon: Wallet },
-  { label: "Demandes", to: "/client/demandes", icon: Inbox },
+  { labelKey: "nav.profile", to: "/client", icon: User, end: true },
+  { labelKey: "nav.orders", to: "/client/commandes", icon: ClipboardList },
+  { labelKey: "nav.measurements", to: "/client/mesures", icon: Ruler },
+  { labelKey: "nav.payments", to: "/client/paiements", icon: Wallet },
+  { labelKey: "nav.requests", to: "/client/demandes", icon: Inbox },
 ];
 
-const DRAWER_ITEMS = [{ label: "Reçus", to: "/client/recus", icon: FileText }];
+const DRAWER_ITEMS = [{ labelKey: "nav.receipts", to: "/client/recus", icon: FileText }];
 
 // `nom`/`logoUrl` viennent de l'atelier DONT LE CLIENT CONNECTÉ EST CLIENT —
 // exposés via GET /api/moi (voir moi.routes.js), le seul endpoint accessible
 // à un USER : /api/parametres est réservé ADMIN (requireAtelier). Même
 // repli que Logo (AppLayout.jsx) tant que non chargé/configuré.
 function Logo({ logoUrl, nom }) {
+  const { t } = useTranslation();
   return (
     <>
       {logoUrl ? (
         <img
           src={logoUrl}
-          alt="Logo de l'atelier"
+          alt={t("nav.workshopLogoAlt")}
           className="size-8 shrink-0 rounded-lg object-contain bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-800"
         />
       ) : (
@@ -39,7 +41,7 @@ function Logo({ logoUrl, nom }) {
         </span>
       )}
       <span className="text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 truncate">
-        {nom || "Espace client"}
+        {nom || t("nav.clientSpaceFallback")}
       </span>
     </>
   );
@@ -50,13 +52,14 @@ function Logo({ logoUrl, nom }) {
 // ADMIN (NotificationBell, AppLayout.jsx). isPending/isError ignorés
 // volontairement : un compteur absent reste un détail décoratif.
 function NotificationBell() {
+  const { t } = useTranslation();
   const { data } = useMesNombreNonLuesQuery();
   const count = data?.count ?? 0;
   return (
     <NavLink
       to="/client/notifications"
       className="relative rounded-lg p-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-      aria-label={count > 0 ? `${count} notifications non lues` : "Notifications"}
+      aria-label={count > 0 ? t("nav.unreadNotifications", { count }) : t("nav.notifications")}
     >
       <Bell className="size-4" aria-hidden="true" />
       {count > 0 && (
@@ -69,6 +72,7 @@ function NotificationBell() {
 }
 
 export default function ClientLayout() {
+  const { t } = useTranslation();
   const logoutMutation = useLogoutMutation();
   const [drawerOpen, setDrawerOpen] = useState(false);
   // isPending/isError ignorés volontairement : le logo est un détail
@@ -86,7 +90,7 @@ export default function ClientLayout() {
             type="button"
             onClick={() => setDrawerOpen(true)}
             className="md:hidden rounded-lg p-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
-            aria-label="Ouvrir le menu"
+            aria-label={t("nav.openMenu")}
           >
             <Menu className="size-4" aria-hidden="true" />
           </button>
@@ -99,10 +103,10 @@ export default function ClientLayout() {
             onClick={() => logoutMutation.mutate()}
             disabled={logoutMutation.isPending}
             className="inline-flex items-center gap-1.5 text-sm rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
-            title="Se déconnecter"
+            title={t("nav.logout")}
           >
             <LogOut className="size-3.5" aria-hidden="true" />
-            <span className="hidden sm:inline">Se déconnecter</span>
+            <span className="hidden sm:inline">{t("nav.logout")}</span>
           </button>
         </div>
       </header>
@@ -126,7 +130,7 @@ export default function ClientLayout() {
             }
           >
             <item.icon className="size-4" aria-hidden="true" />
-            {item.label}
+            {t(item.labelKey)}
           </NavLink>
         ))}
       </nav>
@@ -135,7 +139,7 @@ export default function ClientLayout() {
           monté pour pouvoir animer l'ouverture/fermeture). */}
       <button
         type="button"
-        aria-label="Fermer le menu"
+        aria-label={t("nav.closeMenu")}
         tabIndex={drawerOpen ? 0 : -1}
         onClick={() => setDrawerOpen(false)}
         className={`md:hidden fixed inset-0 z-40 bg-black/40 transition-opacity duration-200 ${
@@ -166,7 +170,7 @@ export default function ClientLayout() {
               }
             >
               <item.icon className="size-4 shrink-0" aria-hidden="true" />
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           ))}
         </nav>
@@ -177,7 +181,7 @@ export default function ClientLayout() {
       </main>
 
       <nav
-        aria-label="Navigation principale"
+        aria-label={t("nav.mainNavigation")}
         className="md:hidden fixed inset-x-0 bottom-0 z-30 flex bg-white dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800 pb-[env(safe-area-inset-bottom)]"
       >
         {NAV_ITEMS.map((item) => (
@@ -202,7 +206,7 @@ export default function ClientLayout() {
                 >
                   <item.icon className="size-5" aria-hidden="true" />
                 </span>
-                {item.label}
+                {t(item.labelKey)}
               </>
             )}
           </NavLink>

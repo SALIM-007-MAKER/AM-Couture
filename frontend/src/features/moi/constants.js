@@ -5,15 +5,18 @@ import { ClipboardList, RefreshCw, Ban, Wallet, PackageCheck, FileText, CheckCir
 // Contrairement à features/notifications/constants.js (côté ADMIN), pas de
 // fonction de message : le texte est déjà figé côté backend au moment de
 // l'événement (voir lib/notificationsClient.js), jamais recalculé ici.
-export const NOTIFICATION_CLIENT_LABELS = {
-  COMMANDE_CREEE: "Commande enregistrée",
-  COMMANDE_STATUT_CHANGE: "Mise à jour",
-  COMMANDE_ANNULEE: "Commande annulée",
-  PAIEMENT_ENREGISTRE: "Paiement",
-  LIVRAISON_ENREGISTREE: "Livraison",
-  RECU_EMIS: "Reçu",
-  DEMANDE_ACCEPTEE: "Demande acceptée",
-  DEMANDE_REFUSEE: "Demande refusée",
+// Clés i18n (voir i18n/fr.js "notificationsClient") plutôt que des libellés
+// en dur, résolues via t() côté composant — même convention que labelKey
+// (AppLayout.jsx).
+export const NOTIFICATION_CLIENT_LABEL_KEYS = {
+  COMMANDE_CREEE: "notificationsClient.COMMANDE_CREEE",
+  COMMANDE_STATUT_CHANGE: "notificationsClient.COMMANDE_STATUT_CHANGE",
+  COMMANDE_ANNULEE: "notificationsClient.COMMANDE_ANNULEE",
+  PAIEMENT_ENREGISTRE: "notificationsClient.PAIEMENT_ENREGISTRE",
+  LIVRAISON_ENREGISTREE: "notificationsClient.LIVRAISON_ENREGISTREE",
+  RECU_EMIS: "notificationsClient.RECU_EMIS",
+  DEMANDE_ACCEPTEE: "notificationsClient.DEMANDE_ACCEPTEE",
+  DEMANDE_REFUSEE: "notificationsClient.DEMANDE_REFUSEE",
 };
 
 export const NOTIFICATION_CLIENT_ICONS = {

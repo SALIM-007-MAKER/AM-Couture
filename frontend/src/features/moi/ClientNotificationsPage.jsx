@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { Bell, Check } from "lucide-react";
 import { useMesNotificationsQuery, useMarquerNotificationLuMutation } from "./hooks.js";
-import { NOTIFICATION_CLIENT_LABELS, NOTIFICATION_CLIENT_ICONS, NOTIFICATION_CLIENT_TONES } from "./constants.js";
+import { NOTIFICATION_CLIENT_LABEL_KEYS, NOTIFICATION_CLIENT_ICONS, NOTIFICATION_CLIENT_TONES } from "./constants.js";
 import {
   NOTIFICATION_LABELS,
   NOTIFICATION_ICONS,
@@ -12,6 +12,7 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/QueryStat
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 const TONE_CLASSES = {
   danger: "text-red-600 dark:text-red-400",
@@ -29,17 +30,18 @@ function formatDateHeure(iso) {
 // d'activité — commande créée, paiement, demande acceptée/refusée...,
 // marquable lu, propre au client).
 export default function ClientNotificationsPage() {
+  const { t } = useTranslation();
   const query = useMesNotificationsQuery();
   const marquerLuMutation = useMarquerNotificationLuMutation();
   const data = query.data?.data ?? [];
 
   return (
     <div className="max-w-2xl space-y-6">
-      <PageHeader icon={Bell} title="Notifications" subtitle="Tout ce qui se passe entre vous et votre atelier." />
+      <PageHeader icon={Bell} title={t("nav.notifications")} subtitle={t("client.notificationsSubtitle")} />
 
-      {query.isPending && <LoadingState label="Chargement des notifications…" />}
+      {query.isPending && <LoadingState label={t("client.notificationsLoading")} />}
       {query.isError && <ErrorState error={query.error} onRetry={query.refetch} />}
-      {query.data && data.length === 0 && <EmptyState icon={Bell}>Aucune notification pour l'instant.</EmptyState>}
+      {query.data && data.length === 0 && <EmptyState icon={Bell}>{t("client.notificationsEmpty")}</EmptyState>}
 
       {query.data && data.length > 0 && (
         <ul className="space-y-2">
@@ -47,7 +49,7 @@ export default function ClientNotificationsPage() {
             const estEvenement = notif.source === "evenement";
             const Icon = estEvenement ? NOTIFICATION_CLIENT_ICONS[notif.type] : NOTIFICATION_ICONS[notif.type];
             const tone = TONE_CLASSES[estEvenement ? NOTIFICATION_CLIENT_TONES[notif.type] : NOTIFICATION_TONES[notif.type]];
-            const label = estEvenement ? NOTIFICATION_CLIENT_LABELS[notif.type] : NOTIFICATION_LABELS[notif.type];
+            const label = estEvenement ? t(NOTIFICATION_CLIENT_LABEL_KEYS[notif.type]) : NOTIFICATION_LABELS[notif.type];
             const message = estEvenement ? notif.message : notificationMessage(notif);
             return (
               <li key={notif.id}>
@@ -77,7 +79,7 @@ export default function ClientNotificationsPage() {
                       loading={marquerLuMutation.isPending && marquerLuMutation.variables?.id === notif.id}
                       onClick={() => marquerLuMutation.mutate({ id: notif.id, lu: true })}
                     >
-                      Lu
+                      {t("client.marquerLu")}
                     </Button>
                   )}
                 </Card>

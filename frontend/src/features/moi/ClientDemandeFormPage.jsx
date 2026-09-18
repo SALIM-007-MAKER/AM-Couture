@@ -8,6 +8,7 @@ import { Field, inputClass } from "../../components/FormField.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 // Propose une PROPOSITION de nouvelle commande à l'atelier — jamais de prix,
 // de dates ni de choix de modèle du catalogue acceptés ici (voir
@@ -15,6 +16,7 @@ import Button from "../../components/Button.jsx";
 // l'atelier revient vers vous pour discuter des détails avant de créer la
 // commande réelle.
 export default function ClientDemandeFormPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const mutation = useCreerDemandeMutation();
   const [description, setDescription] = useState("");
@@ -30,24 +32,24 @@ export default function ClientDemandeFormPage() {
 
   return (
     <div className="max-w-lg space-y-6">
-      <PageHeader icon={Inbox} title="Nouvelle demande" subtitle="Décrivez ce que vous souhaitez commander — l'atelier vous recontactera." />
+      <PageHeader icon={Inbox} title={t("client.nouvelleDemandeTitle")} subtitle={t("client.nouvelleDemandeSubtitle")} />
 
       <Card>
         <form onSubmit={handleSubmit} className="space-y-4">
           <GlobalFormError error={mutation.error} />
-          <Field label="Description" hint="Type de vêtement, tissu, occasion, délai souhaité…">
+          <Field label={t("client.fieldDescription")} hint={t("client.descriptionHint")}>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={5}
               maxLength={2000}
               className={inputClass}
-              placeholder="Ex : Un boubou pour un mariage, en bazin bleu, avant fin du mois."
+              placeholder={t("client.descriptionPlaceholder")}
             />
             <FieldError messages={details?.description} />
           </Field>
           <Button type="submit" variant="primary" icon={Send} loading={mutation.isPending}>
-            Envoyer la demande
+            {t("client.envoyerDemande")}
           </Button>
         </form>
       </Card>

@@ -6,12 +6,14 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/QueryStat
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
 }
 
 export default function ClientDemandesPage() {
+  const { t } = useTranslation();
   const query = useMesDemandesQuery();
   const data = query.data?.data ?? [];
 
@@ -19,18 +21,18 @@ export default function ClientDemandesPage() {
     <div className="max-w-2xl space-y-6">
       <PageHeader
         icon={Inbox}
-        title="Mes demandes"
-        subtitle="Vos propositions de nouvelle commande envoyées à l'atelier."
+        title={t("client.demandesTitle")}
+        subtitle={t("client.demandesSubtitle")}
         actions={
           <Button as={Link} to="/client/demandes/nouvelle" variant="primary" icon={Plus}>
-            Nouvelle demande
+            {t("client.nouvelleDemande")}
           </Button>
         }
       />
 
-      {query.isPending && <LoadingState label="Chargement de vos demandes…" />}
+      {query.isPending && <LoadingState label={t("client.demandesLoading")} />}
       {query.isError && <ErrorState error={query.error} onRetry={query.refetch} />}
-      {query.data && data.length === 0 && <EmptyState icon={Inbox}>Vous n'avez encore envoyé aucune demande.</EmptyState>}
+      {query.data && data.length === 0 && <EmptyState icon={Inbox}>{t("client.demandesEmpty")}</EmptyState>}
 
       {query.data && data.length > 0 && (
         <div className="space-y-3">
@@ -41,16 +43,16 @@ export default function ClientDemandesPage() {
                 <span className="text-xs text-neutral-400">{formatDate(demande.createdAt)}</span>
               </div>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                {demande.modele ? `Modèle souhaité : ${demande.modele.nom}. ` : ""}
-                {demande.description || "Aucune description fournie."}
+                {demande.modele ? t("client.modeleSouhaite", { nom: demande.modele.nom }) : ""}
+                {demande.description || t("client.aucuneDescription")}
               </p>
               {demande.statut === "ACCEPTEE" && demande.commande && (
                 <Link to={`/client/commandes/${demande.commande.id}`} className="text-sm font-medium hover:underline">
-                  Voir la commande {demande.commande.numero} →
+                  {t("client.voirCommandeFleche", { numero: demande.commande.numero })}
                 </Link>
               )}
               {demande.statut === "REFUSEE" && demande.motifRefus && (
-                <p className="text-sm text-neutral-500">Motif : {demande.motifRefus}</p>
+                <p className="text-sm text-neutral-500">{t("client.motifRefus", { motif: demande.motifRefus })}</p>
               )}
             </Card>
           ))}

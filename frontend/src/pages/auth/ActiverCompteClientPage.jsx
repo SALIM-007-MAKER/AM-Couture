@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { Scissors, Lock, Eye, EyeOff, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useActiverCompteClientMutation } from "../../hooks/useAuth.js";
 import { GlobalFormError } from "../../components/QueryState.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 // Dernière étape de l'invitation envoyée par l'ADMIN (voir
 // InviterClientButton.jsx et POST /clientes/:id/inviter) — atteinte depuis
@@ -16,6 +17,7 @@ import { GlobalFormError } from "../../components/QueryState.jsx";
 const NOM_PLATEFORME = "Gestion d'Atelier";
 
 export default function ActiverCompteClientPage() {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const navigate = useNavigate();
@@ -31,7 +33,7 @@ export default function ActiverCompteClientPage() {
     e.preventDefault();
     setConfirmationError("");
     if (nouveauMotDePasse !== confirmation) {
-      setConfirmationError("La confirmation ne correspond pas au mot de passe.");
+      setConfirmationError(t("activation.confirmMismatch"));
       return;
     }
     mutation.mutate(
@@ -56,26 +58,26 @@ export default function ActiverCompteClientPage() {
 
         <div className="w-full rounded-3xl bg-neutral-900/70 backdrop-blur-xl border border-white/10 shadow-2xl p-6 space-y-5">
           <div className="text-center space-y-1.5">
-            <h1 className="text-2xl font-semibold tracking-tight text-white">Activer mon compte</h1>
-            <p className="text-sm text-neutral-400">Choisissez votre mot de passe pour accéder à votre espace client.</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-white">{t("activation.heading")}</h1>
+            <p className="text-sm text-neutral-400">{t("activation.subtitle")}</p>
           </div>
 
           {!token ? (
             <p className="flex items-start gap-2 rounded-xl bg-red-950/60 text-red-300 text-sm px-3 py-3">
               <AlertTriangle className="size-4 shrink-0 mt-0.5" aria-hidden="true" />
-              Lien invalide — aucun jeton fourni. Demandez un nouveau lien à votre atelier.
+              {t("activation.invalidLink")}
             </p>
           ) : mutation.isSuccess ? (
             <p className="flex items-start gap-2 rounded-xl bg-green-950/60 text-green-300 text-sm px-3 py-3 animate-fade-in">
               <CheckCircle2 className="size-4 shrink-0 mt-0.5" aria-hidden="true" />
-              Compte activé — redirection vers votre espace…
+              {t("activation.success")}
             </p>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <GlobalFormError error={mutation.error} />
               <div className="space-y-1.5">
                 <label htmlFor="nouveauMotDePasse" className="text-sm font-medium text-neutral-300">
-                  Mot de passe
+                  {t("activation.password")}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -88,13 +90,13 @@ export default function ActiverCompteClientPage() {
                     value={nouveauMotDePasse}
                     onChange={(e) => setNouveauMotDePasse(e.target.value)}
                     className={`${darkInputClass} pr-10`}
-                    placeholder="8 caractères minimum"
+                    placeholder={t("activation.passwordPlaceholder")}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((s) => !s)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors"
-                    aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                    aria-label={showPassword ? t("login.hidePassword") : t("login.showPassword")}
                   >
                     {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
                   </button>
@@ -102,7 +104,7 @@ export default function ActiverCompteClientPage() {
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="confirmation" className="text-sm font-medium text-neutral-300">
-                  Confirmer le mot de passe
+                  {t("activation.confirmPassword")}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-neutral-500" aria-hidden="true" />
@@ -124,7 +126,7 @@ export default function ActiverCompteClientPage() {
                 disabled={mutation.isPending}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-neutral-950 text-sm font-semibold py-2.5 shadow-lg shadow-amber-900/30 transition disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98]"
               >
-                {mutation.isPending ? "Activation…" : "Activer mon compte"}
+                {mutation.isPending ? t("activation.submitting") : t("activation.submit")}
                 {!mutation.isPending && <ArrowRight className="size-4" aria-hidden="true" />}
               </button>
             </form>

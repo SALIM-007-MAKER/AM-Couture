@@ -11,6 +11,7 @@ import Button from "../../components/Button.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
 import CommandeStatutBadge from "../commandes/components/CommandeStatutBadge.jsx";
 import PaiementStatutBadge from "../commandes/components/PaiementStatutBadge.jsx";
+import { useTranslation } from "../../i18n/index.js";
 
 function categorieLabelLocal(value) {
   return CATEGORIES_VETEMENT.find((c) => c.value === value)?.label ?? value;
@@ -38,10 +39,11 @@ function InfoRow({ label, value }) {
 // (GenererRecuButton plus bas) — ne crée qu'un document à partir de données
 // déjà existantes, jamais une écriture métier.
 export default function ClientCommandeDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const query = useMaCommandeQuery(id);
 
-  if (query.isPending) return <LoadingState label="Chargement de la commande…" />;
+  if (query.isPending) return <LoadingState label={t("client.commandeDetailLoading")} />;
   if (query.isError) return <ErrorState error={query.error} onRetry={query.refetch} />;
 
   const commande = query.data;
@@ -61,23 +63,23 @@ export default function ClientCommandeDetailPage() {
       />
 
       <div className="space-y-2">
-        <SectionTitle icon={Shirt}>Détails</SectionTitle>
+        <SectionTitle icon={Shirt}>{t("client.sectionDetails")}</SectionTitle>
         <Card className="text-sm space-y-3">
           {commande.modele ? (
             <p className="font-medium text-neutral-900 dark:text-neutral-100">{commande.modele.nom}</p>
           ) : (
-            <p className="text-neutral-500">Aucun modèle du catalogue associé — commande sur mesure directe.</p>
+            <p className="text-neutral-500">{t("client.commandeSansModeleLong")}</p>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
-            <InfoRow label="Type" value={categorieLabelLocal(commande.typeVetement)} />
-            <InfoRow label="Couleur" value={commande.couleur} />
-            <InfoRow label="Tissu" value={commande.tissu} />
-            <InfoRow label="Date de commande" value={formatDate(commande.dateCommande)} />
-            <InfoRow label="Livraison prévue" value={formatDate(commande.dateLivraisonPrevue)} />
+            <InfoRow label={t("client.fieldType")} value={categorieLabelLocal(commande.typeVetement)} />
+            <InfoRow label={t("client.fieldCouleur")} value={commande.couleur} />
+            <InfoRow label={t("client.fieldTissu")} value={commande.tissu} />
+            <InfoRow label={t("client.fieldDateCommande")} value={formatDate(commande.dateCommande)} />
+            <InfoRow label={t("client.fieldLivraisonPrevue")} value={formatDate(commande.dateLivraisonPrevue)} />
           </div>
           {commande.description && (
             <div>
-              <p className="text-neutral-500 text-xs mb-0.5">Description</p>
+              <p className="text-neutral-500 text-xs mb-0.5">{t("client.fieldDescription")}</p>
               <p className="text-neutral-900 dark:text-neutral-100 whitespace-pre-wrap">{commande.description}</p>
             </div>
           )}
@@ -85,18 +87,18 @@ export default function ClientCommandeDetailPage() {
       </div>
 
       <div className="space-y-2">
-        <SectionTitle icon={Banknote}>Finances</SectionTitle>
+        <SectionTitle icon={Banknote}>{t("client.sectionFinances")}</SectionTitle>
         <Card className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-center">
           <div>
-            <p className="text-neutral-500 text-xs">Prix total</p>
+            <p className="text-neutral-500 text-xs">{t("client.prixTotal")}</p>
             <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">{commande.prixTotal}</p>
           </div>
           <div>
-            <p className="text-neutral-500 text-xs">Payé</p>
+            <p className="text-neutral-500 text-xs">{t("client.paye")}</p>
             <p className="text-lg font-semibold tabular-nums text-green-600 dark:text-green-400 mt-0.5">{commande.totalPaye}</p>
           </div>
           <div>
-            <p className="text-neutral-500 text-xs">Reste à payer</p>
+            <p className="text-neutral-500 text-xs">{t("client.resteAPayer")}</p>
             <p className="text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-100 mt-0.5">{commande.solde}</p>
           </div>
         </Card>
@@ -104,9 +106,9 @@ export default function ClientCommandeDetailPage() {
       </div>
 
       <div className="space-y-2">
-        <SectionTitle icon={Wallet}>Paiements</SectionTitle>
+        <SectionTitle icon={Wallet}>{t("client.sectionPaiements")}</SectionTitle>
         {commande.paiements.length === 0 ? (
-          <p className="text-sm text-neutral-500">Aucun paiement enregistré pour l'instant.</p>
+          <p className="text-sm text-neutral-500">{t("client.aucunPaiement")}</p>
         ) : (
           <div className="space-y-2">
             {commande.paiements.map((p) => (
@@ -122,14 +124,14 @@ export default function ClientCommandeDetailPage() {
       </div>
 
       <div className="space-y-2">
-        <SectionTitle icon={Truck}>Livraisons</SectionTitle>
+        <SectionTitle icon={Truck}>{t("client.sectionLivraisons")}</SectionTitle>
         {commande.livraisons.length === 0 ? (
-          <p className="text-sm text-neutral-500">Aucune livraison enregistrée pour l'instant.</p>
+          <p className="text-sm text-neutral-500">{t("client.aucuneLivraison")}</p>
         ) : (
           <div className="space-y-2">
             {commande.livraisons.map((l) => (
               <Card key={l.id} variant="outlined" className="text-sm">
-                <p className="text-neutral-900 dark:text-neutral-100">Livrée le {formatDate(l.dateLivraison)}</p>
+                <p className="text-neutral-900 dark:text-neutral-100">{t("client.livreeLe", { date: formatDate(l.dateLivraison) })}</p>
               </Card>
             ))}
           </div>
@@ -144,14 +146,15 @@ export default function ClientCommandeDetailPage() {
 // document, jamais pour modifier quoi que ce soit. Même repli "un seul
 // bouton, une carte de résultat" que InviterClientButton.jsx (côté ADMIN).
 function GenererRecuButton({ commandeId }) {
+  const { t } = useTranslation();
   const mutation = useGenererRecuMutation(commandeId);
 
   if (mutation.data) {
     return (
       <Card variant="outlined" className="flex items-center justify-between gap-3 text-sm">
-        <span className="text-green-700 dark:text-green-400">Reçu {mutation.data.numero} généré.</span>
+        <span className="text-green-700 dark:text-green-400">{t("client.recuGenere", { numero: mutation.data.numero })}</span>
         <Button as="a" href={recuPdfUrl(mutation.data.id)} target="_blank" rel="noreferrer" variant="secondary" size="sm" icon={Download}>
-          Télécharger
+          {t("client.telecharger")}
         </Button>
       </Card>
     );
@@ -161,7 +164,7 @@ function GenererRecuButton({ commandeId }) {
     <div className="space-y-2">
       <GlobalFormError error={mutation.error} />
       <Button variant="secondary" size="sm" icon={FileText} loading={mutation.isPending} onClick={() => mutation.mutate()}>
-        Générer un reçu
+        {t("client.genererRecu")}
       </Button>
     </div>
   );
