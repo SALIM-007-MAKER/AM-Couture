@@ -69,8 +69,8 @@ export default {
       trialMark: "(essai)",
     },
     plans: {
-      title: "Plans d'abonnement",
-      subtitle: "Formules proposées aux ateliers, avec leur prix mensuel et leurs fonctionnalités.",
+      title: "Tarification des abonnements",
+      subtitle: "Définissez les plans proposés aux ateliers : prix mensuel et fonctionnalités incluses.",
       newPlan: "Nouveau plan",
       loading: "Chargement des plans…",
       empty: "Aucun plan pour l'instant.",

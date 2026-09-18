@@ -5,7 +5,7 @@ export default {
       overview: "Overview",
       workshops: "Workshops",
       subscriptions: "Subscriptions",
-      pricing: "Plans",
+      pricing: "Pricing",
       platformName: "Workshop Manager",
       role: "Superadmin",
     },

@@ -68,8 +68,8 @@ export default {
       trialMark: "(trial)",
     },
     plans: {
-      title: "Subscription plans",
-      subtitle: "Plans offered to workshops, with their monthly price and included features.",
+      title: "Subscription pricing",
+      subtitle: "Define the plans offered to workshops: monthly price and included features.",
       newPlan: "New plan",
       loading: "Loading plans…",
       empty: "No plans yet.",

@@ -5,7 +5,7 @@ export default {
       overview: "Vue d'ensemble",
       workshops: "Ateliers",
       subscriptions: "Abonnements",
-      pricing: "Plans",
+      pricing: "Tarification",
       platformName: "Gestion d'Atelier",
       role: "Superadmin",
     },
