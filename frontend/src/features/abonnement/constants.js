@@ -23,3 +23,10 @@ export function formatDateFr(iso) {
 export function formatPrix(prix) {
   return Number(prix).toLocaleString(dateLocale(), { maximumFractionDigits: 2 });
 }
+
+// Lien de contact WhatsApp (wa.me) — SIMPLE lien, jamais une action d'achat :
+// `numero` = chiffres avec indicatif (réglé par le SUPERADMIN), `message` =
+// texte prérempli sans donnée personnelle.
+export function lienWhatsapp(numero, message) {
+  return `https://wa.me/${numero}?text=${encodeURIComponent(message)}`;
+}

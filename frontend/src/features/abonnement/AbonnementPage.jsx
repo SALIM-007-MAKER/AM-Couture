@@ -1,4 +1,5 @@
-import { CreditCard, Clock3, Gift, Layers, Info, MessageCircle } from "lucide-react";
+import { useState } from "react";
+import { CreditCard, Clock3, Gift, Layers } from "lucide-react";
 import { useEtatAbonnementQuery, usePlansQuery } from "./hooks.js";
 import { formatDateFr, formatPrix } from "./constants.js";
 import StatutAbonnementBadge from "./components/StatutAbonnementBadge.jsx";
@@ -7,7 +8,10 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/QueryStat
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
-import Button from "../../components/Button.jsx";
+import DureeSelector from "./components/DureeSelector.jsx";
+import PlansIncluded from "./components/PlansIncluded.jsx";
+import PlansFaq from "./components/PlansFaq.jsx";
+import ContactBanner from "./components/ContactBanner.jsx";
 import { useTranslation } from "../../i18n/index.js";
 
 function InfoRow({ label, value }) {
@@ -32,9 +36,18 @@ export default function AbonnementPage() {
   const abonnement = etat?.abonnement;
   const essai = etat?.essai;
   const whatsapp = etat?.contact?.whatsapp;
+  const plans = plansQuery.data ?? [];
+
+  // Durées proposées = union des tarifs de tous les plans (données serveur).
+  // Par défaut : la durée de l'abonnement actif si elle existe, sinon la plus courte.
+  const durees = [...new Set(plans.flatMap((p) => p.tarifs.map((x) => x.dureeMois)))].sort((a, b) => a - b);
+  const [dureeChoisie, setDureeChoisie] = useState(null);
+  const dureeParDefaut = etat?.statut === "ACTIF" && durees.includes(abonnement?.dureeMois) ? abonnement.dureeMois : durees[0];
+  const duree = durees.includes(dureeChoisie) ? dureeChoisie : dureeParDefaut;
+  const remiseMax = Math.max(0, ...plans.map((p) => p.tarifs.find((x) => x.dureeMois === duree)?.remisePourcent ?? 0));
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <PageHeader icon={CreditCard} title={t("nav.subscription")} subtitle={t("sub.subtitle")} />
 
       <div className="space-y-2">
@@ -99,40 +112,33 @@ export default function AbonnementPage() {
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="space-y-4">
         <SectionTitle icon={Layers}>{t("sub.plansTitle")}</SectionTitle>
         {plansQuery.isPending && <LoadingState label={t("common.loading")} />}
         {plansQuery.isError && <ErrorState error={plansQuery.error} onRetry={plansQuery.refetch} />}
-        {plansQuery.data && plansQuery.data.length === 0 && <EmptyState icon={Layers}>{t("sub.plansEmpty")}</EmptyState>}
-        {plansQuery.data && plansQuery.data.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {plansQuery.data.map((plan) => (
-              <PlanCard key={plan.id} plan={plan} courant={etat?.statut === "ACTIF" && abonnement?.planNom === plan.nom} />
-            ))}
-          </div>
+        {plansQuery.data && plans.length === 0 && <EmptyState icon={Layers}>{t("sub.plansEmpty")}</EmptyState>}
+        {plans.length > 0 && (
+          <>
+            <DureeSelector durees={durees} value={duree} onChange={setDureeChoisie} remiseMax={remiseMax} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+              {plans.map((plan) => (
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  dureeMois={duree}
+                  courant={etat?.statut === "ACTIF" && abonnement?.planNom === plan.nom}
+                  whatsapp={whatsapp}
+                />
+              ))}
+            </div>
+            <PlansIncluded plans={plans} />
+          </>
         )}
-
-        <Card variant="outlined" className="flex items-center justify-between gap-3 flex-wrap text-sm text-neutral-600 dark:text-neutral-400">
-          <span className="flex items-start gap-2">
-            <Info className="size-4 shrink-0 mt-0.5" aria-hidden="true" />
-            {t("sub.contactMessage")}
-          </span>
-          {/* Simple lien de contact WhatsApp (numéro réglé par le SUPERADMIN) :
-              jamais une action d'achat ni d'activation. */}
-          {whatsapp && (
-            <Button
-              as="a"
-              href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(t("sub.contactPrefill"))}`}
-              target="_blank"
-              rel="noreferrer"
-              variant="secondary"
-              icon={MessageCircle}
-            >
-              {t("sub.contactButton")}
-            </Button>
-          )}
-        </Card>
       </div>
+
+      <PlansFaq />
+
+      <ContactBanner whatsapp={whatsapp} />
     </div>
   );
 }
