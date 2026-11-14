@@ -415,7 +415,7 @@ router.post("/:id/comptes/:userId/impersonation", async (req, res) => {
     superadminId: req.user.id,
   });
   const token = signAuthToken(compte, { impersonatedBy: req.user.id });
-  setAuthCookie(res, token);
+  setAuthCookie(res, token, { impersonation: true });
   res.json({ id: compte.id, identifiant: compte.identifiant, role: compte.role, atelierId: compte.atelierId });
 });
 

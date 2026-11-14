@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { nouveauMotDePasseField } from "../lib/passwordPolicy.js";
 import { emptyToUndefined, normalizeText, optionalTrimmed, optionalImageField } from "../lib/zodHelpers.js";
 import { normalizePhone } from "../lib/phone.js";
 import { LANGUES_DISPONIBLES } from "./compte.schema.js";
@@ -22,7 +23,7 @@ const telephoneField = z.preprocess(
 // Mêmes bornes que compte.schema.js (changement de mot de passe) — cohérence
 // du niveau d'exigence dans tout le projet.
 const identifiantField = z.string().trim().min(3, "3 caractères minimum.").max(60);
-const passwordField = z.string().min(8, "8 caractères minimum.");
+const passwordField = nouveauMotDePasseField;
 
 export const creerAtelierSchema = z
   .object({

@@ -71,12 +71,12 @@ describe("Frontières entre rôles ADMIN / USER", () => {
   });
 
   test("un compte SUPERADMIN ne peut PAS accéder à /api/moi", async () => {
-    const passwordHash = await bcrypt.hash("password123", 4);
+    const passwordHash = await bcrypt.hash("Atelier-Test-2026!", 4);
     const superadmin = await prisma.user.create({
       data: { identifiant: `superadmin-test-${Date.now()}`, passwordHash, role: "SUPERADMIN" },
     });
     const api = client(baseUrl);
-    await api.post("/api/auth/login", { identifiant: superadmin.identifiant, password: "password123" });
+    await api.post("/api/auth/login", { identifiant: superadmin.identifiant, password: "Atelier-Test-2026!" });
     const res = await api.get("/api/moi");
     assert.equal(res.status, 403);
     await prisma.user.delete({ where: { id: superadmin.id } });

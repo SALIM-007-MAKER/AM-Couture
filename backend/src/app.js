@@ -1,6 +1,7 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
+import { securityHeaders, csrfOriginGuard } from "./middlewares/security.middleware.js";
 import authRouter from "./routes/auth.routes.js";
 import clientesRouter from "./routes/clientes.routes.js";
 import modelesRouter from "./routes/modeles.routes.js";
@@ -34,6 +35,11 @@ const app = express();
 // Vercel place l'app derrière un proxy : indispensable pour que req.ip
 // (rate limiting) et les cookies "secure" reflètent la vraie requête client.
 app.set("trust proxy", 1);
+app.disable("x-powered-by");
+
+// En-têtes de sécurité + garde Origin (CSRF) AVANT tout parsing de corps et tout
+// routeur — voir middlewares/security.middleware.js.
+app.use("/api", securityHeaders, csrfOriginGuard);
 
 // 5mb : les photos (modèles) et le logo de l'atelier sont uploadés en base64
 // dans le corps JSON (voir optionalImageField, zodHelpers.js) — une image de

@@ -66,7 +66,7 @@ describe("Essai gratuit et blocage post-expiration", () => {
       prenom: "Jean",
       nomProprietaire: "Dupont",
       email: `essai-15j-${Date.now()}@example.com`,
-      adminPassword: "password123",
+      adminPassword: "Atelier-Test-2026!",
       telephone: "90000099",
     });
     assert.equal(res.status, 201);
@@ -120,7 +120,7 @@ describe("Bypass SUPERADMIN pendant une impersonation", () => {
     ({ atelier, admin } = await creerAtelierEtAdmin({ nom: "Atelier Bloque Impersonation" }));
     await prisma.atelier.update({ where: { id: atelier.id }, data: { trialEndsAt: new Date("2020-01-01") } });
 
-    const passwordHash = await bcrypt.hash("password123", 4);
+    const passwordHash = await bcrypt.hash("Atelier-Test-2026!", 4);
     const superadmin = await prisma.user.create({
       data: { identifiant: `superadmin-test-${Date.now()}`, passwordHash, role: "SUPERADMIN" },
     });
@@ -138,7 +138,7 @@ describe("Bypass SUPERADMIN pendant une impersonation", () => {
     const superApi = client(baseUrl);
     const loginSuper = await superApi.post("/api/auth/login", {
       identifiant: (await prisma.user.findUnique({ where: { id: superadminId } })).identifiant,
-      password: "password123",
+      password: "Atelier-Test-2026!",
     });
     assert.equal(loginSuper.status, 200);
 
