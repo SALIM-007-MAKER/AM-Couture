@@ -13,6 +13,7 @@ import { creerToken, consommerToken } from "../lib/tokenAction.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { emailVerificationTemplate, emailReinitialisationTemplate } from "../lib/emailTemplates.js";
 import { rateLimitPersistant } from "../lib/rateLimiter.js";
+import { journaliserSecurite } from "../lib/securityLog.js";
 
 const router = Router();
 
@@ -84,6 +85,7 @@ router.post("/login", loginLimiter, async (req, res) => {
   // Message volontairement identique dans les deux cas (identifiant inconnu
   // ou mot de passe faux) : ne jamais révéler quel champ est incorrect.
   if (!user || !valid) {
+    await journaliserSecurite("LOGIN_ECHEC", { req, userId: user?.id });
     throw new HttpError(401, "Identifiant ou mot de passe incorrect.");
   }
 
@@ -106,6 +108,7 @@ router.post("/login", loginLimiter, async (req, res) => {
 
   const token = signAuthToken({ ...user, clienteId });
   setAuthCookie(res, token);
+  await journaliserSecurite("LOGIN_OK", { req, userId: user.id, atelierId: user.atelierId });
   res.json({ id: user.id, identifiant: user.identifiant, role: user.role, atelierId: user.atelierId });
 });
 
@@ -318,6 +321,7 @@ router.post("/reinitialiser-mot-de-passe-token", async (req, res) => {
   // cookie ici : ce flux ne connecte jamais (voir décision d'origine),
   // la personne se reconnecte ensuite normalement via /login.
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash, sessionVersion: { increment: 1 } } });
+  await journaliserSecurite("MOT_DE_PASSE_REINITIALISE", { req, userId: user.id, atelierId: user.atelierId });
   res.status(204).end();
 });
 
@@ -370,6 +374,7 @@ router.post("/quitter-impersonation", requireAuth, async (req, res) => {
   }
   const token = signAuthToken(superadmin);
   setAuthCookie(res, token);
+  await journaliserSecurite("IMPERSONATION_FIN", { req, userId: superadmin.id, atelierId: req.user.atelierId });
   res.json({ id: superadmin.id, identifiant: superadmin.identifiant, role: superadmin.role, atelierId: superadmin.atelierId });
 });
 

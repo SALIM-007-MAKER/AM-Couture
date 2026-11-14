@@ -844,3 +844,31 @@ model JournalImpersonation {
   @@index([atelierId])
   @@index([superadminId])
 }
+
+// Journal de sécurité PERSISTANT (connexions, changements de mot de passe,
+// impersonation, suspension...). Écrit par backend/src/lib/securityLog.js.
+//
+// - Aucune clé étrangère VOLONTAIREMENT : le journal doit survivre à la
+//   suppression d'un compte ou d'un atelier (c'est précisément là qu'on en a
+//   besoin), et une écriture de journal ne doit jamais pouvoir échouer à cause
+//   d'une contrainte.
+// - JAMAIS de mot de passe, jeton, cookie, identifiant saisi ni corps de
+//   requête : `details` est filtré par securityLog.js (liste blanche de clés).
+// - `ip` est une donnée personnelle : conservation limitée à 365 jours, purge
+//   quotidienne par le cron (cron.routes.js, RETENTION_JOURNAL_SECURITE_JOURS).
+// - `evenement` est un texte libre (pas un enum) : ajouter un type d'événement
+//   ne doit pas exiger une migration.
+model JournalSecurite {
+  id        String   @id @default(cuid())
+  evenement String
+  userId    String?
+  atelierId String?
+  ip        String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([evenement, createdAt])
+  @@index([atelierId, createdAt])
+  @@index([userId, createdAt])
+}

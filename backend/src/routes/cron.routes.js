@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { reconcilierNotifications } from "../lib/notifications.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { rappelsQuotidiensTemplate } from "../lib/emailTemplates.js";
+import { purgerJournalSecurite } from "../lib/securityLog.js";
 
 const router = Router();
 
@@ -31,6 +32,13 @@ router.get("/rappels-quotidiens", async (req, res) => {
   if (req.headers.authorization !== `Bearer ${secret}`) {
     return res.status(401).json({ error: "Non autorisé." });
   }
+
+  // Conservation limitée du journal de sécurité (IP = donnée personnelle) —
+  // un échec de purge ne doit jamais empêcher l'envoi des rappels.
+  const journalPurge = await purgerJournalSecurite().catch((err) => {
+    console.error(`[cron] Purge du journal de sécurité impossible : ${err.message}`);
+    return null;
+  });
 
   const origin = `${req.protocol}://${req.get("host")}`;
   const ateliers = await prisma.atelier.findMany({
@@ -76,7 +84,7 @@ router.get("/rappels-quotidiens", async (req, res) => {
     }
   }
 
-  res.json({ ateliersTraites: ateliers.length, emailsEnvoyes, erreurs });
+  res.json({ ateliersTraites: ateliers.length, emailsEnvoyes, erreurs, journalSecuritePurge: journalPurge });
 });
 
 export default router;

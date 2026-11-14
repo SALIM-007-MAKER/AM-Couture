@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { prisma } from "./prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
+import { journaliserSecurite } from "./securityLog.js";
 
 // Rate-limiting persistant (Postgres) — voir LimiteTaux, schema.prisma, pour
 // le pourquoi (express-rate-limit en mémoire ne suffit pas en serverless).
@@ -60,6 +61,8 @@ export function rateLimitPersistant({ prefixe, limite, fenetreMs, message = "Tro
       const cle = `${prefixe}:${req.ip}`;
       const compte = await incrementer(cle, fenetreMs);
       if (compte > limite) {
+        // Une seule ligne de log au franchissement du seuil (pas à chaque requête bloquée).
+        if (compte === limite + 1) await journaliserSecurite("RATE_LIMIT", { req, details: { prefixe } });
         return next(new HttpError(429, message));
       }
       next();
