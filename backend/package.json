@@ -7,7 +7,7 @@
     "start": "node src/server.js",
     "build": "prisma generate",
     "test": "node --test src/**/__tests__/**/*.test.js",
-    "test:integration": "node --import ./src/integration-tests/preload.js --test src/integration-tests/**/*.test.js"
+    "test:integration": "node --import ./src/integration-tests/preload.js --test --test-concurrency=4 src/integration-tests/**/*.test.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
