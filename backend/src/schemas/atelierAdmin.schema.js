@@ -41,7 +41,7 @@ export const creerAtelierSchema = z
 const telephoneRequisField = z.preprocess(
   emptyToUndefined,
   z
-    .string({ required_error: "Téléphone requis." })
+    .string({ error: "Téléphone requis." })
     .trim()
     .transform(normalizePhone)
     .refine((v) => /^\+?\d{8,15}$/.test(v), "Numéro de téléphone invalide."),
