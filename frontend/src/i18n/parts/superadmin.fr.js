@@ -6,6 +6,12 @@ export default {
       workshops: "Ateliers",
       subscriptions: "Abonnements",
       pricing: "Tarification",
+      // Libellés courts de la barre du bas (mobile) : 5 onglets sur 320 px.
+      overviewShort: "Aperçu",
+      workshopsShort: "Ateliers",
+      subscriptionsShort: "Abonnements",
+      pricingShort: "Tarifs",
+      accountShort: "Compte",
       platformName: "Gestion d'Atelier",
       role: "Superadmin",
     },

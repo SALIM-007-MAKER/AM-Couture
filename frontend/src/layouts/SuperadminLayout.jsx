@@ -17,11 +17,11 @@ import { useTranslation } from "../i18n/index.js";
 // entièrement générique (langue + mot de passe), aucune dépendance à un
 // atelier.
 const NAV_ITEMS = [
-  { labelKey: "sa.layout.overview", to: "/vue-ensemble", icon: LayoutDashboard, end: true },
-  { labelKey: "sa.layout.workshops", to: "/ateliers", icon: Building2 },
-  { labelKey: "sa.layout.subscriptions", to: "/gestion-abonnements", icon: CreditCard },
-  { labelKey: "sa.layout.pricing", to: "/tarifs-abonnement", icon: Tag },
-  { labelKey: "nav.myAccount", to: "/mon-compte", icon: UserCircle },
+  { labelKey: "sa.layout.overview", shortKey: "sa.layout.overviewShort", to: "/vue-ensemble", icon: LayoutDashboard, end: true },
+  { labelKey: "sa.layout.workshops", shortKey: "sa.layout.workshopsShort", to: "/ateliers", icon: Building2 },
+  { labelKey: "sa.layout.subscriptions", shortKey: "sa.layout.subscriptionsShort", to: "/gestion-abonnements", icon: CreditCard },
+  { labelKey: "sa.layout.pricing", shortKey: "sa.layout.pricingShort", to: "/tarifs-abonnement", icon: Tag },
+  { labelKey: "nav.myAccount", shortKey: "sa.layout.accountShort", to: "/mon-compte", icon: UserCircle },
 ];
 
 function NavContent({ collapsed, onNavigate }) {
@@ -36,7 +36,7 @@ function NavContent({ collapsed, onNavigate }) {
           onClick={onNavigate}
           title={collapsed ? t(item.labelKey) : undefined}
           className={({ isActive }) =>
-            `flex items-center gap-2.5 rounded-lg border-l-2 pl-2.5 pr-3 py-2 text-sm font-medium transition-colors ${
+            `flex items-center gap-2.5 rounded-lg border-l-2 pl-2.5 pr-3 py-2.5 md:py-2 text-sm font-medium transition-colors ${
               collapsed ? "justify-center border-l-0 pl-3" : ""
             } ${
               isActive
@@ -47,6 +47,47 @@ function NavContent({ collapsed, onNavigate }) {
         >
           <item.icon className="size-4 shrink-0" aria-hidden="true" />
           {!collapsed && t(item.labelKey)}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
+
+// Barre du bas mobile (< md) — mêmes classes que ClientLayout/AppLayout : les
+// 5 destinations du SUPERADMIN en un clic. Libellés courts (shortKey) pour
+// tenir sur 5 colonnes de 64 px à 320 px de large.
+function BottomNav() {
+  const { t } = useTranslation();
+  return (
+    <nav
+      aria-label={t("nav.mainNavigation")}
+      className="md:hidden fixed inset-x-0 bottom-0 z-30 flex bg-white dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800 pb-[env(safe-area-inset-bottom)]"
+    >
+      {NAV_ITEMS.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.end}
+          className={({ isActive }) =>
+            `flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 px-0.5 py-1.5 text-[10px] font-medium transition-colors active:scale-95 ${
+              isActive
+                ? "text-brand-600 dark:text-brand-400"
+                : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
+            }`
+          }
+        >
+          {({ isActive }) => (
+            <>
+              <span
+                className={`flex items-center justify-center rounded-full p-1.5 transition-colors ${
+                  isActive ? "bg-brand-50 dark:bg-brand-950" : ""
+                }`}
+              >
+                <item.icon className="size-5" aria-hidden="true" />
+              </span>
+              <span className="max-w-full truncate leading-tight">{t(item.shortKey)}</span>
+            </>
+          )}
         </NavLink>
       ))}
     </nav>
@@ -145,7 +186,7 @@ export default function SuperadminLayout() {
             <button
               type="button"
               onClick={toggleSidebar}
-              className="md:hidden rounded-lg p-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
+              className="md:hidden flex size-10 items-center justify-center rounded-lg border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
               aria-label={t("nav.openMenu")}
             >
               <Menu className="size-4" aria-hidden="true" />
@@ -173,7 +214,7 @@ export default function SuperadminLayout() {
               type="button"
               onClick={() => logoutMutation.mutate()}
               disabled={logoutMutation.isPending}
-              className="inline-flex items-center gap-1.5 text-sm rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 text-sm rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 min-h-10 min-w-10 sm:min-h-0 sm:min-w-0 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
               title={t("nav.logout")}
             >
               <LogOut className="size-3.5" aria-hidden="true" />
@@ -182,10 +223,16 @@ export default function SuperadminLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 overflow-x-hidden">
+        {/* pb-24 : dégage le contenu de la barre du bas (mobile). overflow-x-hidden
+            est conservé comme filet (même choix qu'AppLayout/ClientLayout) MAIS
+            n'est plus le seul garde-fou : les pages SuperAdmin ont été corrigées
+            pour ne plus déborder (tableaux -> cartes, min-w-0, flex-wrap). */}
+        <main className="flex-1 min-w-0 p-4 sm:p-6 pb-24 md:pb-6 overflow-x-hidden">
           <Outlet />
         </main>
       </div>
+
+      <BottomNav />
     </div>
   );
 }
