@@ -40,7 +40,11 @@ let compteurIp = 1;
  */
 export function client(baseUrl) {
   let cookie = null;
-  const ip = `203.0.113.${compteurIp++}`;
+  // IP unique par PROCESSUS et par client : `node --test` exécute chaque fichier dans son propre
+  // process, et le limiteur de débit garde ses compteurs en base (fenêtre de 15 min). Un préfixe
+  // fixe faisait partager les mêmes IP à tous les fichiers (et à chaque relance locale), d'où des
+  // 429 sur la connexion dès que le nombre de fichiers augmentait.
+  const ip = `10.${(process.pid >> 8) & 255}.${process.pid & 255}.${(compteurIp++ % 254) + 1}`;
   async function requete(path, { method = "GET", body } = {}) {
     const res = await fetch(`${baseUrl}${path}`, {
       method,
