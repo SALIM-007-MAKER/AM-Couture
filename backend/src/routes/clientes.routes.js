@@ -16,6 +16,7 @@ import mesuresRouter from "./mesures.routes.js";
 import { buildCsv, envoyerCsv } from "../lib/csv.js";
 import { creerToken } from "../lib/tokenAction.js";
 import { envoyerEmail } from "../lib/resend.js";
+import { origineApplication } from "../lib/appUrl.js";
 import { emailInvitationClientTemplate } from "../lib/emailTemplates.js";
 
 const router = Router();
@@ -360,7 +361,7 @@ router.post("/:id/inviter", async (req, res) => {
     return { token };
   });
 
-  const origin = `${req.protocol}://${req.get("host")}`;
+  const origin = origineApplication(req);
   const lienActivation = `${origin}/client/activer?token=${token}`;
 
   // Best effort, jamais bloquant (voir même pattern pour l'email de

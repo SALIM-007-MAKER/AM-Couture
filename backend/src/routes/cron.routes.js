@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { reconcilierNotifications } from "../lib/notifications.js";
 import { envoyerEmail } from "../lib/resend.js";
+import { origineApplication } from "../lib/appUrl.js";
 import { rappelsQuotidiensTemplate } from "../lib/emailTemplates.js";
 import { purgerJournalSecurite } from "../lib/securityLog.js";
 
@@ -40,7 +41,7 @@ router.get("/rappels-quotidiens", async (req, res) => {
     return null;
   });
 
-  const origin = `${req.protocol}://${req.get("host")}`;
+  const origin = origineApplication(req);
   const ateliers = await prisma.atelier.findMany({
     where: { actif: true },
     select: {

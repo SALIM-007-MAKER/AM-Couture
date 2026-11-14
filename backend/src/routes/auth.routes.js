@@ -13,6 +13,7 @@ import { creerToken, consommerToken } from "../lib/tokenAction.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { emailVerificationTemplate, emailReinitialisationTemplate } from "../lib/emailTemplates.js";
 import { rateLimitPersistant } from "../lib/rateLimiter.js";
+import { origineApplication } from "../lib/appUrl.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
 
 const router = Router();
@@ -203,7 +204,7 @@ router.post("/inscription-atelier", inscriptionLimiter, rejectIfDejaConnecte, as
   // jamais l'action principale" (le .catch() reste local, jamais propagé).
   try {
     const verifToken = await creerToken({ userId: admin.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
-    const origin = `${req.protocol}://${req.get("host")}`;
+    const origin = origineApplication(req);
     await envoyerEmail({
       to: admin.email,
       subject: "Confirmez votre email — Gestion d'Atelier",
@@ -247,7 +248,7 @@ router.post("/renvoyer-verification-email", requireAuth, renvoyerVerificationLim
     throw new HttpError(400, "Cet email est déjà vérifié.");
   }
   const verifToken = await creerToken({ userId: user.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
-  const origin = `${req.protocol}://${req.get("host")}`;
+  const origin = origineApplication(req);
   try {
     await envoyerEmail({
       to: user.email,
@@ -289,7 +290,7 @@ router.post("/mot-de-passe-oublie", motDePasseOublieLimiter, async (req, res) =>
   if (user?.email) {
     try {
       const resetToken = await creerToken({ userId: user.id, type: "REINITIALISATION_MOT_DE_PASSE", dureeMs: 60 * 60 * 1000 });
-      const origin = `${req.protocol}://${req.get("host")}`;
+      const origin = origineApplication(req);
       await envoyerEmail({
         to: user.email,
         subject: "Réinitialisation de votre mot de passe — Gestion d'Atelier",
