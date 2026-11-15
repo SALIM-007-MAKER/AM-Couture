@@ -118,7 +118,14 @@ router.post("/login", loginLimiter, async (req, res) => {
   const token = signAuthToken({ ...user, clienteId });
   setAuthCookie(res, token);
   await journaliserSecurite("LOGIN_OK", { req, userId: user.id, atelierId: user.atelierId });
-  res.json({ id: user.id, identifiant: user.identifiant, role: user.role, atelierId: user.atelierId });
+  res.json({
+    id: user.id,
+    identifiant: user.identifiant,
+    role: user.role,
+    atelierId: user.atelierId,
+    // Employés : l'interface en a besoin dès la connexion (le serveur revérifie toujours chaque droit).
+    ...(user.role === "EMPLOYE" ? { poste: user.poste, permissions: user.permissions } : {}),
+  });
 });
 
 // Rate limiting sur l'inscription : plus strict que le login (10/15min) —
