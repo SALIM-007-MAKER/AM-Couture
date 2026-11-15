@@ -48,3 +48,11 @@ export const parametresAbonnementSchema = z
 export const suspensionSchema = z
   .object({ note: z.string().trim().min(3, "Motif requis.").max(300).transform(normalizeText) })
   .strict();
+
+// Paiement par Wave : la formule et la durée suffisent, le montant est calculé par le serveur.
+export const payerWaveSchema = z
+  .object({
+    planId: z.string().trim().min(1, "Formule requise."),
+    dureeMois: z.number().int().min(1, "Durée invalide.").max(60, "60 mois maximum."),
+  })
+  .strict();

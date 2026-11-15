@@ -156,3 +156,27 @@ Aucun rappel : atelier suspendu, abonnement suspendu, paiement déjà déclaré 
 - seuls les administrateurs de l'atelier avec une adresse sont prévenus ; aucun SMS ni notification dans l'application avant la 5.7 ;
 - les textes sont en français uniquement (comme les autres courriels existants) ;
 - les nouveaux ateliers inscrits avant la mise en ligne de cette fonction et dont l'essai finit dans les 3 jours suivant le déploiement recevront un rappel.
+
+## 11. Réalisé en 5.5 — Wave durci, inactif par défaut
+
+**Activation.** Wave n'est proposé que si `WAVE_ENABLED=1`, `WAVE_API_KEY` et `WAVE_WEBHOOK_SECRET` sont tous définis. Sinon : `POST /api/abonnements/payer-wave` répond 503, `POST /api/webhooks/wave` répond 503 sans lire ni écrire quoi que ce soit, `GET /api/abonnements/etat` annonce `paiementsEnLigne.wave: false`. Rien n'est actif en production tant que vous n'avez pas défini ces variables.
+
+**Principes appliqués (tous testés contre un faux serveur Wave).**
+1. **Aucune confiance accordée au navigateur ni au contenu du webhook.** Le webhook (signature HMAC vérifiée, tolérance 5 minutes) n'est qu'un déclencheur. Le serveur relit la session chez Wave avec sa propre clé, puis compare session, référence, montant et devise à sa transaction. Au moindre écart (ex. montant payé différent) : **rien n'est activé**, la transaction reste en attente, l'anomalie est journalisée (`ABONNEMENT_WAVE_INCOHERENT`) pour traitement humain.
+2. **Aucune présomption en cas de doute.** Wave injoignable : le webhook répond 503, Wave réessaie (jusqu'à 3 jours) ; l'événement n'est pas consommé.
+3. **Chaque événement n'agit qu'une fois.** Table `EvenementPaiement` écrite dans la même transaction que l'effet ; l'effet est de plus idempotent (verrou par atelier puis par transaction). Cinq livraisons simultanées = une facture.
+4. **Rattrapage.** Wave n'envoie aucun événement à l'expiration d'une session (30 min) et ne garantit pas la livraison. La tâche quotidienne relit les sessions en attente depuis plus de 3 minutes ; l'atelier peut aussi demander la relecture (`POST /transactions/:id/verifier`). Une session jamais créée est abandonnée après 5 minutes. Un paiement Wave ne peut pas être confirmé à la main.
+5. **Remboursement.** Wave rembourse d'abord (opération idempotente chez eux) ; si Wave refuse ou ne répond pas, rien n'est enregistré (502). Rejouer ne rembourse pas deux fois.
+6. **Création de session en échec** : la transaction est clôturée, rien n'est activé, une nouvelle tentative est possible.
+
+**Tests.** 21 unitaires (signature : corps modifié, secret, rejeu, rotation, en-tête mal formé ; évaluation de session ; activation) et 24 d'intégration. Quatre mutations détectées : confiance au contenu du webhook sans relecture, montant non contrôlé, Wave toujours actif, signature non vérifiée.
+
+**Ce qui n'a PAS été vérifié, et ne peut pas l'être sans vous.**
+- **Aucun appel à l'API Wave réelle n'a été fait.** Le faux serveur applique ma lecture de docs.wave.com (14/11/2026) : noms de champs, statuts (`checkout_status`, `payment_status`), événements, en-tête de signature. Si la réalité diffère, les tests passent quand même. **Un essai réel avec un compte Wave Business est indispensable avant toute activation.**
+- **Wave ne confirme pas servir le Niger.** Il faut un compte Business valide et la confirmation de Wave.
+- La documentation Wave ne décrit pas de bac à sable : un essai réel engage de l'argent réel (prévoir un très petit montant).
+- Wave exige des URLs de retour en https : `PUBLIC_APP_URL` doit l'être.
+- L'ordre des opérations de remboursement (Wave puis base) laisse une fenêtre où Wave a remboursé mais la base n'est pas à jour si elle tombe entre les deux : rejouer l'action rattrape (Wave ne rembourse pas deux fois), mais la situation intermédiaire est possible.
+- Pas d'écran : l'interface de paiement Wave arrive en 5.7.
+
+**Modification d'un test existant.** « aucune route de paiement/souscription n'existe côté ADMIN » affirmait que `/api/webhooks/wave` répondait 404. Il répond désormais 503 tant que Wave n'est pas activé ; le test garde l'interdiction de toute route de simulation ou de confirmation par l'ADMIN.
