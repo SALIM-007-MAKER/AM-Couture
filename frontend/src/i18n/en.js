@@ -10,6 +10,7 @@ import superadminAbo from "./parts/superadminAbo.en.js";
 import paiementsAbo from "./parts/paiementsAbo.en.js";
 import employes from "./parts/employes.en.js";
 import production from "./parts/production.en.js";
+import fournisseurs from "./parts/fournisseurs.en.js";
 
 export default {
   ...shared,
@@ -21,6 +22,7 @@ export default {
   ...paiementsAbo,
   ...employes,
   ...production,
+  ...fournisseurs,
   common: {
     save: "Save",
     cancel: "Cancel",
@@ -64,6 +66,7 @@ export default {
     subscription: "Subscription",
     employees: "Employees",
     production: "Production",
+    suppliers: "Suppliers",
     finances: "Finances",
     notifications: "Notifications",
     unreadNotifications: "{{count}} unread notification(s)",

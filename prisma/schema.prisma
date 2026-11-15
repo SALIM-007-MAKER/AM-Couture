@@ -275,6 +275,7 @@ model Atelier {
   commandes            Commande[]
   depenses             Depense[]
   articlesStock        ArticleStock[]
+  fournisseurs         Fournisseur[]
   abonnements          Abonnement[]
   historiqueAbonnement HistoriqueAbonnement[]
   rappelsAbonnement    RappelAbonnement[]
@@ -1036,5 +1037,26 @@ model AffectationCommande {
   createdAt  DateTime @default(now())
 
   @@index([commandeId, createdAt])
+  @@index([atelierId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Fournisseurs (Phase 6.4) — personnes ou entreprises auprès desquelles l'atelier achète tissus et fournitures.
+// Jamais supprimés (archivage) : les achats de la 6.5 s'y référeront. Nom unique par atelier, sans tenir compte de la casse.
+// ─────────────────────────────────────────────────────────────────────────
+model Fournisseur {
+  id         String    @id @default(cuid())
+  atelierId  String
+  atelier    Atelier   @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  nom        String
+  contact    String?
+  telephone  String?
+  email      String?
+  adresse    String?
+  notes      String?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
   @@index([atelierId])
 }

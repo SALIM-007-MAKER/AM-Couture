@@ -127,3 +127,19 @@ Plan ajusté : **6.1** employés et permissions (serveur) · **6.2** interface e
 - Pas de notification à l'employé lors d'une affectation ni d'un retard : prévu en 6.6.
 - Le retard se calcule en UTC (jour du serveur) ; pas de rapport de production par employé avant la 6.7.
 - Pas d'étapes de production détaillées par commande (décision du 15/11).
+
+## 11. Réalisé en 6.4 — fournisseurs
+
+**Fonctionnement** : un annuaire des fournisseurs de l'atelier (nom, personne à contacter, téléphone, email, adresse, notes) avec recherche, archivage et restauration. Un fournisseur n'est jamais supprimé : les achats de la 6.5 s'y référeront. Le nom est unique par atelier, sans tenir compte de la casse ni des espaces multiples, archivés compris (le message indique si le doublon est archivé) ; la vérification se fait sous verrou, donc des créations simultanées ne produisent qu'une seule fiche (testé avec 6 requêtes parallèles). Un fournisseur archivé ne se modifie pas.
+
+**Permissions** : `fournisseurs.lire` et `fournisseurs.ecrire` (non sensibles, aucune donnée financière), 24 permissions au total. Le poste « Magasinier » les reçoit au départ ; les employés existants ne sont pas modifiés (un poste ne réécrit jamais des droits déjà accordés).
+
+**Base de données** (migration additive `20261123090000_fournisseurs`) : table `Fournisseur` et un index. Retour arrière : supprimer la table.
+
+**API** : 6 routes (`/api/fournisseurs`, voir `docs/API.md` §9 bis ; 173 routes documentées). **Interface** : `/fournisseurs` (liste, fiche, création, modification), entrée « Fournisseurs » dans la navigation filtrée par permission.
+
+**Tests** : 8 d'intégration (CRUD, unicité et casse, concurrence, validation, archivage, isolation entre ateliers, droits lecture/écriture/aucun), 4 E2E (création, doublon refusé avec message, magasinier créé par le PDG qui voit la page sans accès aux finances, archivage). Suites complètes : 333 unitaires backend, 326 intégration, 95 frontend, 46 E2E.
+
+**Test E2E et limiteur de connexion** : les sessions des employés créés pendant les tests sont ouvertes par l'API directement (`e2e/session.js`, IP de test distincte) au lieu du formulaire : le limiteur (10 tentatives / 15 min / IP) est conservé tel quel et les nouveaux parcours le saturaient. La connexion par l'interface reste testée (`auth.spec.js`, `employes.spec.js`).
+
+**Limites** : pas encore de lien article de stock ↔ fournisseur habituel (la 6.5 rattachera les achats aux fournisseurs et aux articles) ; un champ facultatif ne peut pas être vidé après coup (même comportement que les modèles : une valeur vide est ignorée) ; pas d'import de fournisseurs.

@@ -31,6 +31,9 @@ const ClientesListPage = lazy(() => import("./features/clientes/ClientesListPage
 const ClienteFormPage = lazy(() => import("./features/clientes/ClienteFormPage.jsx"));
 const ClienteDetailPage = lazy(() => import("./features/clientes/ClienteDetailPage.jsx"));
 const MesureFormPage = lazy(() => import("./features/clientes/MesureFormPage.jsx"));
+const FournisseursListPage = lazy(() => import("./features/fournisseurs/FournisseursListPage.jsx"));
+const FournisseurFormPage = lazy(() => import("./features/fournisseurs/FournisseurFormPage.jsx"));
+const FournisseurDetailPage = lazy(() => import("./features/fournisseurs/FournisseurDetailPage.jsx"));
 const ModelesListPage = lazy(() => import("./features/modeles/ModelesListPage.jsx"));
 const ModeleFormPage = lazy(() => import("./features/modeles/ModeleFormPage.jsx"));
 const ModeleDetailPage = lazy(() => import("./features/modeles/ModeleDetailPage.jsx"));
@@ -119,6 +122,14 @@ export default function App() {
             </Route>
             <Route element={<RequirePermission permission="clientes.ecrire" />}>
               <Route path="/clientes/:id/mesures/nouvelle" element={<MesureFormPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="fournisseurs.lire" />}>
+              <Route path="/fournisseurs" element={<FournisseursListPage />} />
+              <Route path="/fournisseurs/:id" element={<FournisseurDetailPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="fournisseurs.ecrire" />}>
+              <Route path="/fournisseurs/nouveau" element={<FournisseurFormPage mode="create" />} />
+              <Route path="/fournisseurs/:id/modifier" element={<FournisseurFormPage mode="edit" />} />
             </Route>
             <Route element={<RequirePermission permission="modeles.lire" />}>
               <Route path="/modeles" element={<ModelesListPage />} />

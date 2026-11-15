@@ -10,6 +10,7 @@ import { prisma } from "./lib/prisma.js";
 import authRouter from "./routes/auth.routes.js";
 import clientesRouter from "./routes/clientes.routes.js";
 import modelesRouter from "./routes/modeles.routes.js";
+import fournisseursRouter from "./routes/fournisseurs.routes.js";
 import commandesRouter from "./routes/commandes.routes.js";
 import { paiementsGlobalRouter } from "./routes/paiements.routes.js";
 import { livraisonsGlobalRouter } from "./routes/livraisons.routes.js";
@@ -77,6 +78,7 @@ app.use(cookieParser());
 app.use("/api/auth", authRouter);
 app.use("/api/clientes", clientesRouter);
 app.use("/api/modeles", modelesRouter);
+app.use("/api/fournisseurs", fournisseursRouter);
 app.use("/api/commandes", commandesRouter);
 // Lecture seule, toutes commandes confondues — voir commentaire dans
 // paiements.routes.js / livraisons.routes.js. La création/annulation reste
