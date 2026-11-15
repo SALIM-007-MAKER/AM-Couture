@@ -8,6 +8,7 @@ import { requireValidIdParam } from "../lib/idParam.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
 import { log, messageErreur } from "../lib/logger.js";
 import { confirmerTransaction, rejeterTransaction, rembourserTransaction } from "../lib/souscription.js";
+import { paiementWaveActif, rembourserSession, ErreurWave } from "../lib/wave.js";
 import { streamFacturePdf } from "../lib/facturePdf.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { notifierDecision } from "../lib/notificationsAbonnement.js";
@@ -117,9 +118,10 @@ router.get("/transactions", async (req, res) => {
   res.json({ data, meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) } });
 });
 
-async function decision(req, res, { evenement, appliquer, corps }) {
+async function decision(req, res, { evenement, appliquer, corps, avant }) {
   const parsed = corps.safeParse(req.body ?? {});
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
+  if (avant) await avant();
   const resultat = await prisma.$transaction((tx) => appliquer(tx, parsed.data), { maxWait: 10_000, timeout: 15_000 });
   if (!resultat.deja) {
     await journaliserSecurite(evenement, {
@@ -180,6 +182,21 @@ router.post("/transactions/:id/rembourser", (req, res) =>
   decision(req, res, {
     evenement: "ABONNEMENT_PAIEMENT_REMBOURSE",
     corps: motifSchema,
+    avant: async () => {
+      // Paiement Wave : l'argent est d'abord rendu PAR Wave (opération idempotente chez eux). Si Wave refuse ou ne
+      // répond pas, rien n'est enregistré ici : on ne déclare jamais remboursé un paiement qui ne l'est pas.
+      const t = await prisma.transaction.findUnique({ where: { id: req.params.id }, select: { moyenPaiement: true, statut: true, referenceExterne: true } });
+      if (!t || t.moyenPaiement !== "WAVE" || t.statut !== "REUSSIE") return;
+      if (!paiementWaveActif()) {
+        throw new HttpError(409, "Wave n'est pas activé : impossible de rembourser ce paiement depuis la plateforme.");
+      }
+      try {
+        await rembourserSession(t.referenceExterne);
+      } catch (err) {
+        if (err instanceof ErreurWave) throw new HttpError(502, "Wave n'a pas effectué le remboursement. Rien n'a été enregistré.", { wave: err.message });
+        throw err;
+      }
+    },
     appliquer: (tx, { motif }) =>
       rembourserTransaction(tx, { transactionId: req.params.id, par: req.user.identifiant, motif }),
   }),

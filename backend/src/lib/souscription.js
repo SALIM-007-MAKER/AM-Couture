@@ -41,7 +41,7 @@ export function historiser(tx, { abonnement, action, par, note }) {
 }
 
 /** Lit la transaction (hors verrou) pour connaître son atelier, puis prend les verrous dans l'ordre unique atelier puis ligne. */
-async function chargerEtVerrouiller(tx, transactionId, { atelierId } = {}) {
+export async function chargerEtVerrouiller(tx, transactionId, { atelierId } = {}) {
   const apercu = await tx.transaction.findUnique({ where: { id: transactionId }, select: { id: true, atelierId: true } });
   if (!apercu || (atelierId && apercu.atelierId !== atelierId)) throw new HttpError(404, "Transaction introuvable.");
   await verrouillerCle(tx, cleVerrouAtelier(apercu.atelierId));
@@ -97,7 +97,8 @@ export async function souscrire(
       moyenPaiement,
       montant,
       statut: "EN_ATTENTE",
-      referenceInterne: `MAN-${randomUUID()}`,
+      // Clé de rapprochement unique ; préfixe WAV- pour un paiement Wave (envoyée à Wave comme client_reference).
+      referenceInterne: `${moyenPaiement === "WAVE" ? "WAV" : "MAN"}-${randomUUID()}`,
       referenceExterne: reference ?? null,
       operateur: operateur ?? null,
       preuveNote: preuveNote ?? null,
@@ -126,11 +127,13 @@ export async function annulerParAtelier(tx, { transactionId, atelierId, par }) {
 }
 
 /** Confirmation par le SUPERADMIN : active l'abonnement et émet la facture, une seule fois. */
-export async function confirmerTransaction(tx, { transactionId, par, note, atelierNom }, now = new Date()) {
+export async function confirmerTransaction(tx, { transactionId, par, note, atelierNom, automatique = false }, now = new Date()) {
   const t = await chargerEtVerrouiller(tx, transactionId);
   if (t.statut === "REUSSIE") return { transaction: t, abonnement: t.abonnement, facture: t.facture, deja: true };
   if (t.statut !== "EN_ATTENTE") throw new HttpError(409, "Seul un paiement en attente peut être confirmé.");
-  if (t.moyenPaiement === "WAVE") {
+  // Un paiement Wave n'est confirmé que par le traitement automatique (lib/paiementEnLigne.js), après relecture de la
+  // session chez Wave : jamais à la main, ce qui reviendrait à croire une déclaration.
+  if (t.moyenPaiement === "WAVE" && !automatique) {
     throw new HttpError(409, "Un paiement Wave est confirmé automatiquement par Wave, pas manuellement.");
   }
 
@@ -149,7 +152,7 @@ export async function confirmerTransaction(tx, { transactionId, par, note, ateli
   });
   const transaction = await tx.transaction.update({
     where: { id: t.id },
-    data: { statut: "REUSSIE", confirmeManuellement: true, confirmePar: par, confirmeLe: now },
+    data: { statut: "REUSSIE", confirmeManuellement: !automatique, confirmePar: par, confirmeLe: now },
   });
   const facture = await tx.factureAbonnement.create({
     data: {
@@ -175,6 +178,16 @@ export async function confirmerTransaction(tx, { transactionId, par, note, ateli
     note: note ?? `Paiement ${t.numero} confirmé, facture ${facture.numero}`,
   });
   return { transaction, abonnement, facture, deja: false };
+}
+
+/** Clôture une transaction en ligne restée sans issue (session expirée, jamais créée) : aucun accès accordé. */
+export async function expirerTransaction(tx, { transactionId, motif, par = "systeme" }) {
+  const t = await chargerEtVerrouiller(tx, transactionId);
+  if (t.statut !== "EN_ATTENTE") return { transaction: t, deja: true };
+  const transaction = await tx.transaction.update({ where: { id: t.id }, data: { statut: "EXPIREE", motifRejet: motif } });
+  const abonnement = await tx.abonnement.update({ where: { id: t.abonnementId }, data: { statut: "ANNULE" } });
+  await historiser(tx, { abonnement, action: "EXPIRATION", par, note: `${t.numero} expiré : ${motif}` });
+  return { transaction, abonnement, deja: false };
 }
 
 export async function rejeterTransaction(tx, { transactionId, par, motif }, now = new Date()) {

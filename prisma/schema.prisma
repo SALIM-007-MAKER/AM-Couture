@@ -819,6 +819,20 @@ model RappelAbonnement {
   @@unique([atelierId, type, cle])
 }
 
+/// Événement reçu d'un prestataire de paiement (webhook), mémorisé pour ne jamais traiter deux fois le même.
+/// Wave peut dupliquer, retarder ou désordonner ses envois : l'identifiant de l'événement (`evenementId`) est
+/// la seule clé fiable. La ligne est écrite DANS la transaction qui applique l'effet : si l'effet échoue, la ligne
+/// n'existe pas et la nouvelle livraison du prestataire est traitée normalement.
+model EvenementPaiement {
+  id          String   @id @default(cuid())
+  fournisseur String
+  evenementId String
+  type        String
+  recuLe      DateTime @default(now())
+
+  @@unique([fournisseur, evenementId])
+}
+
 /// Plans d'abonnement de la plateforme (Essentiel, Professionnel...) —
 /// gérés par le SUPERADMIN. Le prix est mensuel ; la durée d'un abonnement
 /// est choisie librement à l'activation (voir Abonnement.dureeMois).

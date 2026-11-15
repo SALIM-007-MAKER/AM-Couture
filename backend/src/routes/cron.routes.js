@@ -8,6 +8,8 @@ import { rappelsQuotidiensTemplate } from "../lib/emailTemplates.js";
 import { purgerJournalSecurite } from "../lib/securityLog.js";
 import { purgerClesIdempotence } from "../lib/idempotence.js";
 import { envoyerRappelsAbonnement } from "../lib/rappelsAbonnement.js";
+import { rattraperTransactionsWave } from "../lib/paiementEnLigne.js";
+import { paiementWaveActif } from "../lib/wave.js";
 
 const router = Router();
 
@@ -100,6 +102,14 @@ router.get("/rappels-quotidiens", async (req, res) => {
     return null;
   });
 
+  // Rattrapage des paiements Wave restés en attente (seulement si Wave est activé).
+  const rattrapageWave = paiementWaveActif()
+    ? await rattraperTransactionsWave(prisma).catch((err) => {
+        log.error("erreur", { categorie: "cron", operation: "rattrapage_wave", message: messageErreur(err) });
+        return null;
+      })
+    : null;
+
   res.json({
     ateliersTraites: ateliers.length,
     emailsEnvoyes,
@@ -107,6 +117,7 @@ router.get("/rappels-quotidiens", async (req, res) => {
     journalSecuritePurge: journalPurge,
     clesIdempotencePurgees: clesPurgees,
     rappelsAbonnement,
+    rattrapageWave,
   });
 });
 

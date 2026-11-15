@@ -12,7 +12,9 @@ import { souscrire, annulerParAtelier } from "../lib/souscription.js";
 import { streamFacturePdf } from "../lib/facturePdf.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { notifierDeclaration } from "../lib/notificationsAbonnement.js";
-import { souscrireSchema } from "../schemas/abonnementPaiement.schema.js";
+import { souscrireSchema, payerWaveSchema } from "../schemas/abonnementPaiement.schema.js";
+import { paiementWaveActif, ErreurWave } from "../lib/wave.js";
+import { demarrerPaiementWave, reconcilierTransactionWave } from "../lib/paiementEnLigne.js";
 
 const router = Router();
 // L'abonnement est celui DE L'ATELIER (Phase 8). LECTURE SEULE : un ADMIN ne
@@ -79,6 +81,8 @@ router.get("/etat", async (req, res) => {
     acces: modeAcces(etat, abonnements, { joursGrace: plateforme?.joursGrace ?? JOURS_GRACE_PAR_DEFAUT }),
     // Déclaration de paiement en attente de confirmation par la plateforme, s'il y en a une.
     paiementEnAttente: enAttente,
+    // Moyens de paiement en ligne réellement disponibles (Wave n'est proposé que s'il est activé et configuré).
+    paiementsEnLigne: { wave: paiementWaveActif() },
     abonnement: a && {
       planNom: a.planNom ?? a.plan?.nom ?? null,
       dureeMois: a.dureeMois,
@@ -122,6 +126,54 @@ router.post("/souscrire", idempotence, async (req, res) => {
     log.warn("abonnement", { evenement: "notification_declaration_echec", message: messageErreur(err) }),
   );
   res.status(201).json({ id: transaction.id, numero: transaction.numero, statut: transaction.statut, montant: transaction.montant });
+});
+
+// POST /api/abonnements/payer-wave — ouvre un paiement Wave. Disponible seulement si Wave est activé (503 sinon).
+// Retourne l'adresse où envoyer l'utilisateur ; l'abonnement n'est activé que lorsque le serveur a relu le paiement
+// chez Wave (webhook ou POST .../transactions/:id/verifier) — jamais sur le retour du navigateur.
+router.post("/payer-wave", idempotence, async (req, res) => {
+  if (!paiementWaveActif()) throw new HttpError(503, "Le paiement par Wave n'est pas disponible. Utilisez un paiement manuel.");
+  const parsed = payerWaveSchema.safeParse(req.body);
+  if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
+  const [atelier, plan] = await Promise.all([
+    prisma.atelier.findUnique({ where: { id: req.user.atelierId }, select: { id: true, nom: true } }),
+    prisma.planAbonnement.findUnique({ where: { id: parsed.data.planId } }),
+  ]);
+  if (!atelier) throw new HttpError(404, "Atelier introuvable.");
+  if (!plan || !plan.actif) throw new HttpError(404, "Formule introuvable ou désactivée.");
+
+  const { transaction, checkoutUrl } = await demarrerPaiementWave(prisma, {
+    atelier,
+    plan,
+    dureeMois: parsed.data.dureeMois,
+    par: req.user.identifiant,
+    origine: origineApplication(req),
+  });
+  await journaliserSecurite("ABONNEMENT_PAIEMENT_DECLARE", {
+    req,
+    userId: req.user.id,
+    atelierId: atelier.id,
+    details: { prefixe: transaction.numero },
+  });
+  res.status(201).json({ id: transaction.id, numero: transaction.numero, statut: transaction.statut, montant: transaction.montant, checkoutUrl });
+});
+
+// POST /api/abonnements/transactions/:id/verifier — demande au SERVEUR de relire un paiement Wave chez Wave. Ne porte
+// aucune affirmation du navigateur : même appelé à tort ou à volonté, il ne peut que constater ce que Wave répond.
+router.post("/transactions/:id/verifier", async (req, res) => {
+  const t = await prisma.transaction.findFirst({ where: { id: req.params.id, atelierId: req.user.atelierId } });
+  if (!t) throw new HttpError(404, "Transaction introuvable.");
+  if (t.moyenPaiement === "WAVE" && t.statut === "EN_ATTENTE") {
+    if (!paiementWaveActif()) throw new HttpError(503, "Le paiement par Wave n'est pas disponible.");
+    try {
+      await reconcilierTransactionWave(prisma, t);
+    } catch (err) {
+      if (err instanceof ErreurWave) throw new HttpError(503, "Vérification auprès de Wave impossible pour le moment. Réessayez dans un instant.");
+      throw err;
+    }
+  }
+  const apres = await prisma.transaction.findUnique({ where: { id: t.id }, select: TRANSACTION_SELECT });
+  res.json(apres);
 });
 
 // GET /api/abonnements/transactions — historique des paiements de l'atelier (déclarés, confirmés, rejetés, remboursés).

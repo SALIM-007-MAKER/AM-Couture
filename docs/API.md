@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 151 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 154 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -216,6 +216,8 @@ Périodes : `period=today\|week\|month\|quarter\|year`, ou `from` et `to` (dates
 | `PATCH /api/parametres` | Atelier | Mêmes champs, tous optionnels. |
 | `GET /api/abonnements/etat` | Atelier¹ | État d'abonnement : `statut` (`ACTIF`, `EN_ATTENTE`, `ESSAI`, `EXPIRE`, `SUSPENDU`, `AUCUN`), essai, abonnement courant, `acces` (`mode` : `COMPLET`, `GRACE` ou `LECTURE_SEULE`, avec la fin de grâce) et `paiementEnAttente` (déclaration non encore tranchée, ou `null`). |
 | `POST /api/abonnements/souscrire` | Atelier¹, idempotente | `{ planId, dureeMois, moyenPaiement ("MOBILE_MONEY" \| "NITA" \| "AMANA" \| "VIREMENT" \| "ESPECES" \| "AUTRE") }` + `operateur?, reference` (obligatoire sauf espèces), `preuveNote?`. Déclare un paiement fait hors plateforme ; **n'accorde aucun accès** avant confirmation. Le montant est calculé par le serveur (un champ `montant` est refusé). La durée doit être proposée par la formule. 409 si une déclaration est déjà en attente. → `201 { id, numero, statut, montant }`. |
+| `POST /api/abonnements/payer-wave` | Atelier¹, idempotente | `{ planId, dureeMois }` — ouvre un paiement Wave et renvoie `201 { id, numero, statut, montant, checkoutUrl }` (adresse où envoyer l'utilisateur). **503 tant que Wave n'est pas activé** (`paiementsEnLigne.wave` de `/etat`). N'active rien : l'abonnement n'est activé que lorsque le serveur a relu le paiement chez Wave. |
+| `POST /api/abonnements/transactions/:id/verifier` | Atelier¹ | Demande au serveur de relire un paiement Wave chez Wave (à appeler au retour du navigateur). Le corps est ignoré : aucune affirmation du client n'est prise en compte. 503 si Wave est injoignable ou inactif. |
 | `GET /api/abonnements/transactions` | Atelier¹ | Historique des paiements de l'atelier (déclarés, confirmés, rejetés, remboursés), avec la facture éventuelle. |
 | `POST /api/abonnements/transactions/:id/annuler` | Atelier¹ | Retire une déclaration en attente. 409 si elle est déjà traitée ; la répéter est sans effet. |
 | `GET /api/abonnements/factures/:id/pdf` | Atelier¹ | Justificatif de paiement en PDF (404 si la facture appartient à un autre atelier). |
@@ -295,11 +297,17 @@ Aucune de ces routes ne donne accès aux données métier d'un atelier (clientes
 | `PUT /api/plateforme/parametres-abonnement` | SuperAdmin | `{ joursGrace }` entier de 0 à 90. |
 | `GET /api/plateforme/journal-securite` | SuperAdmin | `?evenement=`, `atelierId=`, `userId=`, pagination (50 par défaut). |
 
-## 15. Ce qui n'est pas exposé
+## 15. Webhook de paiement
 
-- Le webhook de paiement en ligne (`backend/src/routes/webhooks.routes.js`) existe dans le code mais n'est **pas monté** : les abonnements sont activés manuellement. Il n'est donc pas documenté ici.
+| Route | Accès | Description |
+|---|---|---|
+| `POST /api/webhooks/wave` | Signature Wave | Appelé par Wave, sans cookie. Authentifié par l'en-tête `Wave-Signature` (HMAC-SHA256, tolérance 5 minutes). `401` signature invalide ; `503` Wave non activé ou relecture impossible (Wave réessaie pendant 3 jours) ; `200` événement pris en compte ou sans objet. Le contenu n'est qu'un déclencheur : la session est relue chez Wave avant toute confirmation. Chaque événement n'a d'effet qu'une fois. |
+
+## 16. Ce qui n'est pas exposé
+
+- Le paiement en ligne par Wave est **inactif par défaut** : `WAVE_ENABLED=1`, `WAVE_API_KEY` et `WAVE_WEBHOOK_SECRET` doivent tous être définis (voir `.env.example`). Sinon les routes Wave répondent 503 sans rien traiter.
 - Toute route `/api/*` inconnue répond `404 { "error": "Route API inconnue." }`.
 
-## 16. Constats relevés pendant la rédaction
+## 17. Constats relevés pendant la rédaction
 
 - `GET /api/paiements` et `GET /api/livraisons` (listes globales) ne vérifient pas l'abonnement (« Atelier¹ ») alors que leurs équivalents par commande, et `GET /api/recus`, le font. Une fois l'essai terminé sans abonnement, ces deux listes restent lisibles. Comportement actuel conservé : à décider s'il est voulu.

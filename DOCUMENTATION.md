@@ -374,7 +374,8 @@ Ateliers inscrits / actifs, conversion essai → abonnement, durée moyenne d'ab
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Emails | Oui pour emails |
 | `CRON_SECRET` | Authentifie le cron | Oui pour rappels |
 | `SEED_*` | Amorçage des comptes initiaux | Dev / premier déploiement |
-| `WAVE_*`, `NITA_API_KEY`, `AMANATA_API_KEY` | Paiement en ligne (réservé) | Non (dormant) |
+| `WAVE_ENABLED`, `WAVE_API_KEY`, `WAVE_WEBHOOK_SECRET` | Paiement Wave des abonnements (inactif tant que les trois ne sont pas définis, `WAVE_ENABLED=1`) | Non |
+| `NITA_API_KEY`, `AMANATA_API_KEY` | Réservés (aucune API publique connue) | Non (dormant) |
 
 ### 12.3 Historique récent (commits)
 

@@ -29,6 +29,7 @@ import cronRouter from "./routes/cron.routes.js";
 import stockRouter from "./routes/stock.routes.js";
 import moiRouter from "./routes/moi.routes.js";
 import demandesRouter from "./routes/demandes.routes.js";
+import webhooksRouter from "./routes/webhooks.routes.js";
 
 // Pas de app.listen() ici : ce fichier est importé à la fois par
 // backend/src/server.js (dev local) et par api/index.js (Vercel Function).
@@ -96,11 +97,10 @@ app.use("/api/stock", stockRouter);
 app.use("/api/moi", moiRouter);
 // Gestion ADMIN des demandes de commande envoyées par des clients USER.
 app.use("/api/demandes", demandesRouter);
-// Pas de requireAuth : Wave appelle cette route directement (voir
-// webhooks.routes.js — confiance basée sur la signature HMAC, pas un cookie).
-// Webhooks de paiement (routes/webhooks.routes.js) : volontairement NON montés
-// tant qu'aucun paiement en ligne n'existe (abonnements activés
-// manuellement par le SUPERADMIN). À remonter ici avec l'intégration réelle.
+// Webhooks de paiement (routes/webhooks.routes.js) : pas de requireAuth, Wave appelle cette route directement ;
+// la confiance vient de la signature HMAC. Montés mais INERTES tant que le paiement Wave n'est pas activé
+// (WAVE_ENABLED=1 + clés) : la route répond alors 503 sans rien traiter.
+app.use("/api/webhooks", webhooksRouter);
 // Réservé SUPERADMIN (Phase 8 — multi-tenant) : gestion des ateliers/tenants.
 // Abonnement d'un atelier (activation manuelle) : monté AVANT ateliersRouter,
 // qui porte des routes /:id plus génériques.

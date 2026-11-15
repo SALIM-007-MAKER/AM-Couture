@@ -66,11 +66,12 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
     return res.body;
   }
 
-  test("aucune route de paiement/souscription n'existe côté ADMIN", async () => {
+  test("aucune route de simulation ni de confirmation par l'ADMIN ; le webhook Wave est inerte tant que Wave n'est pas activé", async () => {
     assert.equal((await adminApi.post("/api/abonnements", { planId: plan.id })).status, 404);
     assert.equal((await adminApi.post("/api/transactions/abc/simuler-mock", { resultat: "REUSSIE" })).status, 404);
     assert.equal((await adminApi.post("/api/transactions/abc/confirmer-manuel", {})).status, 404);
-    assert.equal((await adminApi.post("/api/webhooks/wave", {})).status, 404);
+    // Le webhook existe mais ne traite rien sans activation explicite (et il exige de toute façon une signature Wave).
+    assert.equal((await adminApi.post("/api/webhooks/wave", {})).status, 503);
   });
 
   test("ADMIN voit les plans actifs uniquement", async () => {
