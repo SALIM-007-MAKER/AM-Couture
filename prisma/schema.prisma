@@ -202,6 +202,8 @@ model User {
   commandesAssignees  Commande[]            @relation("CommandesAssignees")
   affectationsRecues  AffectationCommande[] @relation("AffectationEmploye")
   affectationsFaites  AffectationCommande[] @relation("AffectationAuteur")
+  notificationsRecues Notification[]        @relation("NotificationsRecues")
+  notificationsLues   NotificationLue[]     @relation("NotificationsLues")
 
   @@index([atelierId])
 }
@@ -277,6 +279,7 @@ model Atelier {
   articlesStock        ArticleStock[]
   fournisseurs         Fournisseur[]
   achats               Achat[]
+  notifications        Notification[]
   abonnements          Abonnement[]
   historiqueAbonnement HistoriqueAbonnement[]
   rappelsAbonnement    RappelAbonnement[]
@@ -553,6 +556,9 @@ enum NotificationType {
   PRET // statut = TERMINEE (prête à récupérer, pas encore livrée)
   LIVRAISON_PROCHE // dateLivraisonPrevue dans les prochains jours (voir lib/notifications.js)
   IMPAYE // 0 FCFA encaissé, hors ANNULEE
+  TACHE_AFFECTEE // (6.6) commande ouverte confiée à un employé : visible par lui seul
+  STOCK_BAS // (6.6) article dont la quantité est au seuil d'alerte ou en dessous
+  ACHAT_EN_RETARD // (6.6) achat non annulé, pas entièrement reçu, dont la date attendue est passée
 }
 
 /// Contenu volontairement minimal : AUCUN texte/libellé stocké — le message
@@ -565,16 +571,46 @@ enum NotificationType {
 /// une ligne est créée (non lue) dès qu'une condition devient vraie, et
 /// supprimée automatiquement dès qu'elle ne l'est plus (commande livrée,
 /// payée...). @@unique évite les doublons lors de cette réconciliation.
+///
+/// Phase 6.6 : une notification porte désormais sur une COMMANDE, un ARTICLE de stock ou un ACHAT (une seule de ces
+/// trois références) et appartient directement à un atelier (atelierId). `destinataireId` limite la vue à une
+/// personne (TACHE_AFFECTEE). `lu` reste l'état de lecture du PDG (et de l'espace client pour PRET/LIVRAISON_PROCHE) ;
+/// chaque EMPLOYÉ a le sien (NotificationLue) : il ne modifie jamais celui du PDG.
 model Notification {
-  id         String           @id @default(cuid())
-  type       NotificationType
-  commandeId String
-  commande   Commande         @relation(fields: [commandeId], references: [id], onDelete: Cascade)
-  lu         Boolean          @default(false)
-  createdAt  DateTime         @default(now())
+  id             String           @id @default(cuid())
+  atelierId      String
+  atelier        Atelier          @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  type           NotificationType
+  commandeId     String?
+  commande       Commande?        @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+  articleId      String?
+  article        ArticleStock?    @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  achatId        String?
+  achat          Achat?           @relation(fields: [achatId], references: [id], onDelete: Cascade)
+  destinataireId String?
+  destinataire   User?            @relation("NotificationsRecues", fields: [destinataireId], references: [id], onDelete: Cascade)
+  lu             Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  lectures NotificationLue[]
 
   @@unique([type, commandeId])
+  @@unique([type, articleId])
+  @@unique([type, achatId])
   @@index([lu])
+  @@index([atelierId])
+}
+
+/// État de lecture d'une notification par un EMPLOYÉ (présence de la ligne = lue). Le PDG n'en a pas : voir Notification.lu.
+model NotificationLue {
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation("NotificationsLues", fields: [userId], references: [id], onDelete: Cascade)
+  luLe           DateTime     @default(now())
+
+  @@id([notificationId, userId])
+  @@index([userId])
 }
 
 enum TypeNotificationClient {
@@ -683,6 +719,7 @@ model ArticleStock {
 
   mouvements  MouvementStock[]
   lignesAchat LigneAchat[]
+  notifications Notification[]
 
   @@index([atelierId])
   @@index([nom])
@@ -1102,7 +1139,8 @@ model Achat {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  lignes LigneAchat[]
+  lignes        LigneAchat[]
+  notifications Notification[]
 
   @@index([atelierId, statut])
   @@index([fournisseurId])

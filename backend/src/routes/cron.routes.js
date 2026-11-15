@@ -5,6 +5,7 @@ import { reconcilierNotifications } from "../lib/notifications.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { rappelsQuotidiensTemplate } from "../lib/emailTemplates.js";
+import { UTILISATEURS_RESUME_QUOTIDIEN } from "../lib/rappelsQuotidiens.js";
 import { purgerJournalSecurite } from "../lib/securityLog.js";
 import { purgerClesIdempotence } from "../lib/idempotence.js";
 import { envoyerRappelsAbonnement } from "../lib/rappelsAbonnement.js";
@@ -18,6 +19,8 @@ const LIBELLES = {
   PRET: "Commande(s) prête(s) à récupérer",
   LIVRAISON_PROCHE: "Livraison(s) prévue(s) sous 3 jours",
   IMPAYE: "Commande(s) impayée(s)",
+  STOCK_BAS: "Article(s) en stock bas",
+  ACHAT_EN_RETARD: "Achat(s) en retard de livraison",
 };
 
 // GET /api/cron/rappels-quotidiens — appelée par Vercel Cron (voir vercel.json),
@@ -57,7 +60,7 @@ router.get("/rappels-quotidiens", async (req, res) => {
     where: { actif: true },
     select: {
       id: true,
-      users: { where: { email: { not: null } }, select: { email: true, prenom: true } },
+      users: { where: UTILISATEURS_RESUME_QUOTIDIEN, select: { email: true, prenom: true } },
     },
   });
 
@@ -71,7 +74,8 @@ router.get("/rappels-quotidiens", async (req, res) => {
 
     const comptes = await prisma.notification.groupBy({
       by: ["type"],
-      where: { lu: false, commande: { atelierId: atelier.id } },
+      // Hors travail confié à un employé (TACHE_AFFECTEE, destinataireId renseigné) : il ne concerne pas le PDG.
+      where: { lu: false, atelierId: atelier.id, destinataireId: null },
       _count: true,
     });
     const total = comptes.reduce((acc, c) => acc + c._count, 0);
