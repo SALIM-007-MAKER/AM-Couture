@@ -239,6 +239,14 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
     assert.equal(Number(actif.prix), 30000);
   });
 
+  // Essai expiré en 2020, bien au-delà de la période de grâce : la lecture reste possible, l'écriture est refusée (402).
+  async function verifierLectureSeule() {
+    assert.equal((await adminApi.get("/api/clientes")).status, 200);
+    const ecriture = await adminApi.post("/api/clientes", { nom: "Lecture", prenom: "Seule", telephone: "90001111" });
+    assert.equal(ecriture.status, 402);
+    assert.equal(ecriture.body.details.lectureSeule, true);
+  }
+
   test("abonnement ACTIF rouvre l'accès malgré l'essai expiré ; expirer/désactiver le referment", async () => {
     await prisma.atelier.update({ where: { id: atelier.id }, data: { trialEndsAt: new Date("2020-01-01") } });
     assert.equal((await adminApi.get("/api/clientes")).status, 200);
@@ -255,14 +263,22 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
     assert.equal(expiration.status, 200);
     assert.equal(expiration.body.statutEffectif, "EXPIRE");
     assert.equal((await etat()).statut, "EXPIRE");
-    assert.equal((await adminApi.get("/api/clientes")).status, 402);
+    // Juste après l'échéance : période de grâce, tout fonctionne encore (avec avertissement côté interface).
+    assert.equal((await etat()).acces.mode, "GRACE");
+    assert.equal((await adminApi.post("/api/clientes", { nom: "Grace", prenom: "Encore", telephone: "90003333" })).status, 201);
+    // Échéance reculée de 30 jours (au-delà de la grâce) : lecture seule.
+    await prisma.abonnement.update({
+      where: { id: actif.id },
+      data: { dateDebut: new Date(Date.now() - 60 * JOUR), dateExpiration: new Date(Date.now() - 30 * JOUR) },
+    });
+    await verifierLectureSeule();
     assert.equal((await superApi.post(`/api/ateliers/${atelier.id}/abonnement/${actif.id}/expirer`, {})).status, 409);
 
     const reactive = await superApi.post(`/api/ateliers/${atelier.id}/abonnement/activer`, { planId: plan.id, dureeMois: 1 });
     assert.equal((await adminApi.get("/api/clientes")).status, 200);
     const desactivation = await superApi.post(`/api/ateliers/${atelier.id}/abonnement/${reactive.body.id}/desactiver`, {});
     assert.equal(desactivation.status, 200);
-    assert.equal((await adminApi.get("/api/clientes")).status, 402);
+    await verifierLectureSeule();
     assert.notEqual((await etat()).statut, "ACTIF");
 
     const histo = (await superApi.get(`/api/ateliers/${atelier.id}/abonnement`)).body.historique.map((h) => h.action);

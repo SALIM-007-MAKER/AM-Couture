@@ -59,7 +59,9 @@ async function request(path, { method = "GET", body, signal } = {}) {
     // (components/PaywallBanner.jsx) s'en sert pour rediriger vers
     // /abonnement depuis n'importe quelle page, sans qu'aucun appelant ici
     // n'ait besoin de connaître ce comportement.
-    if (res.status === 402) {
+    // Exception : un 402 « lecture seule » (details.lectureSeule) refuse UNE écriture, alors que la consultation reste
+    // possible. Pas de redirection : le message du serveur s'affiche là où l'utilisateur a tenté d'écrire.
+    if (res.status === 402 && !payload?.details?.lectureSeule) {
       useAbonnementStore.getState().setBloque(true);
     }
     throw erreurDepuisReponse(res.status, payload, res.headers);

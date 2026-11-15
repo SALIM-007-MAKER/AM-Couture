@@ -3,7 +3,11 @@ import { COOKIE_NAME } from "../lib/authCookie.js";
 import { HttpError } from "./error.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { essaiExpire } from "../lib/trial.js";
-import { statutEffectif } from "../lib/abonnement.js";
+import { etatAbonnementAtelier, modeAcces } from "../lib/abonnement.js";
+
+// Jours de grâce appliqués si la plateforme n'a rien configuré (ParametresPlateforme.joursGrace vaut 7 par défaut).
+const JOURS_GRACE_PAR_DEFAUT = 7;
+const METHODES_LECTURE = new Set(["GET", "HEAD", "OPTIONS"]);
 
 /**
  * Protège une route : exige un cookie de session valide.
@@ -134,22 +138,34 @@ export async function requireAbonnementActif(req, res, next) {
       req.atelierEssai ??
       (await prisma.atelier.findUnique({ where: { id: req.user.atelierId }, select: { trialEndsAt: true } }));
 
-    // Essai en cours (ou atelier ancien sans échéance) : les abonnements n'ont pas à être lus.
-    if (!essaiExpire(atelier)) return next();
+    // Chemin courant, sans requête supplémentaire : essai en cours, ou atelier ancien sans échéance d'essai.
+    if (!atelier?.trialEndsAt || !essaiExpire(atelier)) return next();
 
-    // TOUS les abonnements confirmés, pas seulement le dernier créé : un
-    // abonnement planifié (début futur) ou un ancien abonnement annulé ne
-    // doit jamais masquer un abonnement réellement actif.
-    const abonnementsConfirmes = await prisma.abonnement.findMany({
-      where: { atelierId: req.user.atelierId, statut: "CONFIRME" },
-      select: { statut: true, dateDebut: true, dateExpiration: true },
-    });
-    if (abonnementsConfirmes.some((a) => statutEffectif(a) === "ACTIF")) return next();
+    // Essai terminé : l'état d'abonnement et le délai de grâce décident (voir lib/abonnement.js, modeAcces).
+    const [abonnements, plateforme] = await Promise.all([
+      prisma.abonnement.findMany({
+        where: { atelierId: req.user.atelierId, statut: { in: ["CONFIRME", "SUSPENDU"] } },
+        select: { statut: true, dateDebut: true, dateExpiration: true },
+      }),
+      prisma.parametresPlateforme.findUnique({ where: { id: "plateforme" }, select: { joursGrace: true } }),
+    ]);
+    const etat = etatAbonnementAtelier(atelier, abonnements);
+    const { mode } = modeAcces(etat, abonnements, { joursGrace: plateforme?.joursGrace ?? JOURS_GRACE_PAR_DEFAUT });
+
+    // Accès complet (abonnement actif) ou période de grâce : tout fonctionne, l'interface affiche un avertissement.
+    if (mode !== "LECTURE_SEULE") return next();
+
+    // LECTURE SEULE : l'atelier consulte et exporte ses données, il n'en crée ni n'en modifie plus. Aucune donnée
+    // n'est masquée ni supprimée. Seules exceptions d'écriture : l'état « lu » des notifications (aucune donnée
+    // métier) ; la souscription et le compte ne passent pas par ce middleware.
+    if (METHODES_LECTURE.has(req.method) || req.baseUrl === "/api/notifications") return next();
 
     return next(
-      new HttpError(402, "Votre période d'essai est terminée. Souscrivez à un abonnement pour continuer.", {
-        essaiExpire: true,
-      }),
+      new HttpError(
+        402,
+        "Votre abonnement est terminé : votre atelier est en lecture seule. Vos données restent consultables et exportables. Souscrivez à un abonnement pour reprendre la saisie.",
+        { essaiExpire: true, lectureSeule: true },
+      ),
     );
   } catch (err) {
     next(err);

@@ -84,6 +84,26 @@ test("400 de validation : details conservés", async () => {
   assert.equal(e.kind, "client");
 });
 
+test("402 lecture seule : l'écriture est refusée avec le message du serveur, sans redirection vers l'abonnement", async () => {
+  const { useAbonnementStore } = await import("../../stores/abonnementStore.js");
+  useAbonnementStore.getState().setBloque(false);
+  globalThis.fetch = async () =>
+    reponse(402, { error: "Votre abonnement est terminé : lecture seule.", details: { essaiExpire: true, lectureSeule: true } });
+  const e = await erreurDe(api.post("/clientes", {}));
+  assert.equal(e.status, 402);
+  assert.match(e.message, /lecture seule/);
+  assert.equal(useAbonnementStore.getState().bloque, false);
+});
+
+test("402 sans lecture seule (ancien comportement) : signale le blocage", async () => {
+  const { useAbonnementStore } = await import("../../stores/abonnementStore.js");
+  useAbonnementStore.getState().setBloque(false);
+  globalThis.fetch = async () => reponse(402, { error: "Essai terminé.", details: { essaiExpire: true } });
+  await erreurDe(api.get("/clientes"));
+  assert.equal(useAbonnementStore.getState().bloque, true);
+  useAbonnementStore.getState().setBloque(false);
+});
+
 test("204 : renvoie null", async () => {
   globalThis.fetch = async () => new Response(null, { status: 204 });
   assert.equal(await api.delete("/x"), null);
