@@ -14,7 +14,7 @@ const OR = "#B8912F";
 const SOMBRE = "#1A1A1A";
 const GRIS = "#4A4A4A";
 
-function formatDate(date) {
+export function formatDate(date) {
   return new Date(date).toLocaleDateString("fr-FR", {
     year: "numeric",
     month: "long",
@@ -69,7 +69,7 @@ const PDF_SYMBOL_FALLBACKS = {
   "✘": "X",
 };
 
-function sanitizeForPdf(value) {
+export function sanitizeForPdf(value) {
   if (value === null || value === undefined) return "";
   const str = String(value);
   let out = "";

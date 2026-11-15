@@ -85,3 +85,25 @@ Lue le 15/11/2026 sur docs.wave.com (pages Checkout et Webhooks).
 - Migration `20261117090000_abonnement_paiements_factures` : **additive**, rejouée sur une base contenant déjà un abonnement et une transaction (lignes inchangées, `atelierId` de la transaction déduit de son abonnement). Une seule transaction en attente par abonnement (index unique partiel) ; contraintes `CHECK` en `NOT VALID`.
 - `lib/abonnement.js` : état `SUSPENDU`, `modeAcces()` (complet, grâce, lecture seule), `dateDebutSouscription()` (un renouvellement anticipé commence à l'échéance en cours, aucun jour perdu).
 - 23 tests unitaires (`lib/__tests__/abonnement.test.js`), deux mutations détectées.
+
+## 8. Réalisé en 5.2 — souscription et paiements manuels vérifiés
+
+**Flux.** L'atelier choisit une formule et une durée proposées, puis déclare un paiement fait hors plateforme (opérateur, référence, note) : `POST /api/abonnements/souscrire`. Rien n'est activé. Le SUPERADMIN rapproche la référence de son relevé puis confirme, rejette ou rembourse (`/api/plateforme/transactions/:id/...`). La confirmation active l'abonnement et émet la facture.
+
+**Garanties (toutes testées en intégration, 22 tests, mutations détectées) :**
+- le prix vient du serveur ; un champ `montant` envoyé est refusé ; la durée doit être proposée par la formule ;
+- une déclaration n'accorde aucun accès ; un moyen `WAVE` ne peut pas être déclaré ni confirmé à la main ;
+- une seule déclaration en attente par atelier (règle applicative et index unique partiel) ;
+- confirmations répétées ou simultanées (5 en parallèle) : une seule activation, une seule facture, une seule entrée d'historique ; sans les verrous, le test échoue ;
+- renouvellement anticipé : le nouvel abonnement commence à l'échéance de celui en cours ;
+- rejet, annulation par l'atelier, remboursement : jamais de suppression, tout est daté, signé (`confirmePar`, `rembourseePar`), motivé, historisé et inscrit au journal de sécurité ;
+- isolation : un autre atelier reçoit 404 sur une transaction ou une facture qui n'est pas la sienne ;
+- suspension / réactivation d'un abonnement avec motif obligatoire ; suspendu = lecture seule immédiate.
+
+**Limites connues, à connaître avant usage :**
+- le rapprochement avec le relevé est **humain** : la plateforme ne vérifie aucun paiement auprès d'un opérateur (aucune API disponible) ; sa fiabilité repose sur le SUPERADMIN ;
+- le remboursement est **enregistré**, pas exécuté : l'argent est rendu hors plateforme ; remboursement total uniquement ;
+- le document émis s'intitule « Justificatif de paiement d'abonnement » et ne porte **aucune mention légale** (identifiant fiscal, registre de commerce, adresse du siège) : elles sont à renseigner dans `lib/facturePdf.js` (`EMETTEUR`) avant tout usage comptable ; je ne les connais pas et ne les ai pas inventées ;
+- rembourser un abonnement suivi d'un abonnement planifié laisse un trou entre les deux : les dates ne sont pas recalculées ;
+- pas encore de courriel envoyé à l'atelier lors d'une confirmation ou d'un rejet (prévu avec les rappels, 5.4) ;
+- la lecture seule n'est pas encore appliquée : `acces.mode` est calculé et exposé, mais le blocage reste l'ancien 402 jusqu'à la 5.3.
