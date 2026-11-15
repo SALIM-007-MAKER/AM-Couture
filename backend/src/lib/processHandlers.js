@@ -2,6 +2,8 @@
 // que dans la sortie brute de Node, sans format ni contexte. Même format JSON que les erreurs de
 // requête (voir error.middleware.js) pour qu'on les retrouve avec la même recherche.
 
+import { journaliser as journaliserLog } from "./logger.js";
+
 const INSTALLE = Symbol.for("am.processHandlers.installes");
 const LIGNES_PILE = 8;
 
@@ -20,7 +22,7 @@ function decrire(raison) {
 
 function journaliser(categorie, raison) {
   const { message, pile } = decrire(raison);
-  console.error(JSON.stringify({ type: "erreur", date: new Date().toISOString(), categorie, message, pile }));
+  journaliserLog("error", "erreur", { categorie, message, pile });
 }
 
 /**

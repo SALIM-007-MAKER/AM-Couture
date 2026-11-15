@@ -1,3 +1,4 @@
+import { log, messageErreur } from "../lib/logger.js";
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { reconcilierNotifications } from "../lib/notifications.js";
@@ -38,13 +39,13 @@ router.get("/rappels-quotidiens", async (req, res) => {
   // Conservation limitée du journal de sécurité (IP = donnée personnelle) —
   // un échec de purge ne doit jamais empêcher l'envoi des rappels.
   const journalPurge = await purgerJournalSecurite().catch((err) => {
-    console.error(`[cron] Purge du journal de sécurité impossible : ${err.message}`);
+    log.error("erreur", { categorie: "cron", operation: "purge_journal_securite", message: messageErreur(err) });
     return null;
   });
 
   // Clés d'idempotence expirées (durée de vie 24 h) : même principe, un échec ne bloque pas les rappels.
   const clesPurgees = await purgerClesIdempotence().catch((err) => {
-    console.error(`[cron] Purge des clés d'idempotence impossible : ${err.message}`);
+    log.error("erreur", { categorie: "cron", operation: "purge_cles_idempotence", message: messageErreur(err) });
     return null;
   });
 

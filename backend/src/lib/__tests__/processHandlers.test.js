@@ -64,5 +64,5 @@ test("aucune donnée sensible : seule la pile technique est journalisée, pas de
   installerGestionnairesProcessus(p);
   const lignes = capturer(() => p.emit("unhandledRejection", new Error("échec")));
   const j = JSON.parse(lignes[0]);
-  assert.deepEqual(Object.keys(j).sort(), ["categorie", "date", "message", "pile", "type"]);
+  assert.deepEqual(Object.keys(j).sort(), ["categorie", "date", "message", "niveau", "pile", "type"]);
 });

@@ -1,3 +1,4 @@
+import { log, messageErreur } from "../lib/logger.js";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
@@ -214,7 +215,7 @@ router.post("/inscription-atelier", inscriptionLimiter, rejectIfDejaConnecte, as
       }),
     });
   } catch (err) {
-    console.error(`[inscription-atelier] Échec de l'envoi de l'email de vérification à ${admin.email} :`, err.message);
+    log.error("erreur", { categorie: "email", operation: "verification_inscription", userId: admin.id, message: messageErreur(err) });
   }
 
   const token = signAuthToken(admin);
@@ -299,7 +300,7 @@ router.post("/mot-de-passe-oublie", motDePasseOublieLimiter, async (req, res) =>
         }),
       });
     } catch (err) {
-      console.error(`[mot-de-passe-oublie] Échec de l'envoi à ${user.email} :`, err.message);
+      log.error("erreur", { categorie: "email", operation: "mot_de_passe_oublie", userId: user.id, message: messageErreur(err) });
     }
   }
 

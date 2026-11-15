@@ -1,5 +1,6 @@
 import { HttpError } from "../lib/httpError.js";
 import { classifierErreur, RETRY_AFTER_SECONDES } from "../lib/classifierErreur.js";
+import { journaliser } from "../lib/logger.js";
 
 // Réexporté : toutes les routes importent HttpError depuis ce module.
 export { HttpError };
@@ -13,9 +14,8 @@ function cheminSansQuery(req) {
 }
 
 function ecrireJournal(niveau, ligne) {
-  const texte = JSON.stringify(ligne);
-  if (niveau === "error") console.error(texte);
-  else console.warn(texte);
+  const { type, date: _date, ...champs } = ligne;
+  journaliser(niveau, type, champs);
 }
 
 /**

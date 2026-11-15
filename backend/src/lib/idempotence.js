@@ -14,6 +14,7 @@
 // opération déjà terminée dont le client a reçu la réponse.
 import crypto from "node:crypto";
 import { prisma } from "./prisma.js";
+import { log, messageErreur } from "./logger.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { isUniqueConstraintViolation } from "./prismaErrors.js";
@@ -46,7 +47,7 @@ function normaliser(corps) {
 }
 
 function journaliserEchec(err) {
-  console.error(JSON.stringify({ type: "erreur", date: new Date().toISOString(), categorie: "idempotence", message: String(err?.message).replace(/\s+/g, " ").slice(0, 200) }));
+  log.error("erreur", { categorie: "idempotence", message: messageErreur(err) });
 }
 
 /**
