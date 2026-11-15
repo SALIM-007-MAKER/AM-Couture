@@ -89,7 +89,9 @@ export async function requireAtelier(req, res, next) {
   try {
     const atelier = await prisma.atelier.findUnique({
       where: { id: req.user.atelierId },
-      select: { actif: true },
+      // trialEndsAt lu ici en même temps que `actif` : requireAbonnementActif (juste après) en a besoin, ce qui
+      // lui évite une seconde lecture de la même ligne (un aller-retour de moins par requête authentifiée).
+      select: { actif: true, trialEndsAt: true },
     });
     // atelier introuvable : cas théorique (onDelete: Restrict empêche sa
     // suppression tant qu'un compte y est rattaché) — traité comme suspendu
@@ -97,6 +99,7 @@ export async function requireAtelier(req, res, next) {
     if (!atelier || !atelier.actif) {
       return next(new HttpError(403, "Cet atelier a été suspendu par la plateforme. Contactez le support."));
     }
+    req.atelierEssai = { trialEndsAt: atelier.trialEndsAt };
     next();
   } catch (err) {
     next(err);
@@ -126,18 +129,21 @@ export async function requireAbonnementActif(req, res, next) {
   if (req.user.impersonatedBy) return next();
 
   try {
-    const [atelier, abonnementsConfirmes] = await Promise.all([
-      prisma.atelier.findUnique({ where: { id: req.user.atelierId }, select: { trialEndsAt: true } }),
-      // TOUS les abonnements confirmés, pas seulement le dernier créé : un
-      // abonnement planifié (début futur) ou un ancien abonnement annulé ne
-      // doit jamais masquer un abonnement réellement actif.
-      prisma.abonnement.findMany({
-        where: { atelierId: req.user.atelierId, statut: "CONFIRME" },
-        select: { statut: true, dateDebut: true, dateExpiration: true },
-      }),
-    ]);
+    // Échéance d'essai déjà lue par requireAtelier ; relue seulement si ce middleware est utilisé seul.
+    const atelier =
+      req.atelierEssai ??
+      (await prisma.atelier.findUnique({ where: { id: req.user.atelierId }, select: { trialEndsAt: true } }));
 
+    // Essai en cours (ou atelier ancien sans échéance) : les abonnements n'ont pas à être lus.
     if (!essaiExpire(atelier)) return next();
+
+    // TOUS les abonnements confirmés, pas seulement le dernier créé : un
+    // abonnement planifié (début futur) ou un ancien abonnement annulé ne
+    // doit jamais masquer un abonnement réellement actif.
+    const abonnementsConfirmes = await prisma.abonnement.findMany({
+      where: { atelierId: req.user.atelierId, statut: "CONFIRME" },
+      select: { statut: true, dateDebut: true, dateExpiration: true },
+    });
     if (abonnementsConfirmes.some((a) => statutEffectif(a) === "ACTIF")) return next();
 
     return next(
