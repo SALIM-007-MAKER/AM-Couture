@@ -207,7 +207,7 @@ Profil, mesures, liste et détail des commandes, paiements, reçus (PDF), fil de
 | Intégration (`npm run test:integration`) | isolation tenant, frontières de rôles, essai/abonnement, abonnement manuel, notifications client, mesure requise | ~52 cas |
 | CI | lint → build → tests unitaires → intégration sur Postgres jetable (jamais Neon) | GitHub Actions |
 
-**Déploiement** : push GitHub → Vercel exécute `prisma generate && prisma migrate deploy && vite build`. Variables : `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `CRON_SECRET` (+ clés de paiement réservées).
+**Déploiement** : push GitHub → Vercel exécute `scripts/vercel-build.mjs` (migrations en production uniquement ; procédure et retour arrière : `docs/DEPLOIEMENT.md`). Variables : `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `CRON_SECRET` (+ clés de paiement réservées).
 
 **Démarrage local** : `npm install`, copier `.env.example` vers `.env`, `npx prisma generate`, `npx prisma migrate dev`, puis `npm run dev:backend` (:4000) et `npm run dev:frontend` (:5173).
 

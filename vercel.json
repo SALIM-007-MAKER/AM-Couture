@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx prisma generate && npx prisma migrate deploy && npm run build -w frontend",
+  "buildCommand": "node scripts/vercel-build.mjs",
   "installCommand": "npm install",
   "outputDirectory": "frontend/dist",
   "functions": {
