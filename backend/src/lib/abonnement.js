@@ -137,7 +137,13 @@ export const MODES_ACCES = ["COMPLET", "GRACE", "LECTURE_SEULE"];
 export function modeAcces(etat, abonnements, { joursGrace }, now = new Date()) {
   const complet = { mode: "COMPLET", graceJusquAu: null, joursGraceRestants: null };
   if (etat.statut === "AUCUN" || etat.statut === "ACTIF" || etat.statut === "ESSAI") return complet;
-  if (etat.statut === "SUSPENDU") return { mode: "LECTURE_SEULE", graceJusquAu: null, joursGraceRestants: null };
+  // Atelier antérieur à l'essai gratuit (pas d'échéance d'essai) : jamais restreint, quel que soit son historique.
+  if (!etat.essai) return complet;
+  // Suspendu : lecture seule immédiate, sauf pendant l'essai gratuit encore en cours (la suspension d'un abonnement
+  // ne retire pas un essai dont l'atelier dispose déjà).
+  if (etat.statut === "SUSPENDU") {
+    return etat.essai.actif ? complet : { mode: "LECTURE_SEULE", graceJusquAu: null, joursGraceRestants: null };
+  }
 
   // EXPIRE ou EN_ATTENTE (activation planifiée pas encore commencée) : la grâce court depuis la fin des derniers
   // droits connus (essai ou abonnement échu), la plus tardive des deux.

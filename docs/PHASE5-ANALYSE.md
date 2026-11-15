@@ -107,3 +107,27 @@ Lue le 15/11/2026 sur docs.wave.com (pages Checkout et Webhooks).
 - rembourser un abonnement suivi d'un abonnement planifié laisse un trou entre les deux : les dates ne sont pas recalculées ;
 - pas encore de courriel envoyé à l'atelier lors d'une confirmation ou d'un rejet (prévu avec les rappels, 5.4) ;
 - la lecture seule n'est pas encore appliquée : `acces.mode` est calculé et exposé, mais le blocage reste l'ancien 402 jusqu'à la 5.3.
+
+## 9. Réalisé en 5.3 — grâce puis lecture seule
+
+**Règle appliquée par `requireAbonnementActif`** (toutes les routes métier de l'atelier) :
+
+| Situation | Accès |
+|---|---|
+| Essai en cours, atelier ancien sans échéance d'essai | complet, sans requête supplémentaire |
+| Abonnement actif | complet |
+| Fin d'essai ou d'abonnement depuis moins de `joursGrace` jours (7 par défaut, réglable) | **complet** (l'interface affichera un avertissement, 5.7) |
+| Au-delà de la grâce, ou abonnement suspendu | **lecture seule** : `GET` (consultation, exports CSV, PDF) accepté ; toute écriture refusée en **402** avec `details.lectureSeule: true` |
+| Impersonation SUPERADMIN | jamais restreint |
+
+**Ce qui reste possible en lecture seule** : consulter et exporter toutes les données ; l'état « lu » des notifications ; le compte (langue, mot de passe) ; la page Abonnement, la souscription et le téléchargement des factures. **Aucune donnée n'est supprimée ni masquée.**
+
+**Changements de comportement par rapport à avant (volontaires) :** un atelier dont l'essai a expiré recevait 402 sur toute requête, lecture comprise ; il peut désormais lire et exporter. Les tests qui attendaient ce blocage total ont été modifiés en conséquence (`trial-abonnement`, `abonnement-manuel`). Un abonnement suspendu pendant un essai encore en cours ne restreint pas l'accès (l'essai prime). Les ateliers sans échéance d'essai (antérieurs à la fonctionnalité) ne sont jamais restreints, même avec un ancien abonnement échu : comportement d'avant conservé.
+
+**Tests** : 10 tests d'intégration (`lecture-seule.test.js`) : grâce, matrice de 13 écritures refusées sans aucun effet en base, 21 lectures et exports acceptés, durée de grâce lue dans les réglages, rétablissement immédiat après confirmation d'un paiement. Trois mutations détectées (écritures autorisées, grâce ignorée, lectures bloquées). Côté interface, un 402 « lecture seule » n'ouvre plus la redirection vers la page Abonnement : le message du serveur s'affiche à l'endroit de la saisie (2 tests).
+
+**Limites :**
+- l'interface n'affiche pas encore de bandeau « lecture seule » ni ne désactive les boutons d'écriture (5.7) : l'utilisateur voit le message d'erreur du serveur quand il tente d'écrire ;
+- la ligne `joursGrace` est globale à la plateforme (pas de durée par atelier) ;
+- `GET /api/notifications` réconcilie des alertes calculées en base même en lecture seule (données dérivées, pas des données métier) ;
+- la relecture de l'état d'abonnement après la fin d'essai coûte deux requêtes de plus par requête authentifiée (abonnements et réglages), uniquement pour les ateliers dans cette situation.

@@ -266,6 +266,8 @@ describe("Souscription et paiements d'abonnement", () => {
 
   describe("suspension d'un abonnement", () => {
     test("suspendu : lecture seule immédiate ; réactivé : accès complet", async () => {
+      // L'essai de l'atelier est terminé depuis longtemps : seul son abonnement lui donne encore accès.
+      await prisma.atelier.update({ where: { id: A.id }, data: { trialEndsAt: new Date(Date.now() - 60 * JOUR) } });
       const courant = await prisma.abonnement.findFirst({ where: { atelierId: A.id, statut: "CONFIRME" }, orderBy: { dateDebut: "asc" } });
       assert.equal((await superApi.post(`/api/ateliers/${A.id}/abonnement/${courant.id}/suspendre`, {})).status, 400, "motif obligatoire");
       const s = await superApi.post(`/api/ateliers/${A.id}/abonnement/${courant.id}/suspendre`, { note: "Litige de paiement" });
@@ -276,6 +278,7 @@ describe("Souscription et paiements d'abonnement", () => {
       const r = await superApi.post(`/api/ateliers/${A.id}/abonnement/${courant.id}/reactiver`, { note: "Litige réglé" });
       assert.equal(r.body.statut, "CONFIRME");
       assert.equal((await etat(apiA)).acces.mode, "COMPLET");
+      await prisma.atelier.update({ where: { id: A.id }, data: { trialEndsAt: null } });
     });
   });
 
@@ -291,9 +294,10 @@ describe("Souscription et paiements d'abonnement", () => {
     test("jours de grâce : bornés entre 0 et 90", async () => {
       assert.equal((await superApi.put("/api/plateforme/parametres-abonnement", { joursGrace: 91 })).status, 400);
       assert.equal((await superApi.put("/api/plateforme/parametres-abonnement", { joursGrace: -1 })).status, 400);
-      const ok = await superApi.put("/api/plateforme/parametres-abonnement", { joursGrace: 10 });
-      assert.equal(ok.body.joursGrace, 10);
-      assert.equal((await superApi.put("/api/plateforme/parametres-abonnement", { joursGrace: 7 })).body.joursGrace, 7);
+      // Valeur valide = valeur par défaut : la ligne est partagée avec lecture-seule.test.js (fichiers en parallèle).
+      const ok = await superApi.put("/api/plateforme/parametres-abonnement", { joursGrace: 7 });
+      assert.equal(ok.body.joursGrace, 7);
+      assert.equal((await superApi.get("/api/plateforme/parametres-abonnement")).status, 200);
     });
   });
 });

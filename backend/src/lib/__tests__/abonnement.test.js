@@ -81,6 +81,13 @@ describe("modeAcces — grâce puis lecture seule", () => {
   it("abonnement suspendu : lecture seule immédiate, sans grâce", () => {
     assert.equal(mode({ trialEndsAt: jours(-60) }, [abo("SUSPENDU", -10, 20)]).mode, "LECTURE_SEULE");
   });
+  it("atelier ancien (sans échéance d'essai) : jamais restreint, même avec un abonnement échu", () => {
+    assert.equal(mode({ trialEndsAt: null }, [abo("CONFIRME", -60, -30)]).mode, "COMPLET");
+    assert.equal(mode({ trialEndsAt: null }, [abo("SUSPENDU", -10, 20)]).mode, "COMPLET");
+  });
+  it("abonnement suspendu pendant un essai encore en cours : accès complet", () => {
+    assert.equal(mode({ trialEndsAt: jours(5) }, [abo("SUSPENDU", -2, 28)]).mode, "COMPLET");
+  });
   it("grâce à 0 jour : lecture seule dès l'échéance", () => {
     const abos = [];
     const etat = etatAbonnementAtelier({ trialEndsAt: jours(-1) }, abos, NOW);

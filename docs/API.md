@@ -18,7 +18,7 @@ Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence �
 |---|---|---|
 | Public | aucune | — |
 | Session | cookie valide, tout rôle | 401 |
-| Atelier | compte `ADMIN` rattaché à un atelier actif, **et** essai en cours ou abonnement actif | 401, 403 (rôle ou atelier suspendu), 402 (essai terminé sans abonnement) |
+| Atelier | compte `ADMIN` rattaché à un atelier actif, **et** essai en cours, abonnement actif ou période de grâce. Une fois la grâce écoulée, l'atelier est en **lecture seule** : `GET` (consultation, exports CSV, PDF) accepté, toute écriture refusée | 401, 403 (rôle ou atelier suspendu), 402 (écriture en lecture seule) |
 | Atelier¹ | comme Atelier, **sans** contrôle de l'abonnement | 401, 403 |
 | Cliente | compte `USER` (cliente finale) | 401, 403 |
 | SuperAdmin | compte `SUPERADMIN` | 401, 403 |
@@ -32,7 +32,7 @@ Un atelier n'accède jamais aux données d'un autre : une ressource d'un autre a
 |---|---|
 | 400 | Corps, paramètres ou identifiant invalides |
 | 401 | Non connecté, session expirée ou identifiants faux |
-| 402 | Essai gratuit terminé et aucun abonnement actif |
+| 402 | Écriture refusée : essai ou abonnement terminé au-delà de la période de grâce (lecture seule). `details.lectureSeule` vaut `true` |
 | 403 | Rôle insuffisant, atelier suspendu, origine refusée |
 | 404 | Ressource inexistante **ou appartenant à un autre atelier** |
 | 409 | Conflit métier (doublon, transition interdite, solde dépassé…) |
