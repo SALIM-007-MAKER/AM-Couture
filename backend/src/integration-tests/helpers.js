@@ -160,6 +160,10 @@ export async function supprimerAtelier(atelierId) {
   // par clarté plutôt que de compter sur le SetNull implicite.
   await prisma.cliente.updateMany({ where: { atelierId }, data: { userId: null } });
   await prisma.cliente.deleteMany({ where: { atelierId } });
+  // Achats (6.5) : mouvements de réception → lignes → achats, avant les articles, fournisseurs et dépenses.
+  await prisma.mouvementStock.deleteMany({ where: { ligneAchat: { achat: { atelierId } } } });
+  await prisma.ligneAchat.deleteMany({ where: { achat: { atelierId } } });
+  await prisma.achat.deleteMany({ where: { atelierId } });
   await prisma.modele.deleteMany({ where: { atelierId } });
   await prisma.fournisseur.deleteMany({ where: { atelierId } });
   await prisma.depense.deleteMany({ where: { atelierId } });
