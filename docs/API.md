@@ -1,0 +1,292 @@
+# Documentation de l'API
+
+Référence des 138 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+
+Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
+
+## 1. Conventions
+
+**Format.** JSON en entrée et en sortie (`Content-Type: application/json`), corps limité à 5 Mo (les images sont envoyées en base64 dans le JSON). Les montants et mesures décimales sont renvoyés sous forme de chaînes (`"25000"`). Les dates sont au format ISO 8601.
+
+**Authentification.** Cookie `am_session` (JWT, HttpOnly, `SameSite=Lax`, `Secure` en production), posé par `POST /api/auth/login`. Aucun en-tête `Authorization` n'est utilisé, sauf pour la route cron. À chaque requête, la version de session et l'état de l'atelier sont relus en base : un changement de mot de passe ou une suspension prennent effet immédiatement.
+
+**Protection CSRF.** Toute écriture (`POST`, `PUT`, `PATCH`, `DELETE`) portant un en-tête `Origin` d'un autre site que celui de l'application est refusée (403). Une requête sans `Origin` (curl, serveur à serveur) est acceptée.
+
+**Rôles et niveaux d'accès** (colonne « Accès » ci-dessous) :
+
+| Code | Exigence | Échec |
+|---|---|---|
+| Public | aucune | — |
+| Session | cookie valide, tout rôle | 401 |
+| Atelier | compte `ADMIN` rattaché à un atelier actif, **et** essai en cours ou abonnement actif | 401, 403 (rôle ou atelier suspendu), 402 (essai terminé sans abonnement) |
+| Atelier¹ | comme Atelier, **sans** contrôle de l'abonnement | 401, 403 |
+| Cliente | compte `USER` (cliente finale) | 401, 403 |
+| SuperAdmin | compte `SUPERADMIN` | 401, 403 |
+| Cron | `Authorization: Bearer <CRON_SECRET>` | 401, 503 si le secret n'est pas configuré |
+
+Un atelier n'accède jamais aux données d'un autre : une ressource d'un autre atelier répond **404** (pas 403), comme une ressource inexistante. Une session d'impersonation SUPERADMIN agit avec les droits du compte ADMIN visé et n'est jamais bloquée par l'abonnement.
+
+**Erreurs.** `{ "error": "message", "details": {…}, "requestId": "…" }` (`requestId` sur toute 5xx, identique à l'en-tête `X-Request-Id`). `details` des erreurs 400 de validation : `{ "champ": ["message", …] }` ; pour d'autres erreurs (409), sa forme est propre à la route (voir ERREURS.md).
+
+| Statut | Signification |
+|---|---|
+| 400 | Corps, paramètres ou identifiant invalides |
+| 401 | Non connecté, session expirée ou identifiants faux |
+| 402 | Essai gratuit terminé et aucun abonnement actif |
+| 403 | Rôle insuffisant, atelier suspendu, origine refusée |
+| 404 | Ressource inexistante **ou appartenant à un autre atelier** |
+| 409 | Conflit métier (doublon, transition interdite, solde dépassé…) |
+| 413 | Corps trop volumineux |
+| 429 | Trop de tentatives (limiteur de débit) |
+| 503 | Base ou service indisponible (réessayer) ; l'en-tête `Retry-After` peut être présent |
+
+**Pagination.** Les listes acceptent `page` (≥ 1, défaut 1) et `pageSize` (1 à 100, défaut 20 ; 50 pour le journal de sécurité) et répondent `{ "data": [...], "meta": { "page", "pageSize", "total", "totalPages" } }`. Les routes `/export` renvoient un CSV (`text/csv`) plafonné à 20 000 lignes, avec les mêmes filtres que la liste.
+
+**Idempotence.** Les 7 créations suivantes acceptent l'en-tête optionnel `Idempotency-Key` (8 à 128 caractères parmi lettres, chiffres, `- _ . :`) : rejouer la même requête avec la même clé renvoie la réponse d'origine sans recréer la ressource. Elles sont marquées « idempotente » ci-dessous. Détail : [IDEMPOTENCE.md](IDEMPOTENCE.md).
+
+**Limiteurs de débit** (par IP, persistés en base) : connexion 10 / 15 min · recherche de l'atelier d'un identifiant 30 / 15 min · inscription d'atelier 5 / h · renvoi de l'email de vérification 5 / h · mot de passe oublié 5 / h. Dépassement : 429.
+
+**Identifiants.** Les paramètres `:id`, `:commandeId`, etc. sont validés avant tout accès à la base : un format invalide répond 400.
+
+**Téléphones.** 8 à 15 chiffres. Un numéro de 8 chiffres reçoit l'indicatif du Niger (227) à l'enregistrement.
+
+## 2. Santé et tâches planifiées
+
+| Route | Accès | Description |
+|---|---|---|
+| `GET /api/health` | Public | Le processus répond : `{ "status": "ok", "service": "gestion-atelier-api" }`. Ne dépend pas de la base. |
+| `GET /api/health/ready` | Public | Vérifie la base (`SELECT 1`, 2,5 s maximum) : `200 { "status": "ok", "db": "ok", "latenceMs" }` ou `503 { "status": "degraded", "db": "indisponible" }`. |
+| `GET /api/cron/rappels-quotidiens` | Cron | Appelée par Vercel Cron : envoie les rappels par email, purge le journal de sécurité (rétention 365 jours). |
+
+## 3. Authentification (`/api/auth`)
+
+| Route | Accès | Corps / paramètres → réponse |
+|---|---|---|
+| `POST /api/auth/login` | Public (limiteur) | `{ identifiant, password }` → `200 { id, identifiant, role, atelierId }` + cookie. 401 au même message que l'identifiant soit inconnu ou le mot de passe faux. |
+| `POST /api/auth/logout` | Public | Efface le cookie → `204`. |
+| `GET /api/auth/me` | Session | `{ id, identifiant, langue, role, atelierId, createdAt, email, emailVerifieLe, impersonation }` ; `impersonation` vaut `null` hors impersonation, sinon `{ superadminIdentifiant }`. |
+| `GET /api/auth/atelier-pour-identifiant` | Public (limiteur) | `?identifiant=` → `{ nom, logoUrl }` de l'atelier du compte (écran de connexion personnalisé), `null` si inconnu. |
+| `POST /api/auth/inscription-atelier` | Public (limiteur), refusée si déjà connecté | Crée un atelier et son premier compte ADMIN : `{ prenom, nomProprietaire, email, adminPassword, telephone, nom?, logoUrl?, ville?, pays?, devise?, langue? }` → `201 { id, identifiant, role, atelierId }`. Essai gratuit de 15 jours. |
+| `GET /api/auth/verifier-email` | Public | `?token=` → `{ email }` ; valide l'adresse du compte. |
+| `POST /api/auth/renvoyer-verification-email` | Session (limiteur) | Renvoie le lien de vérification → `{ message }`. |
+| `POST /api/auth/mot-de-passe-oublie` | Public (limiteur) | `{ identifiant }` → `{ message }` identique que le compte existe ou non (pas d'énumération). |
+| `POST /api/auth/reinitialiser-mot-de-passe-token` | Public | `{ token, nouveauMotDePasse }` → `204`. Le jeton est à usage unique. |
+| `POST /api/auth/activer-compte-client` | Public | Active le compte d'une cliente invitée : `{ token, nouveauMotDePasse }` → `{ id, identifiant, role, atelierId }` + cookie. |
+| `POST /api/auth/quitter-impersonation` | Session | Met fin à une impersonation et rétablit la session SUPERADMIN d'origine. |
+
+Politique de mot de passe : voir `backend/src/lib/passwordPolicy.js`.
+
+## 4. Mon compte (`/api/compte`) — Session
+
+| Route | Accès | Corps |
+|---|---|---|
+| `PATCH /api/compte` | Session | `{ langue: "fr" \| "en" \| "ha" }` |
+| `PATCH /api/compte/mot-de-passe` | Session | `{ motDePasseActuel, nouveauMotDePasse }` (différent de l'actuel). Invalide les autres sessions ouvertes. |
+
+## 5. Clientes et mesures
+
+Schéma : `cliente.schema.js`, `mesure.schema.js`.
+
+| Route | Accès | Corps / paramètres |
+|---|---|---|
+| `POST /api/clientes` | Atelier, idempotente | `{ nom, prenom, telephone }` + `telephone2?, email?, adresse?, sexe? ("FEMME" \| "HOMME" \| "AUTRE"), notes?`. 409 si le téléphone existe déjà dans l'atelier (la réponse contient l'identité de la cliente existante dans `details`). |
+| `GET /api/clientes` | Atelier | `?q=` (nom, prénom, téléphone), `archived=true\|false\|all` (défaut `false`), `page`, `pageSize`. |
+| `GET /api/clientes/export` | Atelier | CSV, mêmes filtres. |
+| `GET /api/clientes/:id` | Atelier | Fiche. |
+| `GET /api/clientes/:id/totaux` | Atelier | `{ totalCommandes, totalPaye, totalRestant }` de la cliente. |
+| `PATCH /api/clientes/:id` | Atelier | Mêmes champs que la création, tous optionnels (au moins un). |
+| `POST /api/clientes/:id/archiver` | Atelier | Archive (aucune suppression physique). |
+| `POST /api/clientes/:id/restaurer` | Atelier | Restaure une cliente archivée. |
+| `POST /api/clientes/:id/inviter` | Atelier | Crée le compte de connexion (identifiant = téléphone) et renvoie un lien d'activation ; 409 si un compte existe déjà. |
+| `POST /api/clientes/:id/mesures` | Atelier | Nouvelle prise de mesures (historique conservé) : champs en cm parmi `epaule, poitrine, taille, hanches, longueur, longueurRobe, longueurJupe, longueurPantalon, longueurManche, tourBras, tourCou, tourPoignet, tourCuisse, tourGenou` (0,1 à 300, 2 décimales), `autres?` (objet libre, 20 clés maximum), `notes?`. |
+| `GET /api/clientes/:id/mesures` | Atelier | Historique, paginé. |
+| `GET /api/clientes/:id/mesures/derniere` | Atelier | Dernière prise de mesures. |
+| `GET /api/clientes/:id/mesures/:mesureId` | Atelier | Une prise de mesures. |
+
+## 6. Modèles
+
+Schéma : `modele.schema.js`. Catégories : `ROBE, BOUBOU, ENSEMBLE, PANTALON, CHEMISE, JUPE, KAFTAN, COSTUME, TENUE_TRADITIONNELLE, AUTRE`.
+
+| Route | Accès | Corps / paramètres |
+|---|---|---|
+| `POST /api/modeles` | Atelier | `{ nom, categorie }` + `description?, prixIndicatif?, photoUrl?` |
+| `GET /api/modeles` | Atelier | `?q=`, `categorie=`, `archived=true\|false\|all`, pagination. |
+| `GET /api/modeles/:id` | Atelier | Fiche. |
+| `PATCH /api/modeles/:id` | Atelier | Mêmes champs, optionnels. |
+| `POST /api/modeles/:id/archiver` | Atelier | Archive. |
+| `POST /api/modeles/:id/restaurer` | Atelier | Restaure. |
+
+## 7. Commandes, paiements, livraisons et reçus
+
+Schémas : `commande.schema.js`, `paiement.schema.js`, `livraison.schema.js`, `annulation.schema.js`, `recu.schema.js`.
+
+**Règles métier clés.** Une commande ne peut pas être créée pour une cliente archivée ni pour une cliente sans aucune mesure (409, `details.mesureManquante`). Le solde est toujours calculé (`prixTotal` − paiements non annulés), jamais stocké. Un paiement ne peut pas dépasser le solde (409) ni viser une commande annulée. Aucune suppression : les paiements, livraisons et dépenses s'**annulent** avec un motif, et restent visibles dans l'historique. Les écritures sur une commande sont sérialisées (verrou) : deux paiements simultanés ne peuvent pas dépasser le solde.
+
+**Statuts** : `NOUVELLE → EN_CONFECTION → ESSAYAGE ⇄ RETOUCHES → TERMINEE → LIVREE`, `ANNULEE` possible avant `LIVREE`. Toute autre transition répond 409. `LIVREE` et `ANNULEE` sont définitifs.
+
+| Route | Accès | Corps / paramètres |
+|---|---|---|
+| `POST /api/commandes` | Atelier, idempotente | `{ clienteId, typeVetement, prixTotal, dateLivraisonPrevue }` + `modeleId?, description?, couleur?, tissu?, quantite? (1–50), priorite? ("NORMALE" \| "URGENTE"), dateCommande?, observations?, photoTissuUrl?, photoModeleUrl?, paiementInitial? { montant, mode, reference?, commentaire? }` → `201` avec `totalPaye`, `solde`, `statutPaiement`. Numéro généré (`CMD-AAAA-NNNN`). |
+| `GET /api/commandes` | Atelier | `?q=` (numéro, nom, téléphone), `statut`, `priorite`, `clienteId`, `livraisonDu`, `livraisonAu`, pagination. Chaque ligne porte `totalPaye`, `solde`, `statutPaiement`. |
+| `GET /api/commandes/export` | Atelier | CSV, mêmes filtres. |
+| `GET /api/commandes/:id` | Atelier | Détail avec cliente, modèle, historique complet des paiements et des livraisons (annulés compris) et `totalPaye`, `solde`. |
+| `GET /api/commandes/:id/fiche-pdf` | Atelier | Fiche de commande en PDF. |
+| `PATCH /api/commandes/:id` | Atelier | Champs modifiables : `modeleId, typeVetement, description, couleur, tissu, quantite, priorite, dateLivraisonPrevue, observations, photoTissuUrl, photoModeleUrl`. Le prix et la cliente ne se modifient pas. |
+| `POST /api/commandes/:id/statut` | Atelier | `{ statut }` — transition contrôlée. |
+| `POST /api/commandes/:commandeId/paiements` | Atelier, idempotente | `{ montant, mode ("ESPECES" \| "MOBILE_MONEY" \| "VIREMENT" \| "AUTRE") }` + `reference?, commentaire?`. 409 si le montant dépasse le solde. |
+| `GET /api/commandes/:commandeId/paiements` | Atelier | Paiements de la commande, annulés compris (avec motif), paginés. |
+| `GET /api/commandes/:commandeId/paiements/:paiementId` | Atelier | Un paiement. |
+| `POST /api/commandes/:commandeId/paiements/:paiementId/annuler` | Atelier | `{ motif }` (3 à 500 caractères). 409 si déjà annulé. |
+| `POST /api/commandes/:commandeId/paiements/:paiementId/recu` | Atelier | Émet le reçu du paiement (un seul par paiement, 409 sinon). |
+| `GET /api/commandes/:commandeId/paiements/:paiementId/recu` | Atelier | Reçu du paiement. |
+| `POST /api/commandes/:commandeId/livraisons` | Atelier, idempotente | `{ }` + `dateLivraison?, commentaire?, paiementFinal?` (paiement du solde, atomique). Passe la commande à `LIVREE`. |
+| `GET /api/commandes/:commandeId/livraisons` | Atelier | Livraisons de la commande. |
+| `GET /api/commandes/:commandeId/livraisons/:livraisonId` | Atelier | Une livraison. |
+| `POST /api/commandes/:commandeId/livraisons/:livraisonId/annuler` | Atelier | `{ motif }`. |
+| `POST /api/commandes/:commandeId/recus` | Atelier | Émet un reçu de commande (corps vide). |
+| `GET /api/commandes/:commandeId/recus` | Atelier | Reçus de la commande. |
+
+Listes globales, toutes commandes confondues, en lecture seule :
+
+| Route | Accès | Paramètres |
+|---|---|---|
+| `GET /api/paiements` | Atelier¹ | `?q=`, `mode=`, `dateFrom`, `dateTo`, pagination. |
+| `GET /api/livraisons` | Atelier¹ | `?q=`, `dateFrom`, `dateTo`, pagination. |
+| `GET /api/recus` | Atelier | `?q=`, `dateFrom`, `dateTo`, pagination. |
+| `GET /api/recus/:id` | Atelier | Un reçu. |
+| `GET /api/recus/:id/pdf` | Atelier | Reçu en PDF. |
+
+## 8. Dépenses
+
+Schéma : `depense.schema.js`.
+
+| Route | Accès | Corps / paramètres |
+|---|---|---|
+| `POST /api/depenses` | Atelier, idempotente | `{ categorie, montant }` + `date?, description?, justificatifUrl?` |
+| `GET /api/depenses` | Atelier | `?q=`, `categorie=`, `dateFrom`, `dateTo`, pagination (annulées comprises). |
+| `GET /api/depenses/stats` | Atelier | `?categorie`, `dateFrom`, `dateTo` → totaux hors dépenses annulées. |
+| `GET /api/depenses/export` | Atelier | CSV. |
+| `GET /api/depenses/:id` | Atelier | Une dépense. |
+| `POST /api/depenses/:id/annuler` | Atelier | `{ motif }`. |
+
+## 9. Stock
+
+Schéma : `articleStock.schema.js`. Unités : `METRE, PIECE, KG, LITRE, ROULEAU, PAQUET, AUTRE`.
+
+| Route | Accès | Corps / paramètres |
+|---|---|---|
+| `POST /api/stock` | Atelier | `{ nom }` + `categorie?, unite? (défaut PIECE), seuilAlerte?, prixUnitaire?, notes?, quantiteInitiale?` |
+| `GET /api/stock` | Atelier | `?q=`, `categorie=`, `archived=true\|false\|all`, pagination. |
+| `GET /api/stock/alertes` | Atelier | Articles actifs ayant un seuil d'alerte et dont la quantité est au seuil ou en dessous. |
+| `GET /api/stock/export` | Atelier | CSV. |
+| `GET /api/stock/:id` | Atelier | Article avec quantité courante. |
+| `PATCH /api/stock/:id` | Atelier | Champs de l'article, optionnels (409 si archivé). La quantité ne se modifie que par mouvement. |
+| `POST /api/stock/:id/archiver` | Atelier | Archive. |
+| `POST /api/stock/:id/restaurer` | Atelier | Restaure. |
+| `GET /api/stock/:id/mouvements` | Atelier | Historique des mouvements, paginé. |
+| `POST /api/stock/:id/mouvements` | Atelier, idempotente | `{ type ("ENTREE" \| "SORTIE"), quantite }` + `motif?`. 409 si l'article est archivé ou si la quantité est insuffisante pour une sortie. |
+
+## 10. Tableau de bord, rapports et notifications
+
+Périodes : `period=today\|week\|month\|quarter\|year`, ou `from` et `to` (dates ; `to` ≥ `from`).
+
+| Route | Accès | Paramètres → réponse |
+|---|---|---|
+| `GET /api/dashboard/summary` | Atelier | `period` ou `from`/`to` → clientes actives, commandes (créées sur la période ; en cours, terminées, livrées, en retard, non payées à l'instant T), encaissements, dépenses, résultat de trésorerie. |
+| `GET /api/dashboard/recent` | Atelier | `?limit=` (1–50, défaut 10) → dernières commandes, paiements, livraisons, dépenses (annulés exclus). |
+| `GET /api/rapports/finances` | Atelier | Période → total commandé, encaissé, dépenses, solde ; avec une période, comparaison à la période précédente (`variation`). |
+| `GET /api/rapports/evolution` | Atelier | `from`, `to` → série mensuelle (commandes, encaissements, dépenses), plafonnée à 60 mois. |
+| `GET /api/rapports/commandes` | Atelier | Période → répartition par statut, priorité et type de vêtement. |
+| `GET /api/rapports/commandes/en-retard` | Atelier | Pagination → commandes dont la livraison prévue est dépassée. |
+| `GET /api/rapports/commandes/a-livrer` | Atelier | `?horizonJours=` (1–90, défaut 7), pagination. |
+| `GET /api/rapports/clientes` | Atelier | Période → clientes actives et archivées, nouvelles et ayant commandé, meilleures clientes par nombre de commandes. |
+| `GET /api/rapports/modeles` | Atelier | Catalogue par catégorie (hors période), modèles les plus utilisés dans les commandes de la période. |
+| `GET /api/notifications` | Atelier | `?lu=true\|false`, pagination. Réconcilie les alertes (retard, prête, livraison proche, impayée) avant de répondre. |
+| `GET /api/notifications/nombre-non-lues` | Atelier | `{ count, notifications, demandes }` (alertes non lues + demandes en attente) — sondée toutes les 60 s par l'interface. |
+| `PATCH /api/notifications/:id` | Atelier | `{ lu: boolean }` |
+| `POST /api/notifications/marquer-lu` | Atelier | `{ ids: [...] }` (1 à 200). Un identifiant d'un autre atelier est ignoré. |
+| `POST /api/notifications/supprimer` | Atelier | `{ ids: [...] }` (1 à 200). |
+
+## 11. Paramètres de l'atelier et abonnement
+
+| Route | Accès | Corps |
+|---|---|---|
+| `GET /api/parametres` | Atelier¹ | Informations de l'atelier. |
+| `PUT /api/parametres` | Atelier | Remplacement : `{ nom, devise }` + `logoUrl?, telephone?, adresse?, slogan?, recuConfig?`. |
+| `PATCH /api/parametres` | Atelier | Mêmes champs, tous optionnels. |
+| `GET /api/abonnements/etat` | Atelier¹ | État d'abonnement de l'atelier : essai, abonnement actif, jours restants. |
+| `GET /api/plans-abonnement` | Session | Plans actifs (tarifs, durées, remises). |
+
+## 12. Demandes de commande
+
+Une cliente propose une commande (côté Cliente) ; l'atelier la traite. L'acceptation **lie** une commande créée séparément par `POST /api/commandes`, elle n'en crée pas.
+
+| Route | Accès | Corps / paramètres |
+|---|---|---|
+| `GET /api/demandes` | Atelier | `?statut=EN_ATTENTE\|ACCEPTEE\|REFUSEE`, pagination. |
+| `GET /api/demandes/:id` | Atelier | Une demande. |
+| `POST /api/demandes/:id/accepter` | Atelier | `{ commandeId }` — la commande doit appartenir au même atelier **et** à la même cliente. 409 si la demande n'est plus en attente. |
+| `POST /api/demandes/:id/refuser` | Atelier | `{ motifRefus? }` |
+
+## 13. Espace cliente finale (`/api/moi`) — Cliente
+
+Une cliente ne voit que ses propres données.
+
+| Route | Accès | Description |
+|---|---|---|
+| `GET /api/moi` | Cliente | Profil et atelier. |
+| `GET /api/moi/mesures` | Cliente | Ses mesures. |
+| `GET /api/moi/commandes` | Cliente | Ses commandes avec payé et reste (liste complète, non paginée : `{ data }`). |
+| `GET /api/moi/commandes/:id` | Cliente | Une de ses commandes avec l'historique de ses paiements et livraisons (404 si elle n'est pas à elle). |
+| `GET /api/moi/paiements` | Cliente | Ses paiements. |
+| `GET /api/moi/notifications` | Cliente | Ses notifications. |
+| `GET /api/moi/notifications/non-lues` | Cliente | Nombre de notifications non lues. |
+| `PATCH /api/moi/notifications/:id` | Cliente | Marque une notification lue ou non lue. |
+| `POST /api/moi/demandes` | Cliente | `{ description? , modeleId? }` — propose une commande à l'atelier. |
+| `GET /api/moi/demandes` | Cliente | Ses demandes. |
+| `POST /api/moi/commandes/:id/recus` | Cliente | Demande l'émission du reçu d'une de ses commandes. |
+| `GET /api/moi/recus` | Cliente | Ses reçus. |
+| `GET /api/moi/recus/:id/pdf` | Cliente | Un de ses reçus en PDF. |
+
+## 14. Administration de la plateforme — SuperAdmin
+
+Aucune de ces routes ne donne accès aux données métier d'un atelier (clientes, commandes…) : pour intervenir, le SUPERADMIN démarre une impersonation, journalisée.
+
+| Route | Accès | Corps / paramètres |
+|---|---|---|
+| `GET /api/ateliers` | SuperAdmin | `?q=`, pagination. |
+| `POST /api/ateliers` | SuperAdmin | Crée un atelier et son compte ADMIN : `{ nom, adminIdentifiant, adminPassword }` + `devise?, telephone?, adresse?`. |
+| `GET /api/ateliers/resume` | SuperAdmin | Totaux de la plateforme (ateliers, comptes, clientes, commandes…). |
+| `GET /api/ateliers/tendances` | SuperAdmin | Évolution sur 6 mois (inscriptions, revenus d'abonnement de la plateforme). |
+| `GET /api/ateliers/alertes` | SuperAdmin | Nouveaux ateliers (7 jours), abonnements expirés ou expirant sous 7 jours, ateliers suspendus. Recalculé à chaque appel. |
+| `GET /api/ateliers/abonnements` | SuperAdmin | État d'abonnement de chaque atelier (`ACTIF`, `EN_ATTENTE`, `ESSAI`, `EXPIRE`, `AUCUN`). |
+| `GET /api/ateliers/:id` | SuperAdmin | Fiche d'un atelier. |
+| `PATCH /api/ateliers/:id` | SuperAdmin | `{ nom?, devise?, telephone?, adresse?, ville?, pays? }` |
+| `PATCH /api/ateliers/:id/statut` | SuperAdmin | `{ actif: boolean }` — suspend ou réactive (effet immédiat sur toutes les sessions). |
+| `GET /api/ateliers/:id/activite` | SuperAdmin | Fil d'activité (connexions…). |
+| `GET /api/ateliers/:id/impersonations` | SuperAdmin | Journal des impersonations de l'atelier. |
+| `POST /api/ateliers/:id/comptes` | SuperAdmin | Ajoute un compte ADMIN : `{ identifiant, password }` + `prenom?, nom?, email?`. |
+| `DELETE /api/ateliers/:id/comptes/:userId` | SuperAdmin | Retire un compte (refusé si l'atelier n'aurait plus aucun compte) → `204`. |
+| `PATCH /api/ateliers/:id/comptes/:userId/mot-de-passe` | SuperAdmin | `{ nouveauMotDePasse }` — invalide les sessions du compte. |
+| `POST /api/ateliers/:id/comptes/:userId/impersonation` | SuperAdmin | Ouvre une session limitée dans le temps sous l'identité du compte ; journalisée. |
+| `DELETE /api/ateliers/:id` | SuperAdmin | Supprime un atelier **vide** (aucune cliente, modèle, commande, dépense ni abonnement), sinon 409 : suspendre plutôt → `204`. |
+| `GET /api/ateliers/:atelierId/abonnement` | SuperAdmin | Abonnements de l'atelier. |
+| `POST /api/ateliers/:atelierId/abonnement/activer` | SuperAdmin, idempotente | `{ planId }` + `dateDebut?`, et `dureeMois` (1–60) **ou** `dateExpiration`, `note?`. Activation manuelle. |
+| `PATCH /api/ateliers/:atelierId/abonnement/:abonnementId` | SuperAdmin | `{ planId?, dateDebut?, dateExpiration?, note? }` |
+| `POST /api/ateliers/:atelierId/abonnement/:abonnementId/expirer` | SuperAdmin | `{ note? }` — met fin à l'abonnement maintenant. |
+| `POST /api/ateliers/:atelierId/abonnement/:abonnementId/desactiver` | SuperAdmin | `{ note? }` |
+| `GET /api/plans-abonnement/tous` | SuperAdmin | Tous les plans, actifs ou non. |
+| `POST /api/plans-abonnement` | SuperAdmin | `{ nom, prixMensuel }` + `description?, fonctionnalites? (20 max), tarifsDuree? (8 max : { dureeMois, remisePourcent }), ordre?` |
+| `PATCH /api/plans-abonnement/:id` | SuperAdmin | Mêmes champs + `actif?`. |
+| `GET /api/plateforme/contact` | SuperAdmin | Numéro WhatsApp de contact de la plateforme. |
+| `PUT /api/plateforme/contact` | SuperAdmin | `{ whatsapp }` (8 à 15 chiffres avec indicatif). |
+| `GET /api/plateforme/journal-securite` | SuperAdmin | `?evenement=`, `atelierId=`, `userId=`, pagination (50 par défaut). |
+
+## 15. Ce qui n'est pas exposé
+
+- Le webhook de paiement en ligne (`backend/src/routes/webhooks.routes.js`) existe dans le code mais n'est **pas monté** : les abonnements sont activés manuellement. Il n'est donc pas documenté ici.
+- Toute route `/api/*` inconnue répond `404 { "error": "Route API inconnue." }`.
+
+## 16. Constats relevés pendant la rédaction
+
+- `GET /api/paiements` et `GET /api/livraisons` (listes globales) ne vérifient pas l'abonnement (« Atelier¹ ») alors que leurs équivalents par commande, et `GET /api/recus`, le font. Une fois l'essai terminé sans abonnement, ces deux listes restent lisibles. Comportement actuel conservé : à décider s'il est voulu.
