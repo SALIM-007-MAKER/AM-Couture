@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
@@ -247,7 +248,7 @@ router.get("/:id/mouvements", async (req, res) => {
 // depuis MouvementStock (table enfant) — sérialise les mouvements
 // concurrents sur LE MÊME article, empêchant une SORTIE de faire passer le
 // stock sous zéro même sous charge.
-router.post("/:id/mouvements", async (req, res) => {
+router.post("/:id/mouvements", idempotence, async (req, res) => {
   const parsed = createMouvementStockSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   const { type, quantite, motif } = parsed.data;

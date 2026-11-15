@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
@@ -41,7 +42,7 @@ const CLIENTE_SUMMARY_SELECT = { id: true, nom: true, prenom: true, telephone: t
 const MODELE_SUMMARY_SELECT = { id: true, nom: true, categorie: true, archivedAt: true };
 
 // POST /api/commandes — création (+ paiement initial optionnel, atomique)
-router.post("/", async (req, res) => {
+router.post("/", idempotence, async (req, res) => {
   const parsed = createCommandeSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
@@ -384,25 +385,34 @@ router.post("/:id/statut", async (req, res) => {
   // Compare-and-swap atomique : si le statut a changé entre la lecture et
   // l'écriture (course concurrente), count=0 -> conflit propre plutôt qu'une
   // transition appliquée sur un état qui n'est plus le bon.
-  const result = await prisma.commande.updateMany({
-    where: { id, atelierId: req.user.atelierId, statut: current.statut },
-    data: { statut: nextStatut },
-  });
-  if (result.count === 0) {
-    throw new HttpError(409, "Le statut de la commande a changé entre-temps, réessayez.");
-  }
+  // Le changement de statut et l'événement client qui le décrit sont écrits dans la MÊME transaction
+  // (comme la création de commande, le paiement, la livraison et le reçu) : si l'événement ne peut pas
+  // être écrit, le statut n'est pas modifié. Avant, un échec entre les deux laissait un statut changé
+  // sans événement pour la cliente (anomalie 8).
+  const commande = await prisma.$transaction(
+    async (tx) => {
+      const result = await tx.commande.updateMany({
+        where: { id, atelierId: req.user.atelierId, statut: current.statut },
+        data: { statut: nextStatut },
+      });
+      if (result.count === 0) {
+        throw new HttpError(409, "Le statut de la commande a changé entre-temps, réessayez.");
+      }
 
-  await creerNotificationClient(prisma, {
-    clienteId: current.clienteId,
-    commandeId: id,
-    type: nextStatut === "ANNULEE" ? "COMMANDE_ANNULEE" : "COMMANDE_STATUT_CHANGE",
-    message:
-      nextStatut === "ANNULEE"
-        ? `Votre commande ${current.numero} a été annulée.`
-        : `Votre commande ${current.numero} est maintenant : ${STATUT_COMMANDE_LABELS[nextStatut] ?? nextStatut}.`,
-  });
+      await creerNotificationClient(tx, {
+        clienteId: current.clienteId,
+        commandeId: id,
+        type: nextStatut === "ANNULEE" ? "COMMANDE_ANNULEE" : "COMMANDE_STATUT_CHANGE",
+        message:
+          nextStatut === "ANNULEE"
+            ? `Votre commande ${current.numero} a été annulée.`
+            : `Votre commande ${current.numero} est maintenant : ${STATUT_COMMANDE_LABELS[nextStatut] ?? nextStatut}.`,
+      });
 
-  const commande = await prisma.commande.findUnique({ where: { id } });
+      return tx.commande.findUnique({ where: { id } });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
   res.json(commande);
 });
 

@@ -7,6 +7,14 @@ import { HttpError } from "../middlewares/error.middleware.js";
 // même ordre de grandeur d'entropie que les secrets applicatifs existants
 // (référenceInterne des transactions Wave utilise crypto.randomUUID()) —
 // largement suffisant pour un jeton non devinable par force brute.
+// Seul le HACHÉ SHA-256 du jeton est stocké : une fuite de la base (sauvegarde,
+// export) ne donne alors aucun lien de réinitialisation/activation utilisable.
+// Le jeton en clair n'existe que dans l'email envoyé. 256 bits d'entropie
+// rendent un sel inutile.
+export function hacherToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 function genererToken() {
   return crypto.randomBytes(32).toString("hex");
 }
@@ -22,7 +30,7 @@ function genererToken() {
 export async function creerToken({ userId, type, dureeMs }, client = prisma) {
   const token = genererToken();
   await client.tokenAction.create({
-    data: { token, type, userId, expireLe: new Date(Date.now() + dureeMs) },
+    data: { token: hacherToken(token), type, userId, expireLe: new Date(Date.now() + dureeMs) },
   });
   return token;
 }
@@ -35,7 +43,7 @@ export async function creerToken({ userId, type, dureeMs }, client = prisma) {
  * jetons). Retourne l'utilisateur associé si valide.
  */
 export async function consommerToken({ token, type }) {
-  const enregistrement = await prisma.tokenAction.findUnique({ where: { token }, include: { user: true } });
+  const enregistrement = await prisma.tokenAction.findUnique({ where: { token: hacherToken(token) }, include: { user: true } });
   const invalide =
     !enregistrement ||
     enregistrement.type !== type ||

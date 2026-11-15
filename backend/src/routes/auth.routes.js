@@ -13,6 +13,8 @@ import { creerToken, consommerToken } from "../lib/tokenAction.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { emailVerificationTemplate, emailReinitialisationTemplate } from "../lib/emailTemplates.js";
 import { rateLimitPersistant } from "../lib/rateLimiter.js";
+import { origineApplication } from "../lib/appUrl.js";
+import { journaliserSecurite } from "../lib/securityLog.js";
 
 const router = Router();
 
@@ -84,6 +86,7 @@ router.post("/login", loginLimiter, async (req, res) => {
   // Message volontairement identique dans les deux cas (identifiant inconnu
   // ou mot de passe faux) : ne jamais révéler quel champ est incorrect.
   if (!user || !valid) {
+    await journaliserSecurite("LOGIN_ECHEC", { req, userId: user?.id });
     throw new HttpError(401, "Identifiant ou mot de passe incorrect.");
   }
 
@@ -106,6 +109,7 @@ router.post("/login", loginLimiter, async (req, res) => {
 
   const token = signAuthToken({ ...user, clienteId });
   setAuthCookie(res, token);
+  await journaliserSecurite("LOGIN_OK", { req, userId: user.id, atelierId: user.atelierId });
   res.json({ id: user.id, identifiant: user.identifiant, role: user.role, atelierId: user.atelierId });
 });
 
@@ -200,7 +204,7 @@ router.post("/inscription-atelier", inscriptionLimiter, rejectIfDejaConnecte, as
   // jamais l'action principale" (le .catch() reste local, jamais propagé).
   try {
     const verifToken = await creerToken({ userId: admin.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
-    const origin = `${req.protocol}://${req.get("host")}`;
+    const origin = origineApplication(req);
     await envoyerEmail({
       to: admin.email,
       subject: "Confirmez votre email — Gestion d'Atelier",
@@ -244,7 +248,7 @@ router.post("/renvoyer-verification-email", requireAuth, renvoyerVerificationLim
     throw new HttpError(400, "Cet email est déjà vérifié.");
   }
   const verifToken = await creerToken({ userId: user.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
-  const origin = `${req.protocol}://${req.get("host")}`;
+  const origin = origineApplication(req);
   try {
     await envoyerEmail({
       to: user.email,
@@ -286,7 +290,7 @@ router.post("/mot-de-passe-oublie", motDePasseOublieLimiter, async (req, res) =>
   if (user?.email) {
     try {
       const resetToken = await creerToken({ userId: user.id, type: "REINITIALISATION_MOT_DE_PASSE", dureeMs: 60 * 60 * 1000 });
-      const origin = `${req.protocol}://${req.get("host")}`;
+      const origin = origineApplication(req);
       await envoyerEmail({
         to: user.email,
         subject: "Réinitialisation de votre mot de passe — Gestion d'Atelier",
@@ -318,6 +322,7 @@ router.post("/reinitialiser-mot-de-passe-token", async (req, res) => {
   // cookie ici : ce flux ne connecte jamais (voir décision d'origine),
   // la personne se reconnecte ensuite normalement via /login.
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash, sessionVersion: { increment: 1 } } });
+  await journaliserSecurite("MOT_DE_PASSE_REINITIALISE", { req, userId: user.id, atelierId: user.atelierId });
   res.status(204).end();
 });
 
@@ -370,6 +375,7 @@ router.post("/quitter-impersonation", requireAuth, async (req, res) => {
   }
   const token = signAuthToken(superadmin);
   setAuthCookie(res, token);
+  await journaliserSecurite("IMPERSONATION_FIN", { req, userId: superadmin.id, atelierId: req.user.atelierId });
   res.json({ id: superadmin.id, identifiant: superadmin.identifiant, role: superadmin.role, atelierId: superadmin.atelierId });
 });
 

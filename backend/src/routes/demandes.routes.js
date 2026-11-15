@@ -112,26 +112,34 @@ router.post("/:id/refuser", async (req, res) => {
   const parsed = refuserDemandeSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
 
-  const result = await prisma.demandeCommande.updateMany({
-    where: { id: req.params.id, atelierId: req.user.atelierId, statut: "EN_ATTENTE" },
-    data: { statut: "REFUSEE", motifRefus: parsed.data.motifRefus },
-  });
-  if (result.count === 0) {
-    const existante = await prisma.demandeCommande.findFirst({
-      where: { id: req.params.id, atelierId: req.user.atelierId },
-      select: { id: true },
-    });
-    if (!existante) throw new HttpError(404, "Demande introuvable.");
-    throw new HttpError(409, "Cette demande a déjà été traitée.");
-  }
+  // Refus et événement client dans la MÊME transaction (anomalie 8) : si la cliente ne peut pas être
+  // prévenue, la demande reste EN_ATTENTE plutôt que d'être refusée en silence.
+  const demande = await prisma.$transaction(
+    async (tx) => {
+      const result = await tx.demandeCommande.updateMany({
+        where: { id: req.params.id, atelierId: req.user.atelierId, statut: "EN_ATTENTE" },
+        data: { statut: "REFUSEE", motifRefus: parsed.data.motifRefus },
+      });
+      if (result.count === 0) {
+        const existante = await tx.demandeCommande.findFirst({
+          where: { id: req.params.id, atelierId: req.user.atelierId },
+          select: { id: true },
+        });
+        if (!existante) throw new HttpError(404, "Demande introuvable.");
+        throw new HttpError(409, "Cette demande a déjà été traitée.");
+      }
 
-  const demande = await prisma.demandeCommande.findUnique({ where: { id: req.params.id }, select: DEMANDE_SELECT });
-  await creerNotificationClient(prisma, {
-    clienteId: demande.cliente.id,
-    commandeId: null,
-    type: "DEMANDE_REFUSEE",
-    message: demande.motifRefus ? `Votre demande a été refusée : ${demande.motifRefus}` : "Votre demande a été refusée.",
-  });
+      const refusee = await tx.demandeCommande.findUnique({ where: { id: req.params.id }, select: DEMANDE_SELECT });
+      await creerNotificationClient(tx, {
+        clienteId: refusee.cliente.id,
+        commandeId: null,
+        type: "DEMANDE_REFUSEE",
+        message: refusee.motifRefus ? `Votre demande a été refusée : ${refusee.motifRefus}` : "Votre demande a été refusée.",
+      });
+      return refusee;
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
   res.json(demande);
 });
 

@@ -22,6 +22,7 @@ import {
 } from "../lib/atelierProvisioning.js";
 import { signAuthToken } from "../lib/jwt.js";
 import { setAuthCookie } from "../lib/authCookie.js";
+import { journaliserSecurite } from "../lib/securityLog.js";
 
 // Réservé au SUPERADMIN de la plateforme (Phase 8 — multi-tenant) : gestion
 // des ateliers (tenants). Un ADMIN n'accède jamais à ces routes — il gère
@@ -280,6 +281,7 @@ router.patch("/:id/statut", async (req, res) => {
     where: { id: req.params.id },
     data: { actif, suspenduLe: actif ? null : new Date() },
   });
+  await journaliserSecurite(actif ? "ATELIER_REACTIVE" : "ATELIER_SUSPENDU", { req, userId: req.user.id, atelierId: req.params.id });
   res.json(atelier);
 });
 
@@ -369,6 +371,7 @@ router.patch("/:id/comptes/:userId/mot-de-passe", async (req, res) => {
     userId: req.params.userId,
     nouveauMotDePasse: parsed.data.nouveauMotDePasse,
   });
+  await journaliserSecurite("MOT_DE_PASSE_REINITIALISE_PAR_SUPERADMIN", { req, userId: req.user.id, atelierId: req.params.id, details: { compteId: req.params.userId } });
   res.status(204).end();
 });
 
@@ -415,7 +418,8 @@ router.post("/:id/comptes/:userId/impersonation", async (req, res) => {
     superadminId: req.user.id,
   });
   const token = signAuthToken(compte, { impersonatedBy: req.user.id });
-  setAuthCookie(res, token);
+  setAuthCookie(res, token, { impersonation: true });
+  await journaliserSecurite("IMPERSONATION_DEBUT", { req, userId: req.user.id, atelierId: req.params.id, details: { compteId: compte.id } });
   res.json({ id: compte.id, identifiant: compte.identifiant, role: compte.role, atelierId: compte.atelierId });
 });
 

@@ -4,6 +4,7 @@ import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
+import { verrouillerCle } from "../lib/verrous.js";
 import {
   createModeleSchema,
   updateModeleSchema,
@@ -26,8 +27,13 @@ router.param("id", requireValidIdParam);
  * archivé. Le même nom dans une catégorie différente reste autorisé (ex.
  * "Classique" en ROBE et en ENSEMBLE).
  */
-async function assertNoDuplicateNomCategorie(atelierId, nom, categorie, excludeId) {
-  const existing = await prisma.modele.findFirst({
+// Clé du verrou consultatif : atelier + catégorie + nom en minuscules (comparaison insensible à la casse,
+// comme la vérification ci-dessous). Le nom est déjà normalisé (espaces) par le schéma de validation.
+const cleModele = (atelierId, categorie, nom) =>
+  `modele:${atelierId}:${categorie}:${String(nom).trim().replace(/\s+/g, " ").toLowerCase()}`;
+
+async function assertNoDuplicateNomCategorie(client, atelierId, nom, categorie, excludeId) {
+  const existing = await client.modele.findFirst({
     where: {
       atelierId,
       nom: { equals: nom, mode: "insensitive" },
@@ -54,9 +60,16 @@ router.post("/", async (req, res) => {
   }
   const data = parsed.data;
 
-  await assertNoDuplicateNomCategorie(req.user.atelierId, data.nom, data.categorie);
-
-  const modele = await prisma.modele.create({ data: { ...data, atelierId: req.user.atelierId } });
+  // Vérification ET création dans une même transaction, sous verrou consultatif (anomalie 6 : 6 modèles
+  // créés sur 8 requêtes simultanées avant correction).
+  const modele = await prisma.$transaction(
+    async (tx) => {
+      await verrouillerCle(tx, cleModele(req.user.atelierId, data.categorie, data.nom));
+      await assertNoDuplicateNomCategorie(tx, req.user.atelierId, data.nom, data.categorie);
+      return tx.modele.create({ data: { ...data, atelierId: req.user.atelierId } });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
   res.status(201).json(modele);
 });
 
@@ -126,18 +139,23 @@ router.patch("/:id", async (req, res) => {
     throw new HttpError(409, "Modèle archivé : restaurez-le avant de le modifier.");
   }
 
-  if (data.nom !== undefined || data.categorie !== undefined) {
-    const nom = data.nom ?? current.nom;
-    const categorie = data.categorie ?? current.categorie;
-    await assertNoDuplicateNomCategorie(req.user.atelierId, nom, categorie, id);
-  }
-
   // updateMany avec condition sur archivedAt : garde-fou atomique contre un
   // archivage concurrent survenu entre la lecture ci-dessus et cette écriture.
-  const result = await prisma.modele.updateMany({
-    where: { id, atelierId: req.user.atelierId, archivedAt: null },
-    data,
-  });
+  const result = await prisma.$transaction(
+    async (tx) => {
+      if (data.nom !== undefined || data.categorie !== undefined) {
+        const nom = data.nom ?? current.nom;
+        const categorie = data.categorie ?? current.categorie;
+        await verrouillerCle(tx, cleModele(req.user.atelierId, categorie, nom));
+        await assertNoDuplicateNomCategorie(tx, req.user.atelierId, nom, categorie, id);
+      }
+      return tx.modele.updateMany({
+        where: { id, atelierId: req.user.atelierId, archivedAt: null },
+        data,
+      });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
   if (result.count === 0) {
     throw new HttpError(409, "Modèle archivé : restaurez-le avant de le modifier.");
   }

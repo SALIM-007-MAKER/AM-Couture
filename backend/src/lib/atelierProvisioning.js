@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "./prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
+import { isUniqueConstraintViolation } from "./prismaErrors.js";
 
 // Logique partagée entre les DEUX façons de créer un atelier (Phase 8) :
 //  - SUPERADMIN authentifié, POST /api/ateliers (ateliers.routes.js) — appelle
@@ -32,12 +33,9 @@ export async function creerAtelierEtAdmin({
   identifiantErrorField = "adminIdentifiant",
   identifiantErrorMessage = "Cet identifiant est déjà utilisé.",
 }) {
-  const existant = await prisma.user.findUnique({ where: { identifiant: adminIdentifiant } });
-  if (existant) {
-    throw new HttpError(409, identifiantErrorMessage, {
-      [identifiantErrorField]: [identifiantErrorMessage],
-    });
-  }
+  // AUCUNE vérification préalable « l'identifiant existe-t-il ? » : entre cette lecture et la création,
+  // une autre requête pouvait créer le même compte (anomalie 3). La garantie vient de la contrainte
+  // UNIQUE de la base ; sa violation est traduite plus bas en erreur rattachée au champ concerné.
 
   // Coût 12 — identique à prisma/seed.js et compte.routes.js, seules autres
   // origines d'un hash dans ce projet.
@@ -49,24 +47,35 @@ export async function creerAtelierEtAdmin({
   // accepté depuis le frontend (voir lib/trial.js, middlewares/auth.middleware.js).
   const trialEndsAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000);
 
-  return prisma.$transaction(async (tx) => {
-    const atelier = await tx.atelier.create({
-      data: { nom, logoUrl, devise, telephone, adresse, ville, pays, trialEndsAt },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const atelier = await tx.atelier.create({
+        data: { nom, logoUrl, devise, telephone, adresse, ville, pays, trialEndsAt },
+      });
+      const admin = await tx.user.create({
+        data: {
+          identifiant: adminIdentifiant,
+          passwordHash,
+          role: "ADMIN",
+          atelierId: atelier.id,
+          prenom,
+          nom: nomProprietaire,
+          email,
+          langue,
+        },
+      });
+      return { atelier, admin };
     });
-    const admin = await tx.user.create({
-      data: {
-        identifiant: adminIdentifiant,
-        passwordHash,
-        role: "ADMIN",
-        atelierId: atelier.id,
-        prenom,
-        nom: nomProprietaire,
-        email,
-        langue,
-      },
-    });
-    return { atelier, admin };
-  });
+  } catch (err) {
+    // La transaction est annulée : aucun atelier orphelin. Le conflit est rattaché au champ concerné.
+    if (isUniqueConstraintViolation(err, "identifiant")) {
+      throw new HttpError(409, identifiantErrorMessage, { [identifiantErrorField]: [identifiantErrorMessage] });
+    }
+    if (isUniqueConstraintViolation(err, "email")) {
+      throw new HttpError(409, "Cet email est déjà utilisé.", { email: ["Cet email est déjà utilisé."] });
+    }
+    throw err;
+  }
 }
 
 // Réinitialisation de mot de passe par le SUPERADMIN (voir
@@ -97,17 +106,21 @@ export async function ajouterCompteAtelier({ atelierId, identifiant, password, p
   const atelier = await prisma.atelier.findUnique({ where: { id: atelierId }, select: { id: true } });
   if (!atelier) throw new HttpError(404, "Atelier introuvable.");
 
-  const existant = await prisma.user.findUnique({ where: { identifiant } });
-  if (existant) {
-    throw new HttpError(409, "Cet identifiant est déjà utilisé.", {
-      identifiant: ["Cet identifiant est déjà utilisé."],
-    });
-  }
-
+  // Pas de vérification préalable (voir creerAtelierEtAdmin) : la contrainte UNIQUE décide.
   const passwordHash = await bcrypt.hash(password, 12);
-  return prisma.user.create({
-    data: { identifiant, passwordHash, role: "ADMIN", atelierId, prenom, nom, email },
-  });
+  try {
+    return await prisma.user.create({
+      data: { identifiant, passwordHash, role: "ADMIN", atelierId, prenom, nom, email },
+    });
+  } catch (err) {
+    if (isUniqueConstraintViolation(err, "identifiant")) {
+      throw new HttpError(409, "Cet identifiant est déjà utilisé.", { identifiant: ["Cet identifiant est déjà utilisé."] });
+    }
+    if (isUniqueConstraintViolation(err, "email")) {
+      throw new HttpError(409, "Cet email est déjà utilisé.", { email: ["Cet email est déjà utilisé."] });
+    }
+    throw err;
+  }
 }
 
 // Démarre une impersonation : le SUPERADMIN `superadminId` va agir avec le

@@ -74,8 +74,11 @@ describe("optionalImageField", () => {
   function fabriquerDataUrl(taillePayloadOctets) {
     // Chaque groupe de 4 caractères base64 encode 3 octets — approximation
     // volontairement simple, suffisante pour tester la limite de taille.
-    const nbCars = Math.ceil((taillePayloadOctets * 4) / 3);
-    return `data:image/png;base64,${"A".repeat(nbCars)}`;
+    // Depuis le contrôle des octets magiques, le contenu doit commencer par la
+    // vraie signature PNG (8 octets) — le reste est du remplissage.
+    const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const corps = Buffer.concat([signature, Buffer.alloc(Math.max(0, taillePayloadOctets - 8))]);
+    return `data:image/png;base64,${corps.toString("base64")}`;
   }
 
   test("accepte une data URL image sous la limite de taille", () => {

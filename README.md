@@ -77,4 +77,4 @@ npm run dev:frontend   # http://localhost:5173 (proxy /api -> :4000)
 
 ## Déploiement
 
-Push sur GitHub → Vercel construit avec `prisma generate && prisma migrate deploy && vite build` (voir `vercel.json`). Variables d'environnement à configurer dans le dashboard Vercel : `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`, `BLOB_READ_WRITE_TOKEN`.
+Push sur GitHub → Vercel construit avec `prisma generate && prisma migrate deploy && vite build` (voir `vercel.json`). Variables d'environnement à configurer dans le dashboard Vercel : `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`.

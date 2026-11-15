@@ -56,6 +56,25 @@ const IMAGE_DATA_URL_RE = /^data:image\/(png|jpe?g|webp|gif);base64,([A-Za-z0-9+
  * supplémentaire). Une URL http(s) reste acceptée en plus, par compatibilité
  * avec une éventuelle valeur déjà enregistrée avant l'introduction de l'upload.
  */
+/**
+ * Vérifie que le contenu décodé est RÉELLEMENT une image du type annoncé (octets
+ * magiques), pas seulement un préfixe `data:image/...` déclaré par le client.
+ */
+export function signatureImageValide(mime, base64) {
+  let buf;
+  try {
+    buf = Buffer.from(base64.slice(0, 64), "base64");
+  } catch {
+    return false;
+  }
+  const type = mime.toLowerCase();
+  if (type === "png") return buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (type === "jpeg" || type === "jpg") return buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+  if (type === "gif") return ["GIF87a", "GIF89a"].includes(buf.subarray(0, 6).toString("latin1"));
+  if (type === "webp") return buf.subarray(0, 4).toString("latin1") === "RIFF" && buf.subarray(8, 12).toString("latin1") === "WEBP";
+  return false;
+}
+
 export const optionalImageField = (maxBytes = 2 * 1024 * 1024) =>
   z.preprocess(
     emptyToUndefined,
@@ -69,6 +88,10 @@ export const optionalImageField = (maxBytes = 2 * 1024 * 1024) =>
         const match = v.match(IMAGE_DATA_URL_RE);
         if (match) {
           const base64 = match[2];
+          if (!signatureImageValide(match[1], base64)) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Le fichier n'est pas une image valide." });
+            return;
+          }
           const padding = (base64.match(/=*$/) || [""])[0].length;
           const bytes = (base64.length * 3) / 4 - padding;
           if (bytes > maxBytes) {

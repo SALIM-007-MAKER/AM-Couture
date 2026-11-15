@@ -1,6 +1,10 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
+import { securityHeaders, csrfOriginGuard } from "./middlewares/security.middleware.js";
+import { requestId } from "./middlewares/requestId.middleware.js";
+import { installerGestionnairesProcessus } from "./lib/processHandlers.js";
+import { prisma } from "./lib/prisma.js";
 import authRouter from "./routes/auth.routes.js";
 import clientesRouter from "./routes/clientes.routes.js";
 import modelesRouter from "./routes/modeles.routes.js";
@@ -29,11 +33,21 @@ import demandesRouter from "./routes/demandes.routes.js";
 // Frontend et API partagent le même domaine en prod → pas de CORS nécessaire.
 // En dev, le proxy Vite (frontend/vite.config.js) joue ce rôle.
 
+// Journalise les rejets et exceptions non gérés (désactivé en test : le lanceur de tests a ses propres gestionnaires).
+if (process.env.NODE_ENV !== "test") installerGestionnairesProcessus();
+
 const app = express();
 
 // Vercel place l'app derrière un proxy : indispensable pour que req.ip
 // (rate limiting) et les cookies "secure" reflètent la vraie requête client.
 app.set("trust proxy", 1);
+app.disable("x-powered-by");
+
+// En-têtes de sécurité + garde Origin (CSRF) AVANT tout parsing de corps et tout
+// routeur — voir middlewares/security.middleware.js.
+// L'identifiant de requête vient en PREMIER : même une erreur d'analyse du corps en porte un.
+app.use(requestId);
+app.use("/api", securityHeaders, csrfOriginGuard);
 
 // 5mb : les photos (modèles) et le logo de l'atelier sont uploadés en base64
 // dans le corps JSON (voir optionalImageField, zodHelpers.js) — une image de
@@ -94,8 +108,32 @@ app.use("/api/ateliers", ateliersRouter);
 // cron.routes.js).
 app.use("/api/cron", cronRouter);
 
+// Liveness : le processus répond. Volontairement indépendante de la base (un moniteur ne doit pas
+// redémarrer l'application parce que la base est momentanément indisponible).
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "gestion-atelier-api" });
+});
+
+// Readiness : l'application PEUT servir des requêtes, donc la base répond (SELECT 1, durée bornée).
+// 503 sinon. Aucun détail technique dans la réponse (ni adresse, ni message d'erreur de la base).
+const DELAI_READINESS_MS = 2500;
+app.get("/api/health/ready", async (req, res) => {
+  const debut = Date.now();
+  let minuterie;
+  try {
+    await Promise.race([
+      prisma.$queryRaw`SELECT 1`,
+      new Promise((_, rejeter) => {
+        minuterie = setTimeout(() => rejeter(new Error("délai de readiness dépassé")), DELAI_READINESS_MS);
+      }),
+    ]);
+    res.json({ status: "ok", db: "ok", latenceMs: Date.now() - debut });
+  } catch (err) {
+    console.warn(JSON.stringify({ type: "sante", date: new Date().toISOString(), requestId: req.id, db: "indisponible", message: String(err?.message).slice(0, 200) }));
+    res.status(503).json({ status: "degraded", db: "indisponible" });
+  } finally {
+    clearTimeout(minuterie);
+  }
 });
 
 // Paiements/Livraisons/Reçus : toute ÉCRITURE (création, annulation) reste

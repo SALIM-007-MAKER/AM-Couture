@@ -2,7 +2,10 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { reconcilierNotifications } from "../lib/notifications.js";
 import { envoyerEmail } from "../lib/resend.js";
+import { origineApplication } from "../lib/appUrl.js";
 import { rappelsQuotidiensTemplate } from "../lib/emailTemplates.js";
+import { purgerJournalSecurite } from "../lib/securityLog.js";
+import { purgerClesIdempotence } from "../lib/idempotence.js";
 
 const router = Router();
 
@@ -32,7 +35,20 @@ router.get("/rappels-quotidiens", async (req, res) => {
     return res.status(401).json({ error: "Non autorisé." });
   }
 
-  const origin = `${req.protocol}://${req.get("host")}`;
+  // Conservation limitée du journal de sécurité (IP = donnée personnelle) —
+  // un échec de purge ne doit jamais empêcher l'envoi des rappels.
+  const journalPurge = await purgerJournalSecurite().catch((err) => {
+    console.error(`[cron] Purge du journal de sécurité impossible : ${err.message}`);
+    return null;
+  });
+
+  // Clés d'idempotence expirées (durée de vie 24 h) : même principe, un échec ne bloque pas les rappels.
+  const clesPurgees = await purgerClesIdempotence().catch((err) => {
+    console.error(`[cron] Purge des clés d'idempotence impossible : ${err.message}`);
+    return null;
+  });
+
+  const origin = origineApplication(req);
   const ateliers = await prisma.atelier.findMany({
     where: { actif: true },
     select: {
@@ -76,7 +92,7 @@ router.get("/rappels-quotidiens", async (req, res) => {
     }
   }
 
-  res.json({ ateliersTraites: ateliers.length, emailsEnvoyes, erreurs });
+  res.json({ ateliersTraites: ateliers.length, emailsEnvoyes, erreurs, journalSecuritePurge: journalPurge, clesIdempotencePurgees: clesPurgees });
 });
 
 export default router;

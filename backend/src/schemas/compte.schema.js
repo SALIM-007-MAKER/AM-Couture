@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { nouveauMotDePasseField } from "../lib/passwordPolicy.js";
 
 // Préférence stockée uniquement (Phase 6) : aucune traduction réelle de
 // l'interface derrière ce choix pour l'instant — voir User.langue
@@ -18,7 +19,7 @@ export const updateCompteSchema = z
 export const changePasswordSchema = z
   .object({
     motDePasseActuel: z.string().min(1, "Mot de passe actuel requis."),
-    nouveauMotDePasse: z.string().min(8, "8 caractères minimum."),
+    nouveauMotDePasse: nouveauMotDePasseField,
   })
   .strict()
   .refine((data) => data.motDePasseActuel !== data.nouveauMotDePasse, {

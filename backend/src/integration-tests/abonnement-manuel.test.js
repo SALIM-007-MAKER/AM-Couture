@@ -28,14 +28,14 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
 
     const superIdentifiant = `superadmin-abo-${process.pid}-${Date.now()}`;
     const superadmin = await prisma.user.create({
-      data: { identifiant: superIdentifiant, passwordHash: await bcrypt.hash("password123", 4), role: "SUPERADMIN" },
+      data: { identifiant: superIdentifiant, passwordHash: await bcrypt.hash("Atelier-Test-2026!", 4), role: "SUPERADMIN" },
     });
     superadminId = superadmin.id;
 
     adminApi = client(baseUrl);
     assert.equal((await adminApi.post("/api/auth/login", { identifiant, password })).status, 200);
     superApi = client(baseUrl);
-    assert.equal((await superApi.post("/api/auth/login", { identifiant: superIdentifiant, password: "password123" })).status, 200);
+    assert.equal((await superApi.post("/api/auth/login", { identifiant: superIdentifiant, password: "Atelier-Test-2026!" })).status, 200);
 
     const creation = await superApi.post("/api/plans-abonnement", {
       nom: `Professionnel ${process.pid}`,
