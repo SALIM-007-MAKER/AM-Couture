@@ -16,6 +16,7 @@ import mesuresRouter from "./mesures.routes.js";
 import { buildCsv, envoyerCsv } from "../lib/csv.js";
 import { creerToken } from "../lib/tokenAction.js";
 import { isUniqueConstraintViolation } from "../lib/prismaErrors.js";
+import { verrouillerCle } from "../lib/verrous.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { emailInvitationClientTemplate } from "../lib/emailTemplates.js";
@@ -43,8 +44,8 @@ router.use("/:id/mesures", mesuresRouter);
  * doublon même si l'ancienne fiche a été archivée (le bon geste est alors de
  * la restaurer, pas d'en recréer une nouvelle).
  */
-async function assertPhoneAvailable(atelierId, telephone, excludeId) {
-  const existing = await prisma.cliente.findFirst({
+async function assertPhoneAvailable(client, atelierId, telephone, excludeId) {
+  const existing = await client.cliente.findFirst({
     where: {
       atelierId,
       telephone,
@@ -70,9 +71,17 @@ router.post("/", async (req, res) => {
   }
   const data = parsed.data;
 
-  await assertPhoneAvailable(req.user.atelierId, data.telephone);
-
-  const cliente = await prisma.cliente.create({ data: { ...data, atelierId: req.user.atelierId } });
+  // Vérification ET création dans une même transaction, sous un verrou consultatif sur la clé
+  // « atelier + téléphone » : aucune contrainte UNIQUE n'existe en base, donc sans ce verrou deux
+  // créations simultanées passaient toutes les deux la vérification (anomalie 5 : 2 clientes sur 8).
+  const cliente = await prisma.$transaction(
+    async (tx) => {
+      await verrouillerCle(tx, `cliente:${req.user.atelierId}:${data.telephone}`);
+      await assertPhoneAvailable(tx, req.user.atelierId, data.telephone);
+      return tx.cliente.create({ data: { ...data, atelierId: req.user.atelierId } });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
   res.status(201).json(cliente);
 });
 
@@ -231,19 +240,26 @@ router.patch("/:id", async (req, res) => {
   const data = parsed.data;
   const { id } = req.params;
 
-  if (data.telephone) {
-    await assertPhoneAvailable(req.user.atelierId, data.telephone, id);
-  }
-
   // updateMany avec condition sur archivedAt : évite une lecture-puis-écriture
   // non atomique (double-clic / retry concurrent sur la même fiche).
   // atelierId dans le where : une commande d'un autre atelier avec le même
   // id (impossible en pratique, cuid, mais gardé par défense en profondeur)
   // ne serait de toute façon jamais modifiée.
-  const result = await prisma.cliente.updateMany({
-    where: { id, atelierId: req.user.atelierId, archivedAt: null },
-    data,
-  });
+  // Même verrou que la création : un changement de téléphone ne peut pas entrer en collision avec une
+  // création ou une autre modification simultanée vers le même numéro.
+  const result = await prisma.$transaction(
+    async (tx) => {
+      if (data.telephone) {
+        await verrouillerCle(tx, `cliente:${req.user.atelierId}:${data.telephone}`);
+        await assertPhoneAvailable(tx, req.user.atelierId, data.telephone, id);
+      }
+      return tx.cliente.updateMany({
+        where: { id, atelierId: req.user.atelierId, archivedAt: null },
+        data,
+      });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
 
   if (result.count === 0) {
     const existing = await prisma.cliente.findFirst({
