@@ -1,3 +1,4 @@
+import { log, messageErreur } from "../lib/logger.js";
 import { Router } from "express";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
@@ -421,7 +422,7 @@ router.post("/:id/inviter", async (req, res) => {
         html: emailInvitationClientTemplate({ prenom: cliente.prenom, identifiant, lienActivation }),
       });
     } catch (err) {
-      console.error(`[clientes:inviter] Échec de l'envoi de l'invitation à ${cliente.email} :`, err.message);
+      log.error("erreur", { categorie: "email", operation: "invitation_cliente", clienteId: cliente.id, message: messageErreur(err) });
     }
   }
 

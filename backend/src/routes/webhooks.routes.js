@@ -1,3 +1,4 @@
+import { log, messageErreur } from "../lib/logger.js";
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { verifierSignatureWebhook, recupererSession } from "../lib/wave.js";
@@ -78,7 +79,7 @@ router.post("/wave", async (req, res) => {
     // ferait réessayer Wave indéfiniment pour un problème qui nous est
     // propre, sans jamais le résoudre. Le webhook suivant (ou une
     // vérification manuelle) pourra retrancher plus tard.
-    console.error("Webhook Wave : échec de la relecture de session", err);
+    log.error("erreur", { categorie: "webhook_wave", operation: "relecture_session", message: messageErreur(err) });
     return res.status(200).json({ received: true });
   }
 

@@ -3,6 +3,8 @@ import cookieParser from "cookie-parser";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import { securityHeaders, csrfOriginGuard } from "./middlewares/security.middleware.js";
 import { requestId } from "./middlewares/requestId.middleware.js";
+import { requestLog } from "./middlewares/requestLog.middleware.js";
+import { log, messageErreur } from "./lib/logger.js";
 import { installerGestionnairesProcessus } from "./lib/processHandlers.js";
 import { prisma } from "./lib/prisma.js";
 import authRouter from "./routes/auth.routes.js";
@@ -47,6 +49,7 @@ app.disable("x-powered-by");
 // routeur — voir middlewares/security.middleware.js.
 // L'identifiant de requête vient en PREMIER : même une erreur d'analyse du corps en porte un.
 app.use(requestId);
+app.use(requestLog);
 app.use("/api", securityHeaders, csrfOriginGuard);
 
 // 5mb : les photos (modèles) et le logo de l'atelier sont uploadés en base64
@@ -129,7 +132,7 @@ app.get("/api/health/ready", async (req, res) => {
     ]);
     res.json({ status: "ok", db: "ok", latenceMs: Date.now() - debut });
   } catch (err) {
-    console.warn(JSON.stringify({ type: "sante", date: new Date().toISOString(), requestId: req.id, db: "indisponible", message: String(err?.message).slice(0, 200) }));
+    log.warn("sante", { requestId: req.id, db: "indisponible", message: messageErreur(err) });
     res.status(503).json({ status: "degraded", db: "indisponible" });
   } finally {
     clearTimeout(minuterie);

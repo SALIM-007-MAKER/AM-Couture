@@ -1,3 +1,4 @@
+import { log, messageErreur } from "./logger.js";
 import crypto from "node:crypto";
 import { prisma } from "./prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
@@ -67,7 +68,7 @@ export function rateLimitPersistant({ prefixe, limite, fenetreMs, message = "Tro
       }
       next();
     } catch (err) {
-      console.error(`[rateLimitPersistant] Erreur (${prefixe}) — requête laissée passer :`, err.message);
+      log.error("erreur", { categorie: "rate_limit", prefixe, message: messageErreur(err), consequence: "requete_laissee_passer" });
       next();
     }
   };

@@ -1,4 +1,5 @@
 import { prisma } from "./prisma.js";
+import { log, messageErreur } from "./logger.js";
 
 // Journal des événements de sécurité : écrit (1) sur la sortie standard, en JSON
 // (logs Vercel) ET (2) en base (table JournalSecurite, conservation limitée —
@@ -37,23 +38,19 @@ export function assainirDetails(details) {
 export async function journaliserSecurite(evenement, { req, userId, atelierId, details } = {}) {
   const ip = req?.ip ?? null;
   const detailsPropres = assainirDetails(details);
-  console.warn(
-    JSON.stringify({
-      type: "securite",
-      evenement,
-      date: new Date().toISOString(),
-      ...(userId ? { userId } : {}),
-      ...(atelierId ? { atelierId } : {}),
-      ...(ip ? { ip } : {}),
-      ...(detailsPropres ? { details: detailsPropres } : {}),
-    }),
-  );
+  log.warn("securite", {
+    evenement,
+    ...(userId ? { userId } : {}),
+    ...(atelierId ? { atelierId } : {}),
+    ...(ip ? { ip } : {}),
+    ...(detailsPropres ? { details: detailsPropres } : {}),
+  });
   try {
     await prisma.journalSecurite.create({
       data: { evenement, userId: userId ?? null, atelierId: atelierId ?? null, ip, details: detailsPropres ?? undefined },
     });
   } catch (err) {
-    console.error(`[securityLog] Écriture en base impossible (${evenement}) : ${err.message}`);
+    log.error("erreur", { categorie: "journal_securite", evenement, message: messageErreur(err) });
   }
 }
 
