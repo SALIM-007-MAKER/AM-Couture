@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import { securityHeaders, csrfOriginGuard } from "./middlewares/security.middleware.js";
 import { requestId } from "./middlewares/requestId.middleware.js";
+import { installerGestionnairesProcessus } from "./lib/processHandlers.js";
 import { prisma } from "./lib/prisma.js";
 import authRouter from "./routes/auth.routes.js";
 import clientesRouter from "./routes/clientes.routes.js";
@@ -31,6 +32,9 @@ import demandesRouter from "./routes/demandes.routes.js";
 // backend/src/server.js (dev local) et par api/index.js (Vercel Function).
 // Frontend et API partagent le même domaine en prod → pas de CORS nécessaire.
 // En dev, le proxy Vite (frontend/vite.config.js) joue ce rôle.
+
+// Journalise les rejets et exceptions non gérés (désactivé en test : le lanceur de tests a ses propres gestionnaires).
+if (process.env.NODE_ENV !== "test") installerGestionnairesProcessus();
 
 const app = express();
 
