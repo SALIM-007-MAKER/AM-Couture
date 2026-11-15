@@ -15,6 +15,7 @@ import {
 import mesuresRouter from "./mesures.routes.js";
 import { buildCsv, envoyerCsv } from "../lib/csv.js";
 import { creerToken } from "../lib/tokenAction.js";
+import { isUniqueConstraintViolation } from "../lib/prismaErrors.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { emailInvitationClientTemplate } from "../lib/emailTemplates.js";
@@ -316,17 +317,15 @@ router.post("/:id/restaurer", async (req, res) => {
 router.post("/:id/inviter", async (req, res) => {
   const cliente = await prisma.cliente.findFirst({ where: { id: req.params.id, atelierId: req.user.atelierId } });
   if (!cliente) throw new HttpError(404, "Client introuvable.");
-  if (cliente.userId) {
-    throw new HttpError(409, "Ce client a déjà été invité ou possède déjà un compte.");
-  }
 
+  // Cette lecture ne sert qu'à charger les données de l'invitation. Les gardes « déjà invitée » et
+  // « identifiant déjà pris » sont appliquées DANS la transaction ci-dessous (verrou de ligne sur la
+  // cliente + contrainte UNIQUE), jamais par une vérification préalable (anomalie 2).
   const identifiant = cliente.telephone;
-  const existant = await prisma.user.findUnique({ where: { identifiant } });
-  if (existant) {
-    throw new HttpError(409, "Un compte existe déjà avec ce numéro de téléphone.", {
+  const conflitTelephone = () =>
+    new HttpError(409, "Un compte existe déjà avec ce numéro de téléphone.", {
       telephone: ["Un compte existe déjà avec ce numéro de téléphone."],
     });
-  }
 
   // Reporté sur le compte de connexion UNIQUEMENT si disponible : User.email
   // est unique (voir schema.prisma), or Cliente.email ne l'est pas — deux
@@ -334,32 +333,56 @@ router.post("/:id/inviter", async (req, res) => {
   // compte connecté, "mot de passe oublié" (auth.routes.js) ne peut envoyer
   // aucun email pour ce compte, faute d'email enregistré dessus — mieux
   // qu'un email en doublon qui ferait échouer toute l'invitation.
-  let emailPourCompte;
-  if (cliente.email) {
-    const emailDejaUtilise = await prisma.user.findUnique({ where: { email: cliente.email } });
-    if (!emailDejaUtilise) emailPourCompte = cliente.email;
-  }
+  // Concrètement : on tente la création AVEC l'email ; si la contrainte unique de l'email est violée
+  // (même par une invitation simultanée), on recommence SANS email — jamais d'échec de l'invitation.
 
   // Coût bcrypt normal malgré l'inutilisabilité : ce hash ne doit jamais
   // être plus facile à retrouver par force brute qu'un vrai mot de passe.
   const passwordHashTemporaire = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
 
-  const { token } = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
-      data: {
-        identifiant,
-        passwordHash: passwordHashTemporaire,
-        role: "USER",
-        atelierId: cliente.atelierId,
-        prenom: cliente.prenom,
-        nom: cliente.nom,
-        email: emailPourCompte,
+  const creerCompte = (avecEmail) =>
+    prisma.$transaction(
+      async (tx) => {
+        // Verrou de ligne sur la cliente : deux invitations simultanées de la même cliente se
+        // sérialisent ; la seconde voit userId renseigné et refuse avec le message métier.
+        const lignes = await tx.$queryRaw`SELECT "userId" FROM "Cliente" WHERE id = ${cliente.id} AND "atelierId" = ${cliente.atelierId} FOR UPDATE`;
+        if (lignes.length === 0) throw new HttpError(404, "Client introuvable.");
+        if (lignes[0].userId) throw new HttpError(409, "Ce client a déjà été invité ou possède déjà un compte.");
+
+        const user = await tx.user.create({
+          data: {
+            identifiant,
+            passwordHash: passwordHashTemporaire,
+            role: "USER",
+            atelierId: cliente.atelierId,
+            prenom: cliente.prenom,
+            nom: cliente.nom,
+            email: avecEmail ? cliente.email : undefined,
+          },
+        });
+        await tx.cliente.update({ where: { id: cliente.id }, data: { userId: user.id } });
+        const token = await creerToken({ userId: user.id, type: "INVITATION_CLIENT", dureeMs: 7 * 24 * 60 * 60 * 1000 }, tx);
+        return { token };
       },
-    });
-    await tx.cliente.update({ where: { id: cliente.id }, data: { userId: user.id } });
-    const token = await creerToken({ userId: user.id, type: "INVITATION_CLIENT", dureeMs: 7 * 24 * 60 * 60 * 1000 }, tx);
-    return { token };
-  });
+      { maxWait: 10_000, timeout: 15_000 },
+    );
+
+  let token;
+  try {
+    ({ token } = await creerCompte(Boolean(cliente.email)));
+  } catch (err) {
+    if (isUniqueConstraintViolation(err, "identifiant")) throw conflitTelephone();
+    if (cliente.email && isUniqueConstraintViolation(err, "email")) {
+      try {
+        ({ token } = await creerCompte(false));
+      } catch (err2) {
+        if (isUniqueConstraintViolation(err2, "identifiant")) throw conflitTelephone();
+        throw err2;
+      }
+    } else {
+      throw err;
+    }
+  }
 
   const origin = origineApplication(req);
   const lienActivation = `${origin}/client/activer?token=${token}`;

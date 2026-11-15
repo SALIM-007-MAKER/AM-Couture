@@ -58,8 +58,8 @@ RÉSOLUE. Résultats **mesurés** (Postgres 16 et 17).
 | # | Anomalie | Mesure initiale (3.1) | Statut | Sous-phase |
 |---|---|---|---|---|
 | 1 | Reçu émis sur un paiement annulé quand annulation et émission arrivent en même temps (I5) | 25 tours sur 25 : une violation à chaque tour | **RÉSOLUE en 3.3** : cause corrigée. L'annulation et l'émission du reçu prennent le même verrou (la commande) et re-vérifient leurs conditions sous ce verrou. Test bloquant stable sur 20 exécutions consécutives ; la suppression de l'un ou l'autre verrou est détectée (mutation) | 3.3 |
-| 2 | Invitations simultanées de la même cliente | 5 requêtes → 1 succès, 1 refus 409, **3 erreurs 500** | **ATTÉNUÉE en 3.2** : les perdantes reçoivent 409 au lieu de 500 (classement central de `P2002`). **Cause ouverte** : la route vérifie « existe déjà ? » puis crée, sans atomicité ; la contrainte `UNIQUE` rattrape la course après coup | 3.3 (cause) |
-| 3 | Inscriptions simultanées avec le même email | 5 requêtes → 1 succès, **4 erreurs 500** | **ATTÉNUÉE en 3.2** (même mécanisme). **Cause ouverte** (même schéma « vérifier puis créer »). Le message de conflit est générique, sans nom de champ | 3.3 (cause) |
+| 2 | Invitations simultanées de la même cliente | 5 requêtes → 1 succès, 1 refus 409, **3 erreurs 500** | **RÉSOLUE en 3.3** (cause). L'invitation n'a plus de vérification préalable : verrou de ligne sur la cliente, contrainte `UNIQUE` traduite en erreur métier, repli sans email si l'email est déjà porté. Critères remplis : (a) revue de code — les 3 seuls chemins de création de compte (`creerAtelierEtAdmin`, `ajouterCompteAtelier`, invitation) n'ont plus de vérification préalable ; (b) messages métier, jamais le message générique de repli ; (c) 15 exécutions consécutives sans échec | 3.3 |
+| 3 | Inscriptions simultanées avec le même email | 5 requêtes → 1 succès, **4 erreurs 500** | **RÉSOLUE en 3.3** (cause) : même correction ; le conflit est rattaché au champ (`email`, `adminIdentifiant`, `identifiant`) et n'est plus un message générique. Aucun atelier orphelin | 3.3 |
 | 4 | Même téléphone dans deux ateliers | le second atelier reçoit 409 « compte déjà existant » | **OUVERTE** (test `todo` qui échoue) : identité de connexion globale à revoir, orientation validée | 3.7 |
 
 ### Entrées ajoutées en 3.3 (mesurées ou établies par lecture du code, le 15 novembre 2026)
@@ -71,10 +71,7 @@ RÉSOLUE. Résultats **mesurés** (Postgres 16 et 17).
 | 7 | Aucune contrainte `CHECK` en base | **mesuré** : `INSERT` direct d'un paiement à -500 ou 0, `prixTotal` négatif, quantité de commande 0 acceptés | **OUVERTE** | 3.3 |
 | 8 | Événement client non atomique : le changement de statut et le refus d'une demande écrivent l'événement hors transaction | **code** (`commandes.routes.js`, `demandes.routes.js`) — **à confirmer par test** avant correction | **RÉSOLUE en 3.3** : **confirmée** par test (un déclencheur SQL fait échouer l'événement : le statut changeait quand même, et la demande était refusée en silence), puis corrigée — le changement de statut et le refus de demande écrivent leur événement dans la même transaction. Trois routes déjà atomiques servent de contrôle. Test bloquant | 3.3 |
 
-Les tests des anomalies 2 et 3 sont **bloquants** (15 exécutions consécutives sans échec) : ils
-protègent le comportement HTTP atténué, pas la correction de la cause. Ils ne valent pas
-fermeture du registre. L'invariant de données (un seul compte, un seul atelier, aucun orphelin)
-tenait déjà avant la 3.2 et reste vérifié.
+Limite des tests pour 2 et 3 : un test extérieur ne peut pas prouver l'ABSENCE d'une vérification préalable (un message identique peut venir d'un contrôle ou de la contrainte). La preuve de la cause repose donc sur la **revue de code** des trois chemins de création de compte (consignée ci-dessus), complétée par des mutations : retirer la traduction par champ ou le repli sans email est détecté.
 
 Comportements **caractérisés** (le test affirme l'état actuel, à inverser dans la sous-phase
 indiquée) : absence d'idempotence des paiements (3.3), numérotation globale non continue par
