@@ -75,7 +75,14 @@ describe("Concurrence — créations de commandes et statuts", () => {
     assert.equal((await prisma.commande.findUnique({ where: { id: c.id } })).statut, "EN_CONFECTION");
   });
 
-  it("annulation et passage en confection simultanés : l'état final est ANNULEE, chaque succès a son événement", async () => {
+  it("annulation et passage en confection simultanés : l'état final est cohérent avec les succès, chacun a son événement", async () => {
+    // Deux issues LÉGITIMES (verrouillage optimiste, `updateMany` conditionnel à l'ancien statut) :
+    //  (a) une ANNULEE passe → état final ANNULEE (EN_CONFECTION a pu passer juste avant) ;
+    //  (b) EN_CONFECTION passe d'abord : toutes les ANNULEE avaient lu l'ancien statut, perdent la
+    //      course et reçoivent 409 « réessayez » → état final EN_CONFECTION.
+    // (b) a été observé 1 fois sur 12 passages : l'hypothèse « ANNULEE réussit toujours » était
+    // fausse. Ce qui ne doit JAMAIS arriver : plusieurs succès du même type, un état final sans
+    // succès correspondant, ou un événement manquant.
     const c = await creerCommandeApi(A.api, A.cliente.id);
     const reponses = await Promise.all([
       ...Array.from({ length: 5 }, () => A.api.post(`/api/commandes/${c.id}/statut`, { statut: "ANNULEE" })),
@@ -83,10 +90,12 @@ describe("Concurrence — créations de commandes et statuts", () => {
     ]);
     const annulees = reponses.slice(0, 5).filter((r) => r.status === 200).length;
     const confections = reponses.slice(5).filter((r) => r.status === 200).length;
-    assert.equal(annulees, 1, "ANNULEE ne peut réussir qu'une fois");
-    assert.ok(confections <= 1, "EN_CONFECTION ne peut réussir qu'une fois, et seulement avant l'annulation");
     for (const r of reponses) assert.ok([200, 409].includes(r.status), `statut inattendu ${r.status}`);
-    assert.equal((await prisma.commande.findUnique({ where: { id: c.id } })).statut, "ANNULEE");
+    assert.ok(annulees <= 1, "ANNULEE ne peut réussir qu'une fois");
+    assert.ok(confections <= 1, "EN_CONFECTION ne peut réussir qu'une fois");
+    assert.ok(annulees + confections >= 1, "au moins une transition doit réussir");
+    const final = (await prisma.commande.findUnique({ where: { id: c.id } })).statut;
+    assert.equal(final, annulees === 1 ? "ANNULEE" : "EN_CONFECTION", `état final ${final} incohérent avec ${annulees} annulation(s) et ${confections} confection(s)`);
     const evenements = await prisma.notificationClient.count({
       where: { commandeId: c.id, type: { in: ["COMMANDE_STATUT_CHANGE", "COMMANDE_ANNULEE"] } },
     });
