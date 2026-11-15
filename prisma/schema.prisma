@@ -276,6 +276,7 @@ model Atelier {
   depenses             Depense[]
   articlesStock        ArticleStock[]
   fournisseurs         Fournisseur[]
+  achats               Achat[]
   abonnements          Abonnement[]
   historiqueAbonnement HistoriqueAbonnement[]
   rappelsAbonnement    RappelAbonnement[]
@@ -632,6 +633,8 @@ model Depense {
   annuleAt    DateTime?
   annuleMotif String?
 
+  achat Achat?
+
   // atelierId : même correction de drift que Commande ci-dessus (index déjà
   // en base depuis la Phase 8, non déclaré jusqu'ici).
   @@index([atelierId])
@@ -678,7 +681,8 @@ model ArticleStock {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  mouvements MouvementStock[]
+  mouvements  MouvementStock[]
+  lignesAchat LigneAchat[]
 
   @@index([atelierId])
   @@index([nom])
@@ -693,9 +697,13 @@ model MouvementStock {
   // dans la valeur (évite un ENTREE négatif ou une SORTIE positive incohérents).
   quantite  Decimal            @db.Decimal(10, 2)
   motif     String?
+  // Renseigné quand l'entrée vient de la réception d'un achat (Phase 6.5) : trace et garde-fou contre le double comptage.
+  ligneAchatId String?
+  ligneAchat   LigneAchat?        @relation(fields: [ligneAchatId], references: [id], onDelete: Restrict)
   createdAt DateTime           @default(now())
 
   @@index([articleId])
+  @@index([ligneAchatId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1058,5 +1066,60 @@ model Fournisseur {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  achats Achat[]
+
   @@index([atelierId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Achats (Phase 6.5) — bons de commande aux fournisseurs : réception → entrées de stock ; paiement → une dépense.
+// Rien de dérivé n'est stocké : état de réception = lignes (quantiteRecue / quantite) ; payé = dépense liée non annulée ;
+// total = somme des lignes. Jamais supprimés : on annule (tant que rien n'est reçu ni payé).
+// ─────────────────────────────────────────────────────────────────────────
+enum StatutAchat {
+  COMMANDE
+  ANNULE
+}
+
+model Achat {
+  id            String      @id @default(cuid())
+  atelierId     String
+  atelier       Atelier     @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  numero        String      @unique // ACH-2026-0001, même Counter que CMD/REC
+  fournisseurId String
+  fournisseur   Fournisseur @relation(fields: [fournisseurId], references: [id], onDelete: Restrict)
+  statut        StatutAchat @default(COMMANDE)
+  dateCommande  DateTime    @default(now())
+  // Date à laquelle la marchandise est attendue (sert aux rappels de la 6.6).
+  dateAttendue  DateTime?
+  notes         String?
+  // Dépense créée au paiement. Si elle est ensuite annulée (module Dépenses), l'achat redevient « non payé ».
+  depenseId     String?     @unique
+  depense       Depense?    @relation(fields: [depenseId], references: [id], onDelete: Restrict)
+  annuleAt      DateTime?
+  annuleMotif   String?
+  creeParId     String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  lignes LigneAchat[]
+
+  @@index([atelierId, statut])
+  @@index([fournisseurId])
+}
+
+model LigneAchat {
+  id            String       @id @default(cuid())
+  achatId       String
+  achat         Achat        @relation(fields: [achatId], references: [id], onDelete: Restrict)
+  articleId     String
+  article       ArticleStock @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  quantite      Decimal      @db.Decimal(10, 2)
+  prixUnitaire  Decimal      @db.Decimal(10, 2)
+  quantiteRecue Decimal      @default(0) @db.Decimal(10, 2)
+
+  mouvements MouvementStock[]
+
+  @@unique([achatId, articleId])
+  @@index([articleId])
 }
