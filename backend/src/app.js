@@ -2,6 +2,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import { securityHeaders, csrfOriginGuard } from "./middlewares/security.middleware.js";
+import { requestId } from "./middlewares/requestId.middleware.js";
 import authRouter from "./routes/auth.routes.js";
 import clientesRouter from "./routes/clientes.routes.js";
 import modelesRouter from "./routes/modeles.routes.js";
@@ -39,6 +40,8 @@ app.disable("x-powered-by");
 
 // En-têtes de sécurité + garde Origin (CSRF) AVANT tout parsing de corps et tout
 // routeur — voir middlewares/security.middleware.js.
+// L'identifiant de requête vient en PREMIER : même une erreur d'analyse du corps en porte un.
+app.use(requestId);
 app.use("/api", securityHeaders, csrfOriginGuard);
 
 // 5mb : les photos (modèles) et le logo de l'atelier sont uploadés en base64
@@ -103,6 +106,7 @@ app.use("/api/cron", cronRouter);
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "gestion-atelier-api" });
 });
+
 
 // Paiements/Livraisons/Reçus : toute ÉCRITURE (création, annulation) reste
 // exclusivement en routes imbriquées sous /api/commandes/:commandeId/...
