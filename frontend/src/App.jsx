@@ -1,4 +1,6 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { useLocaleStore } from "./stores/localeStore.js";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 import PublicOnlyRoute from "./routes/PublicOnlyRoute.jsx";
@@ -7,55 +9,65 @@ import AppLayout from "./layouts/AppLayout.jsx";
 import SuperadminLayout from "./layouts/SuperadminLayout.jsx";
 import ClientLayout from "./layouts/ClientLayout.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
-import InscriptionAtelierPage from "./pages/auth/InscriptionAtelierPage.jsx";
-import MotDePasseOublieePage from "./pages/auth/MotDePasseOublieePage.jsx";
-import ReinitialiserMotDePasseTokenPage from "./pages/auth/ReinitialiserMotDePasseTokenPage.jsx";
-import ActiverCompteClientPage from "./pages/auth/ActiverCompteClientPage.jsx";
-import VerifierEmailPage from "./pages/auth/VerifierEmailPage.jsx";
-import AteliersPage from "./pages/superadmin/AteliersPage.jsx";
-import AtelierDetailPage from "./pages/superadmin/AtelierDetailPage.jsx";
-import SuperadminDashboardPage from "./pages/superadmin/SuperadminDashboardPage.jsx";
-import GestionAbonnementsPage from "./pages/superadmin/GestionAbonnementsPage.jsx";
-import GestionPlansPage from "./pages/superadmin/GestionPlansPage.jsx";
-import DashboardPage from "./pages/DashboardPage.jsx";
-import FinancesPage from "./pages/FinancesPage.jsx";
+const InscriptionAtelierPage = lazy(() => import("./pages/auth/InscriptionAtelierPage.jsx"));
+const MotDePasseOublieePage = lazy(() => import("./pages/auth/MotDePasseOublieePage.jsx"));
+const ReinitialiserMotDePasseTokenPage = lazy(() => import("./pages/auth/ReinitialiserMotDePasseTokenPage.jsx"));
+const ActiverCompteClientPage = lazy(() => import("./pages/auth/ActiverCompteClientPage.jsx"));
+const VerifierEmailPage = lazy(() => import("./pages/auth/VerifierEmailPage.jsx"));
+const AteliersPage = lazy(() => import("./pages/superadmin/AteliersPage.jsx"));
+const AtelierDetailPage = lazy(() => import("./pages/superadmin/AtelierDetailPage.jsx"));
+const SuperadminDashboardPage = lazy(() => import("./pages/superadmin/SuperadminDashboardPage.jsx"));
+const GestionAbonnementsPage = lazy(() => import("./pages/superadmin/GestionAbonnementsPage.jsx"));
+const GestionPlansPage = lazy(() => import("./pages/superadmin/GestionPlansPage.jsx"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
+const FinancesPage = lazy(() => import("./pages/FinancesPage.jsx"));
 import NotFoundPage from "./pages/NotFoundPage.jsx";
-import ClientesListPage from "./features/clientes/ClientesListPage.jsx";
-import ClienteFormPage from "./features/clientes/ClienteFormPage.jsx";
-import ClienteDetailPage from "./features/clientes/ClienteDetailPage.jsx";
-import MesureFormPage from "./features/clientes/MesureFormPage.jsx";
-import ModelesListPage from "./features/modeles/ModelesListPage.jsx";
-import ModeleFormPage from "./features/modeles/ModeleFormPage.jsx";
-import ModeleDetailPage from "./features/modeles/ModeleDetailPage.jsx";
-import CommandesListPage from "./features/commandes/CommandesListPage.jsx";
-import CommandeFormPage from "./features/commandes/CommandeFormPage.jsx";
-import CommandeDetailPage from "./features/commandes/CommandeDetailPage.jsx";
-import DepensesListPage from "./features/depenses/DepensesListPage.jsx";
-import DepenseFormPage from "./features/depenses/DepenseFormPage.jsx";
-import DepenseDetailPage from "./features/depenses/DepenseDetailPage.jsx";
-import StockListPage from "./features/stock/StockListPage.jsx";
-import StockFormPage from "./features/stock/StockFormPage.jsx";
-import ArticleStockDetailPage from "./features/stock/ArticleStockDetailPage.jsx";
-import LivraisonsListPage from "./features/livraisons/LivraisonsListPage.jsx";
-import PaiementsListPage from "./features/paiements/PaiementsListPage.jsx";
-import RecusListPage from "./features/recus/RecusListPage.jsx";
-import RapportsPage from "./features/rapports/RapportsPage.jsx";
-import ParametresPage from "./features/parametres/ParametresPage.jsx";
-import NotificationsPage from "./features/notifications/NotificationsPage.jsx";
-import CalendrierPage from "./features/calendrier/CalendrierPage.jsx";
-import ComptePage from "./features/compte/ComptePage.jsx";
-import AbonnementPage from "./features/abonnement/AbonnementPage.jsx";
-import DemandesListPage from "./features/demandes/DemandesListPage.jsx";
-import DemandeDetailPage from "./features/demandes/DemandeDetailPage.jsx";
-import ClientProfilPage from "./features/moi/ClientProfilPage.jsx";
-import ClientMesuresPage from "./features/moi/ClientMesuresPage.jsx";
-import ClientCommandesListPage from "./features/moi/ClientCommandesListPage.jsx";
-import ClientCommandeDetailPage from "./features/moi/ClientCommandeDetailPage.jsx";
-import ClientPaiementsPage from "./features/moi/ClientPaiementsPage.jsx";
-import ClientRecusPage from "./features/moi/ClientRecusPage.jsx";
-import ClientNotificationsPage from "./features/moi/ClientNotificationsPage.jsx";
-import ClientDemandesPage from "./features/moi/ClientDemandesPage.jsx";
-import ClientDemandeFormPage from "./features/moi/ClientDemandeFormPage.jsx";
+const ClientesListPage = lazy(() => import("./features/clientes/ClientesListPage.jsx"));
+const ClienteFormPage = lazy(() => import("./features/clientes/ClienteFormPage.jsx"));
+const ClienteDetailPage = lazy(() => import("./features/clientes/ClienteDetailPage.jsx"));
+const MesureFormPage = lazy(() => import("./features/clientes/MesureFormPage.jsx"));
+const ModelesListPage = lazy(() => import("./features/modeles/ModelesListPage.jsx"));
+const ModeleFormPage = lazy(() => import("./features/modeles/ModeleFormPage.jsx"));
+const ModeleDetailPage = lazy(() => import("./features/modeles/ModeleDetailPage.jsx"));
+const CommandesListPage = lazy(() => import("./features/commandes/CommandesListPage.jsx"));
+const CommandeFormPage = lazy(() => import("./features/commandes/CommandeFormPage.jsx"));
+const CommandeDetailPage = lazy(() => import("./features/commandes/CommandeDetailPage.jsx"));
+const DepensesListPage = lazy(() => import("./features/depenses/DepensesListPage.jsx"));
+const DepenseFormPage = lazy(() => import("./features/depenses/DepenseFormPage.jsx"));
+const DepenseDetailPage = lazy(() => import("./features/depenses/DepenseDetailPage.jsx"));
+const StockListPage = lazy(() => import("./features/stock/StockListPage.jsx"));
+const StockFormPage = lazy(() => import("./features/stock/StockFormPage.jsx"));
+const ArticleStockDetailPage = lazy(() => import("./features/stock/ArticleStockDetailPage.jsx"));
+const LivraisonsListPage = lazy(() => import("./features/livraisons/LivraisonsListPage.jsx"));
+const PaiementsListPage = lazy(() => import("./features/paiements/PaiementsListPage.jsx"));
+const RecusListPage = lazy(() => import("./features/recus/RecusListPage.jsx"));
+const RapportsPage = lazy(() => import("./features/rapports/RapportsPage.jsx"));
+const ParametresPage = lazy(() => import("./features/parametres/ParametresPage.jsx"));
+const NotificationsPage = lazy(() => import("./features/notifications/NotificationsPage.jsx"));
+const CalendrierPage = lazy(() => import("./features/calendrier/CalendrierPage.jsx"));
+const ComptePage = lazy(() => import("./features/compte/ComptePage.jsx"));
+const AbonnementPage = lazy(() => import("./features/abonnement/AbonnementPage.jsx"));
+const DemandesListPage = lazy(() => import("./features/demandes/DemandesListPage.jsx"));
+const DemandeDetailPage = lazy(() => import("./features/demandes/DemandeDetailPage.jsx"));
+const ClientProfilPage = lazy(() => import("./features/moi/ClientProfilPage.jsx"));
+const ClientMesuresPage = lazy(() => import("./features/moi/ClientMesuresPage.jsx"));
+const ClientCommandesListPage = lazy(() => import("./features/moi/ClientCommandesListPage.jsx"));
+const ClientCommandeDetailPage = lazy(() => import("./features/moi/ClientCommandeDetailPage.jsx"));
+const ClientPaiementsPage = lazy(() => import("./features/moi/ClientPaiementsPage.jsx"));
+const ClientRecusPage = lazy(() => import("./features/moi/ClientRecusPage.jsx"));
+const ClientNotificationsPage = lazy(() => import("./features/moi/ClientNotificationsPage.jsx"));
+const ClientDemandesPage = lazy(() => import("./features/moi/ClientDemandesPage.jsx"));
+const ClientDemandeFormPage = lazy(() => import("./features/moi/ClientDemandeFormPage.jsx"));
+
+// Chargement à la demande : chaque page est un fragment de code séparé, téléchargé à la première visite de
+// l'écran. L'écran de connexion reste dans le paquet initial (premier écran de tout visiteur).
+function ChargementPage() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center text-gray-500" role="status" aria-live="polite">
+      <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />
+    </div>
+  );
+}
 
 export default function App() {
   // key={locale} : remonte les routes au changement de langue, pour que même
@@ -63,6 +75,7 @@ export default function App() {
   // se rafraîchissent partout.
   const locale = useLocaleStore((s) => s.locale);
   return (
+    <Suspense fallback={<ChargementPage />}>
     <Routes key={locale}>
       <Route element={<PublicOnlyRoute />}>
         <Route path="/login" element={<LoginPage />} />
@@ -148,5 +161,6 @@ export default function App() {
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </Suspense>
   );
 }
