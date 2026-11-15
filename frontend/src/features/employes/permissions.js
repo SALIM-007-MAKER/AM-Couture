@@ -19,6 +19,7 @@ export const PERMISSION_PAR_CHEMIN = {
   "/clientes": "clientes.lire",
   "/modeles": "modeles.lire",
   "/stock": "stock.lire",
+  "/fournisseurs": "fournisseurs.lire",
   "/commandes": "commandes.lire",
   "/demandes": "demandes.lire",
   "/livraisons": "livraisons.lire",

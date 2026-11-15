@@ -23,6 +23,7 @@ import {
   Inbox,
   UserCog,
   Hammer,
+  Store,
 } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { peutAcceder, filtrerNavigation } from "../features/employes/permissions.js";
@@ -54,6 +55,7 @@ const NAV_GROUPS = [
       { labelKey: "nav.clients", to: "/clientes", icon: Users },
       { labelKey: "nav.models", to: "/modeles", icon: Shirt },
       { labelKey: "nav.stock", to: "/stock", icon: Package },
+      { labelKey: "nav.suppliers", to: "/fournisseurs", icon: Store },
       { labelKey: "nav.orders", to: "/commandes", icon: ClipboardList },
       { labelKey: "nav.production", to: "/production", icon: Hammer },
       { labelKey: "nav.requests", to: "/demandes", icon: Inbox },
@@ -115,6 +117,7 @@ const MOBILE_DRAWER_GROUPS = [
       { labelKey: "nav.production", to: "/production", icon: Hammer },
       { labelKey: "nav.deliveries", to: "/livraisons", icon: Truck },
       { labelKey: "nav.stock", to: "/stock", icon: Package },
+      { labelKey: "nav.suppliers", to: "/fournisseurs", icon: Store },
       { labelKey: "nav.requests", to: "/demandes", icon: Inbox },
       { labelKey: "nav.receipts", to: "/recus", icon: FileText },
       { labelKey: "nav.reports", to: "/rapports", icon: BarChart3 },
