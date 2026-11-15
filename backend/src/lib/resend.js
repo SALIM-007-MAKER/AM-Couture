@@ -22,6 +22,15 @@ function requireApiKey() {
 // (meilleure délivrabilité, pas de risque de blocage du domaine partagé).
 const FROM_DEFAULT = "Gestion d'Atelier <onboarding@resend.dev>";
 
+// Délai maximal d'un appel (ms). Sans lui, un service lent ou muet suspend la requête de
+// l'utilisateur (inscription, mot de passe oublié, invitation) et, dans le cron, tous les envois
+// suivants, jusqu'à l'arrêt de la fonction par la plateforme.
+const DELAI_PAR_DEFAUT_MS = 8000;
+function delaiMs() {
+  const v = Number(process.env.RESEND_TIMEOUT_MS);
+  return Number.isFinite(v) && v > 0 ? v : DELAI_PAR_DEFAUT_MS;
+}
+
 /**
  * Envoie un email via l'API Resend. Lance une erreur explicite en cas
  * d'échec (clé absente/invalide, adresse rejetée, panne réseau...) — à
@@ -30,7 +39,27 @@ const FROM_DEFAULT = "Gestion d'Atelier <onboarding@resend.dev>";
  */
 export async function envoyerEmail({ to, subject, html }) {
   const apiKey = requireApiKey();
-  const res = await fetch(`${RESEND_API_BASE}/emails`, {
+  const delai = delaiMs();
+  let res;
+  try {
+    res = await fetchResend(apiKey, { to, subject, html }, delai);
+  } catch (err) {
+    if (err?.name === "TimeoutError" || err?.name === "AbortError") {
+      throw new Error(`Resend n'a pas répondu dans le délai imparti (${delai} ms) : délai dépassé.`);
+    }
+    throw err;
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const message = data?.message || `Erreur Resend (HTTP ${res.status}).`;
+    throw new Error(message);
+  }
+  return data;
+}
+
+function fetchResend(apiKey, { to, subject, html }, delai) {
+  return fetch(`${RESEND_API_BASE}/emails`, {
+    signal: AbortSignal.timeout(delai),
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -43,10 +72,4 @@ export async function envoyerEmail({ to, subject, html }) {
       html,
     }),
   });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    const message = data?.message || `Erreur Resend (HTTP ${res.status}).`;
-    throw new Error(message);
-  }
-  return data;
 }
