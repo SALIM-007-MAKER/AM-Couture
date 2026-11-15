@@ -24,6 +24,8 @@ export const CATALOGUE = {
   "livraisons.ecrire": { module: "livraisons", sensible: false },
   "demandes.lire": { module: "demandes", sensible: false },
   "demandes.ecrire": { module: "demandes", sensible: false },
+  "fournisseurs.lire": { module: "fournisseurs", sensible: false },
+  "fournisseurs.ecrire": { module: "fournisseurs", sensible: false },
   "stock.lire": { module: "stock", sensible: false },
   "stock.ecrire": { module: "stock", sensible: false },
   "dashboard.lire": { module: "dashboard", sensible: false },
@@ -63,7 +65,7 @@ export const POSTES = {
     "dashboard.lire",
     "notifications.lire",
   ],
-  MAGASINIER: ["stock.lire", "stock.ecrire", "modeles.lire", "notifications.lire"],
+  MAGASINIER: ["stock.lire", "stock.ecrire", "fournisseurs.lire", "fournisseurs.ecrire", "modeles.lire", "notifications.lire"],
   COMPTABLE: [
     "clientes.lire",
     "commandes.lire",
