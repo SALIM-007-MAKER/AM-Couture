@@ -7,6 +7,7 @@ import { origineApplication } from "../lib/appUrl.js";
 import { rappelsQuotidiensTemplate } from "../lib/emailTemplates.js";
 import { purgerJournalSecurite } from "../lib/securityLog.js";
 import { purgerClesIdempotence } from "../lib/idempotence.js";
+import { envoyerRappelsAbonnement } from "../lib/rappelsAbonnement.js";
 
 const router = Router();
 
@@ -93,7 +94,20 @@ router.get("/rappels-quotidiens", async (req, res) => {
     }
   }
 
-  res.json({ ateliersTraites: ateliers.length, emailsEnvoyes, erreurs, journalSecuritePurge: journalPurge, clesIdempotencePurgees: clesPurgees });
+  // Rappels d'abonnement (fin d'essai, échéance) : un échec ici ne doit pas masquer le reste du compte rendu.
+  const rappelsAbonnement = await envoyerRappelsAbonnement({ prisma, envoyer: envoyerEmail, origine: origin }).catch((err) => {
+    log.error("erreur", { categorie: "cron", operation: "rappels_abonnement", message: messageErreur(err) });
+    return null;
+  });
+
+  res.json({
+    ateliersTraites: ateliers.length,
+    emailsEnvoyes,
+    erreurs,
+    journalSecuritePurge: journalPurge,
+    clesIdempotencePurgees: clesPurgees,
+    rappelsAbonnement,
+  });
 });
 
 export default router;

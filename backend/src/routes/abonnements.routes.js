@@ -7,9 +7,11 @@ import { idempotence } from "../lib/idempotence.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { formatZodError } from "../lib/validation.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
-import { log } from "../lib/logger.js";
+import { log, messageErreur } from "../lib/logger.js";
 import { souscrire, annulerParAtelier } from "../lib/souscription.js";
 import { streamFacturePdf } from "../lib/facturePdf.js";
+import { origineApplication } from "../lib/appUrl.js";
+import { notifierDeclaration } from "../lib/notificationsAbonnement.js";
 import { souscrireSchema } from "../schemas/abonnementPaiement.schema.js";
 
 const router = Router();
@@ -115,6 +117,10 @@ router.post("/souscrire", idempotence, async (req, res) => {
     details: { prefixe: transaction.numero },
   });
   log.info("abonnement", { evenement: "paiement_declare", transaction: transaction.numero, atelierId: atelier.id });
+  // La plateforme est prévenue par courriel (si une adresse est configurée) ; un échec n'annule pas la déclaration.
+  await notifierDeclaration({ prisma, transaction, atelierNom: atelier.nom, origine: origineApplication(req) }).catch((err) =>
+    log.warn("abonnement", { evenement: "notification_declaration_echec", message: messageErreur(err) }),
+  );
   res.status(201).json({ id: transaction.id, numero: transaction.numero, statut: transaction.statut, montant: transaction.montant });
 });
 

@@ -262,6 +262,7 @@ model Atelier {
   articlesStock        ArticleStock[]
   abonnements          Abonnement[]
   historiqueAbonnement HistoriqueAbonnement[]
+  rappelsAbonnement    RappelAbonnement[]
   demandesCommande     DemandeCommande[]
 }
 
@@ -802,6 +803,20 @@ model FactureAbonnement {
   annuleeMotif      String?
 
   @@index([atelierId, emisLe])
+}
+
+/// Rappel d'abonnement déjà envoyé (fin d'essai, échéance d'abonnement). La contrainte d'unicité garantit qu'un
+/// même rappel n'est envoyé qu'une seule fois par échéance, même si la tâche quotidienne est rejouée ou lancée
+/// en double. `cle` = date de l'échéance concernée (AAAA-MM-JJ) : une nouvelle échéance donne de nouveaux rappels.
+model RappelAbonnement {
+  id        String   @id @default(cuid())
+  atelierId String
+  atelier   Atelier  @relation(fields: [atelierId], references: [id], onDelete: Cascade)
+  type      String
+  cle       String
+  envoyeLe  DateTime @default(now())
+
+  @@unique([atelierId, type, cle])
 }
 
 /// Plans d'abonnement de la plateforme (Essentiel, Professionnel...) —

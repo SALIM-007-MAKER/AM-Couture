@@ -56,7 +56,7 @@ Un atelier n'accède jamais aux données d'un autre : une ressource d'un autre a
 |---|---|---|
 | `GET /api/health` | Public | Le processus répond : `{ "status": "ok", "service": "gestion-atelier-api" }`. Ne dépend pas de la base. |
 | `GET /api/health/ready` | Public | Vérifie la base (`SELECT 1`, 2,5 s maximum) : `200 { "status": "ok", "db": "ok", "latenceMs" }` ou `503 { "status": "degraded", "db": "indisponible" }`. |
-| `GET /api/cron/rappels-quotidiens` | Cron | Appelée par Vercel Cron : envoie les rappels par email, purge le journal de sécurité (rétention 365 jours). |
+| `GET /api/cron/rappels-quotidiens` | Cron | Appelée par Vercel Cron : envoie les rappels de commandes et les rappels d'abonnement (fin d'essai, échéance, une fois par échéance), purge le journal de sécurité (rétention 365 jours) et les clés d'idempotence expirées. |
 
 ## 3. Authentification (`/api/auth`)
 

@@ -6,9 +6,11 @@ import { formatZodError } from "../lib/validation.js";
 import { contactSchema, journalSecuriteQuerySchema } from "../schemas/plateforme.schema.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
-import { log } from "../lib/logger.js";
+import { log, messageErreur } from "../lib/logger.js";
 import { confirmerTransaction, rejeterTransaction, rembourserTransaction } from "../lib/souscription.js";
 import { streamFacturePdf } from "../lib/facturePdf.js";
+import { origineApplication } from "../lib/appUrl.js";
+import { notifierDecision } from "../lib/notificationsAbonnement.js";
 import {
   confirmerSchema,
   motifSchema,
@@ -131,6 +133,13 @@ async function decision(req, res, { evenement, appliquer, corps }) {
       transaction: resultat.transaction.numero,
       par: req.user.identifiant,
     });
+    // L'atelier est prévenu par courriel ; un échec d'envoi n'annule jamais la décision (déjà enregistrée).
+    await notifierDecision({
+      prisma,
+      evenement,
+      transactionId: resultat.transaction.id,
+      origine: origineApplication(req),
+    }).catch((err) => log.warn("abonnement", { evenement: "notification_decision_echec", message: messageErreur(err) }));
   }
   const t = await prisma.transaction.findUnique({ where: { id: req.params.id }, select: TRANSACTION_ADMIN_SELECT });
   res.json({ ...t, dejaTraitee: resultat.deja });
