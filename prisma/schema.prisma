@@ -68,6 +68,9 @@ enum StatutAbonnement {
   EN_ATTENTE
   CONFIRME
   ANNULE
+  // Pause décidée par le SUPERADMIN (litige, fraude suspectée) : l'abonnement ne donne plus accès mais garde ses
+  // dates ; la réactivation le remet en CONFIRME. Distinct de Atelier.actif (suspension de tout l'atelier).
+  SUSPENDU
 }
 
 // Valeur AMANA conservée telle quelle (historique) même si le prestataire est
@@ -78,6 +81,11 @@ enum MoyenPaiement {
   WAVE
   NITA
   AMANA
+  // Paiements hors plateforme déclarés par l'atelier et confirmés par le SUPERADMIN (opérateur précisé en texte libre).
+  MOBILE_MONEY
+  ESPECES
+  VIREMENT
+  AUTRE
 }
 
 // pending/paid/failed/cancelled/expired (§ architecture paiement abonnement)
@@ -95,6 +103,8 @@ enum StatutTransaction {
   ECHOUEE
   ANNULEE
   EXPIREE
+  // Paiement réussi puis remboursé (voir Transaction.rembourseLe). La ligne n'est jamais supprimée.
+  REMBOURSEE
 }
 
 // Historique des changements d'abonnement d'un atelier (§ abonnement géré
@@ -104,6 +114,12 @@ enum ActionAbonnement {
   MODIFICATION
   EXPIRATION
   DESACTIVATION
+  SOUSCRIPTION
+  CONFIRMATION_PAIEMENT
+  REJET_PAIEMENT
+  SUSPENSION
+  REACTIVATION
+  REMBOURSEMENT
 }
 
 // Multi-tenant (Phase 8) — plateforme "Gestion d'Atelier" : SUPERADMIN gère
@@ -716,31 +732,76 @@ model Abonnement {
 }
 
 model Transaction {
-  id                   String            @id @default(cuid())
-  numero               String            @unique // TRX-2026-0001
+  id                   String             @id @default(cuid())
+  numero               String             @unique // TRX-2026-0001
   abonnementId         String
-  abonnement           Abonnement        @relation(fields: [abonnementId], references: [id], onDelete: Restrict)
+  abonnement           Abonnement         @relation(fields: [abonnementId], references: [id], onDelete: Restrict)
   moyenPaiement        MoyenPaiement
-  montant              Decimal           @db.Decimal(10, 2)
-  statut               StatutTransaction @default(EN_ATTENTE)
+  montant              Decimal            @db.Decimal(10, 2)
+  statut               StatutTransaction  @default(EN_ATTENTE)
   // Notre clé d'idempotence — envoyée à Wave comme client_reference : permet
   // de retrouver la transaction depuis le webhook sans jamais en créer deux
   // pour un même paiement (rejeu webhook, double-clic sur "Payer"...).
-  referenceInterne     String            @unique
+  referenceInterne     String             @unique
   // Id de session Wave (cos-...), ou référence de transfert saisie
   // manuellement pour NITA/Amana (voir confirmeManuellement ci-dessous).
   referenceExterne     String?
   // true UNIQUEMENT pour NITA/Amana — jamais mis à true automatiquement,
   // seulement via une action explicite de l'admin (voir notifications.routes
   // équivalent pour abonnements : POST .../confirmer-manuellement).
-  confirmeManuellement Boolean           @default(false)
+  confirmeManuellement Boolean            @default(false)
+  // Atelier propriétaire, dénormalisé depuis l'abonnement pour filtrer et totaliser sans jointure.
+  atelierId            String?
+  // Paiement manuel : déclaré par l'atelier (qui, quand, quelle preuve), puis confirmé ou rejeté par le SUPERADMIN.
+  // Rien de cela ne vaut confirmation : seule la décision du SUPERADMIN (confirmePar/confirmeLe) fait passer la
+  // transaction à REUSSIE.
+  declarePar           String?
+  declareLe            DateTime?
+  operateur            String? // ex. « Airtel Money », pour MOBILE_MONEY
+  preuveNote           String?
+  confirmePar          String?
+  confirmeLe           DateTime?
+  motifRejet           String?
+  // Remboursement : jamais de suppression, la transaction passe à REMBOURSEE avec qui, quand, pourquoi.
+  rembourseLe          DateTime?
+  rembourseePar        String?
+  motifRemboursement   String?
+  facture              FactureAbonnement?
   // Payload webhook Wave brut, conservé pour audit/litige — jamais
   // réinterprété après coup, juste une preuve horodatée de ce qui a été reçu.
   donneesBrutesWebhook Json?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   @@index([abonnementId])
+  @@index([atelierId, statut])
+  @@index([statut, createdAt])
+}
+
+/// Justificatif de paiement d'un abonnement. Émise à la confirmation d'une transaction, numérotée (FAC-AAAA-NNNN)
+/// et IMMUTABLE : les champs ci-dessous sont des instantanés au jour de l'émission (renommer l'atelier ou le plan
+/// plus tard ne réécrit pas une facture). Un remboursement ne la supprime pas : il la marque annulée.
+model FactureAbonnement {
+  id                String        @id @default(cuid())
+  numero            String        @unique
+  transactionId     String        @unique
+  transaction       Transaction   @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  abonnementId      String
+  atelierId         String
+  atelierNom        String
+  planNom           String?
+  dureeMois         Int?
+  periodeDebut      DateTime?
+  periodeFin        DateTime?
+  montant           Decimal       @db.Decimal(10, 2)
+  devise            String        @default("FCFA")
+  moyenPaiement     MoyenPaiement
+  referencePaiement String?
+  emisLe            DateTime      @default(now())
+  annuleeLe         DateTime?
+  annuleeMotif      String?
+
+  @@index([atelierId, emisLe])
 }
 
 /// Plans d'abonnement de la plateforme (Essentiel, Professionnel...) —
@@ -752,6 +813,9 @@ model PlanAbonnement {
   description     String?
   prixMensuel     Decimal  @db.Decimal(10, 2)
   fonctionnalites String[]
+  // Limites chiffrées (ex. { "clientes": 500, "comptes": 3 }). Vide = aucune limite. Structure prévue ; aucune
+  // limite n'est appliquée par le code tant qu'elle n'est pas définie par le SUPERADMIN (décision 15/11/2026).
+  limites         Json     @default("{}")
   // Durées proposées avec remise : [{ dureeMois, remisePourcent }] — vide =
   // durées standard (1/3/6/12 mois) sans remise. Voir lib/abonnement.js
   // (prixPourDuree) : le prix figé à l'activation utilise la même règle.
@@ -787,6 +851,8 @@ model HistoriqueAbonnement {
 model ParametresPlateforme {
   id              String   @id @default("plateforme")
   contactWhatsapp String?
+  // Jours de grâce après la fin d'un essai ou d'un abonnement : accès complet avec bandeau, puis lecture seule.
+  joursGrace      Int      @default(7)
   updatedAt       DateTime @updatedAt
 }
 
