@@ -105,13 +105,19 @@ export default {
       "RETARD": "En retard",
       "PRET": "Prête",
       "LIVRAISON_PROCHE": "Livraison proche",
-      "IMPAYE": "Impayée"
+      "IMPAYE": "Impayée",
+      "TACHE_AFFECTEE": "Travail confié",
+      "STOCK_BAS": "Stock bas",
+      "ACHAT_EN_RETARD": "Achat en retard"
     },
     "msg": {
       "RETARD": "{{numero}} ({{modele}}) — en retard, livraison prévue le {{date}}.",
       "PRET": "{{numero}} ({{modele}}) — prête à récupérer (statut : {{statut}}).",
       "LIVRAISON_PROCHE": "{{numero}} ({{modele}}) — à livrer le {{date}}.",
-      "IMPAYE": "{{numero}} ({{modele}}) — aucun paiement enregistré."
+      "IMPAYE": "{{numero}} ({{modele}}) — aucun paiement enregistré.",
+      "TACHE_AFFECTEE": "{{numero}} ({{modele}}) — ce travail vous est confié, livraison prévue le {{date}}.",
+      "STOCK_BAS": "{{nom}} — stock bas : {{quantite}} {{unite}} (seuil d'alerte : {{seuil}}).",
+      "ACHAT_EN_RETARD": "Achat {{numero}} chez {{fournisseur}} — attendu le {{date}}, pas entièrement reçu."
     },
     "filterAll": "Toutes",
     "filterUnread": "Non lues",
