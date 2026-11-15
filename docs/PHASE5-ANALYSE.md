@@ -180,3 +180,30 @@ Aucun rappel : atelier suspendu, abonnement suspendu, paiement déjà déclaré 
 - Pas d'écran : l'interface de paiement Wave arrive en 5.7.
 
 **Modification d'un test existant.** « aucune route de paiement/souscription n'existe côté ADMIN » affirmait que `/api/webhooks/wave` répondait 404. Il répond désormais 503 tant que Wave n'est pas activé ; le test garde l'interdiction de toute route de simulation ou de confirmation par l'ADMIN.
+
+## 12. Réalisé en 5.6 — tableau de bord commercial (API)
+
+Trois routes réservées au SUPERADMIN, en lecture seule (`/api/plateforme/commerce/...`, détail dans `docs/API.md`). **Il n'y a pas encore d'écran** : l'interface arrive en 5.7.
+
+| Route | Contenu |
+|---|---|
+| `synthese` | ateliers par état et par mode d'accès, revenus du mois et du mois précédent, cumul, revenu mensuel récurrent, paiements à vérifier, anomalies Wave, conversion des essais, taux de renouvellement |
+| `revenus?mois=&atelierId=` | série mensuelle (encaissé, remboursé, net), totaux, ventilation par formule et par moyen de paiement |
+| `renouvellements?jours=` | ateliers à relancer : échéance dans l'horizon, récemment expirés, essais qui finissent, avec contact |
+
+**Définitions** (à lire avant d'interpréter un chiffre) :
+- **Encaissement** : transaction d'abonnement confirmée, datée du jour de la confirmation. **Remboursement** : daté du jour du remboursement. **Net** = encaissé − remboursé du mois (un paiement encaissé en octobre et remboursé en novembre pèse sur novembre).
+- **Revenu mensuel récurrent** : somme de prix ÷ durée des abonnements **actifs aujourd'hui**.
+- **Renouvelé** : un abonnement échu pendant les 90 derniers jours a été suivi d'un autre qui commence au plus un jour avant son échéance et au plus (jours de grâce) après.
+- **Converti** : atelier dont l'essai s'est terminé pendant les 90 derniers jours et qui a (ou a eu) un abonnement confirmé ou suspendu.
+- Les ateliers **suspendus** par la plateforme sont comptés à part, hors des états d'abonnement.
+
+**Ce que ces chiffres ne contiennent pas — à connaître :**
+- Les abonnements **activés à la main sans transaction** (paiement reçu hors plateforme, ou cadeau) ne sont **pas** comptés en revenus : ils sont signalés à part (`activationsSansPaiementEnregistre`) avec leur valeur. Si vous activez manuellement après avoir reçu de l'argent, ce revenu n'apparaît pas tant que la souscription ne passe pas par la déclaration de paiement.
+- Aucun chiffre n'est ventilé par pays, ni par devise : tout est en FCFA.
+- Les agrégats mensuels sont en UTC.
+- Les listes chargent tous les ateliers en mémoire : adapté à quelques centaines d'ateliers, à revoir (pagination, agrégation SQL) au-delà de quelques milliers.
+
+**Correction d'un indicateur existant.** `GET /api/ateliers/tendances` datait le revenu d'un paiement par `updatedAt`, qui change à chaque modification (un remboursement, par exemple). Il utilise maintenant la date de confirmation.
+
+**Tests.** 19 unitaires (dates fixes) et 16 d'intégration avec de vraies requêtes SQL (mois à cheval, remboursements, ventilations, droits d'accès, paramètres invalides). Deux mutations détectées (revenu mensuel récurrent comptant les abonnements suspendus, renouvellement sans limite de grâce). Un défaut de présentation corrigé en cours de route : les montants issus du SQL s'écrivaient « 27000.00 » alors que le reste de l'API écrit « 27000 ».

@@ -173,3 +173,31 @@ export function dateDebutSouscription(abonnements, now = new Date()) {
     .map((a) => new Date(a.dateExpiration));
   return fins.length > 0 ? new Date(Math.max(...fins.map((d) => d.getTime()))) : now;
 }
+
+// ── Continuité des renouvellements ────────────────────────────────────────
+// Un renouvellement qui commence moins d'un jour après l'échéance en cours la prolonge : une activation manuelle
+// peut démarrer le lendemain à 00h00, sans que l'atelier ait eu un seul jour sans abonnement.
+const TOLERANCE_CONTINUITE_MS = MS_PAR_JOUR;
+
+/** Fin de la couverture continue qui part de l'abonnement actif : les renouvellements planifiés à la suite la prolongent. */
+export function finDeChaine(abonnements, now) {
+  const confirmes = abonnements.filter((a) => a.statut === "CONFIRME" && a.dateDebut && a.dateExpiration);
+  let fin = null;
+  for (const a of confirmes) {
+    if (new Date(a.dateDebut) <= now && new Date(a.dateExpiration) > now) {
+      if (!fin || new Date(a.dateExpiration) > fin) fin = new Date(a.dateExpiration);
+    }
+  }
+  if (!fin) return null;
+  let prolonge = true;
+  while (prolonge) {
+    prolonge = false;
+    for (const a of confirmes) {
+      if (new Date(a.dateDebut).getTime() <= fin.getTime() + TOLERANCE_CONTINUITE_MS && new Date(a.dateExpiration) > fin) {
+        fin = new Date(a.dateExpiration);
+        prolonge = true;
+      }
+    }
+  }
+  return fin;
+}

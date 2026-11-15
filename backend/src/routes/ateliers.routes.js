@@ -113,9 +113,10 @@ router.get("/tendances", async (req, res) => {
     // représentatif du moment où le revenu est réellement acquis que
     // createdAt (date de simple initiation, potentiellement restée EN_ATTENTE
     // un moment avant confirmation).
+    // Date du revenu = jour de confirmation (confirmeLe) ; repli sur updatedAt pour d'éventuelles lignes anciennes.
     prisma.transaction.findMany({
-      where: { statut: "REUSSIE", updatedAt: { gte: debut } },
-      select: { montant: true, updatedAt: true },
+      where: { statut: "REUSSIE", OR: [{ confirmeLe: { gte: debut } }, { confirmeLe: null, updatedAt: { gte: debut } }] },
+      select: { montant: true, confirmeLe: true, updatedAt: true },
     }),
   ]);
 
@@ -135,7 +136,7 @@ router.get("/tendances", async (req, res) => {
     if (parMois[cle]) parMois[cle].nouveauxAteliers += 1;
   }
   for (const t of transactions) {
-    const cle = cleDe(t.updatedAt);
+    const cle = cleDe(t.confirmeLe ?? t.updatedAt);
     if (parMois[cle]) parMois[cle].revenus += Number(t.montant);
   }
 
