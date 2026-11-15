@@ -32,6 +32,7 @@ export default function ClienteCommandesHistory({ clienteId }) {
     <div className="space-y-3">
       {data.data.map((commande) => {
         const soldeRestant = Number(commande.solde) > 0;
+        const voirFinances = commande.solde !== undefined;
         return (
           <Link key={commande.id} to={`/commandes/${commande.id}`}>
             <Card variant="outlined" className="space-y-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors">
@@ -47,6 +48,7 @@ export default function ClienteCommandesHistory({ clienteId }) {
                 {t("client.commandeLivraisonPrevueLe")}
                 {formatDate(commande.dateLivraisonPrevue)}
               </p>
+              {voirFinances && (
               <div className="flex items-center justify-between gap-3 text-sm pt-1 border-t border-neutral-100 dark:border-neutral-800">
                 <span className="text-neutral-500">
                   {t("client.commandePaye")} <span className="text-green-600 dark:text-green-400 font-medium tabular-nums">{commande.totalPaye}</span>
@@ -57,6 +59,7 @@ export default function ClienteCommandesHistory({ clienteId }) {
                   {soldeRestant ? t("client.commandeReste", { solde: commande.solde }) : t("client.commandePayeIntegralement")}
                 </span>
               </div>
+              )}
             </Card>
           </Link>
         );

@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import { useLocaleStore } from "./stores/localeStore.js";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
 import PublicOnlyRoute from "./routes/PublicOnlyRoute.jsx";
-import { RequireAtelier, RequireSuperadmin, RequireClient } from "./routes/RoleGuards.jsx";
+import { RequireAtelier, RequireSuperadmin, RequireClient, RequirePermission } from "./routes/RoleGuards.jsx";
 import AppLayout from "./layouts/AppLayout.jsx";
 import SuperadminLayout from "./layouts/SuperadminLayout.jsx";
 import ClientLayout from "./layouts/ClientLayout.jsx";
@@ -18,6 +18,8 @@ const AteliersPage = lazy(() => import("./pages/superadmin/AteliersPage.jsx"));
 const AtelierDetailPage = lazy(() => import("./pages/superadmin/AtelierDetailPage.jsx"));
 const SuperadminDashboardPage = lazy(() => import("./pages/superadmin/SuperadminDashboardPage.jsx"));
 const GestionAbonnementsPage = lazy(() => import("./pages/superadmin/GestionAbonnementsPage.jsx"));
+const EmployesPage = lazy(() => import("./features/employes/EmployesPage.jsx"));
+const EmployeFormPage = lazy(() => import("./features/employes/EmployeFormPage.jsx"));
 const GestionPlansPage = lazy(() => import("./pages/superadmin/GestionPlansPage.jsx"));
 const PaiementsAbonnementPage = lazy(() => import("./pages/superadmin/PaiementsAbonnementPage.jsx"));
 const CommercePage = lazy(() => import("./pages/superadmin/CommercePage.jsx"));
@@ -99,39 +101,108 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<RequireAtelier />}>
           <Route element={<AppLayout />}>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/clientes" element={<ClientesListPage />} />
-            <Route path="/clientes/nouvelle" element={<ClienteFormPage mode="create" />} />
-            <Route path="/clientes/:id" element={<ClienteDetailPage />} />
-            <Route path="/clientes/:id/modifier" element={<ClienteFormPage mode="edit" />} />
-            <Route path="/clientes/:id/mesures/nouvelle" element={<MesureFormPage />} />
-            <Route path="/modeles" element={<ModelesListPage />} />
-            <Route path="/modeles/nouveau" element={<ModeleFormPage mode="create" />} />
-            <Route path="/modeles/:id" element={<ModeleDetailPage />} />
-            <Route path="/modeles/:id/modifier" element={<ModeleFormPage mode="edit" />} />
-            <Route path="/commandes" element={<CommandesListPage />} />
-            <Route path="/commandes/nouvelle" element={<CommandeFormPage mode="create" />} />
-            <Route path="/commandes/:id" element={<CommandeDetailPage />} />
-            <Route path="/commandes/:id/modifier" element={<CommandeFormPage mode="edit" />} />
-            <Route path="/finances" element={<FinancesPage />} />
-            <Route path="/livraisons" element={<LivraisonsListPage />} />
-            <Route path="/paiements" element={<PaiementsListPage />} />
-            <Route path="/depenses" element={<DepensesListPage />} />
-            <Route path="/depenses/nouvelle" element={<DepenseFormPage />} />
-            <Route path="/stock" element={<StockListPage />} />
-            <Route path="/stock/nouveau" element={<StockFormPage mode="create" />} />
-            <Route path="/stock/:id" element={<ArticleStockDetailPage />} />
-            <Route path="/stock/:id/modifier" element={<StockFormPage mode="edit" />} />
-            <Route path="/depenses/:id" element={<DepenseDetailPage />} />
-            <Route path="/recus" element={<RecusListPage />} />
-            <Route path="/rapports" element={<RapportsPage />} />
-            <Route path="/calendrier" element={<CalendrierPage />} />
-            <Route path="/notifications" element={<NotificationsPage />} />
-            <Route path="/parametres" element={<ParametresPage />} />
+            <Route element={<RequirePermission permission="dashboard.lire" />}>
+              <Route path="/" element={<DashboardPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="clientes.lire" />}>
+              <Route path="/clientes" element={<ClientesListPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="clientes.ecrire" />}>
+              <Route path="/clientes/nouvelle" element={<ClienteFormPage mode="create" />} />
+            </Route>
+            <Route element={<RequirePermission permission="clientes.lire" />}>
+              <Route path="/clientes/:id" element={<ClienteDetailPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="clientes.ecrire" />}>
+              <Route path="/clientes/:id/modifier" element={<ClienteFormPage mode="edit" />} />
+            </Route>
+            <Route element={<RequirePermission permission="clientes.ecrire" />}>
+              <Route path="/clientes/:id/mesures/nouvelle" element={<MesureFormPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="modeles.lire" />}>
+              <Route path="/modeles" element={<ModelesListPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="modeles.ecrire" />}>
+              <Route path="/modeles/nouveau" element={<ModeleFormPage mode="create" />} />
+            </Route>
+            <Route element={<RequirePermission permission="modeles.lire" />}>
+              <Route path="/modeles/:id" element={<ModeleDetailPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="modeles.ecrire" />}>
+              <Route path="/modeles/:id/modifier" element={<ModeleFormPage mode="edit" />} />
+            </Route>
+            <Route element={<RequirePermission permission="commandes.lire" />}>
+              <Route path="/commandes" element={<CommandesListPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="commandes.ecrire" />}>
+              <Route path="/commandes/nouvelle" element={<CommandeFormPage mode="create" />} />
+            </Route>
+            <Route element={<RequirePermission permission="commandes.lire" />}>
+              <Route path="/commandes/:id" element={<CommandeDetailPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="commandes.ecrire" />}>
+              <Route path="/commandes/:id/modifier" element={<CommandeFormPage mode="edit" />} />
+            </Route>
+            <Route element={<RequirePermission permission="finances.voir" />}>
+              <Route path="/finances" element={<FinancesPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="livraisons.lire" />}>
+              <Route path="/livraisons" element={<LivraisonsListPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="paiements.lire" />}>
+              <Route path="/paiements" element={<PaiementsListPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="depenses.lire" />}>
+              <Route path="/depenses" element={<DepensesListPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="depenses.ecrire" />}>
+              <Route path="/depenses/nouvelle" element={<DepenseFormPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="stock.lire" />}>
+              <Route path="/stock" element={<StockListPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="stock.ecrire" />}>
+              <Route path="/stock/nouveau" element={<StockFormPage mode="create" />} />
+            </Route>
+            <Route element={<RequirePermission permission="stock.lire" />}>
+              <Route path="/stock/:id" element={<ArticleStockDetailPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="stock.ecrire" />}>
+              <Route path="/stock/:id/modifier" element={<StockFormPage mode="edit" />} />
+            </Route>
+            <Route element={<RequirePermission permission="depenses.lire" />}>
+              <Route path="/depenses/:id" element={<DepenseDetailPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="paiements.lire" />}>
+              <Route path="/recus" element={<RecusListPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="rapports.lire" />}>
+              <Route path="/rapports" element={<RapportsPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="commandes.lire" />}>
+              <Route path="/calendrier" element={<CalendrierPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="notifications.lire" />}>
+              <Route path="/notifications" element={<NotificationsPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="@admin" />}>
+              <Route path="/parametres" element={<ParametresPage />} />
+            </Route>
             <Route path="/compte" element={<ComptePage />} />
-            <Route path="/abonnement" element={<AbonnementPage />} />
-            <Route path="/demandes" element={<DemandesListPage />} />
-            <Route path="/demandes/:id" element={<DemandeDetailPage />} />
+            <Route element={<RequirePermission permission="@admin" />}>
+              <Route path="/employes" element={<EmployesPage />} />
+              <Route path="/employes/nouveau" element={<EmployeFormPage />} />
+              <Route path="/employes/:id" element={<EmployeFormPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="@admin" />}>
+              <Route path="/abonnement" element={<AbonnementPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="demandes.lire" />}>
+              <Route path="/demandes" element={<DemandesListPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="demandes.lire" />}>
+              <Route path="/demandes/:id" element={<DemandeDetailPage />} />
+            </Route>
           </Route>
         </Route>
 

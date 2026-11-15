@@ -65,7 +65,7 @@ export default function ModeleDetailPage() {
 
       <Card className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
         <InfoRow label={t("modele.list.colCategory")} value={categorieLabel(modele.categorie)} />
-        <InfoRow label={t("modele.list.colPrice")} value={modele.prixIndicatif} />
+        {modele.prixIndicatif !== undefined && <InfoRow label={t("modele.list.colPrice")} value={modele.prixIndicatif} />}
         {modele.description && (
           <div className="sm:col-span-2">
             <p className="text-neutral-500 text-xs mb-0.5">{t("client.fieldDescription")}</p>

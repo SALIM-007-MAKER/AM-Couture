@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/apiClient.js";
+import { cheminAccueilEmploye } from "../features/employes/permissions.js";
 
 const ME_KEY = ["auth", "me"];
 
@@ -13,6 +14,8 @@ const ME_KEY = ["auth", "me"];
 export function homePathForUser(user) {
   if (user?.role === "SUPERADMIN") return "/vue-ensemble";
   if (user?.role === "USER") return "/client";
+  // Un employé arrive sur le premier écran auquel il a droit (le tableau de bord n'est pas garanti).
+  if (user?.role === "EMPLOYE") return cheminAccueilEmploye(user);
   return "/";
 }
 

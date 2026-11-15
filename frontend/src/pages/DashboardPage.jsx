@@ -1,3 +1,4 @@
+import { useCan } from "../hooks/usePermissions.js";
 import { useSearchParams, Link } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -115,6 +116,7 @@ function WatchList({ icon: Icon, tone, title, items, isPending, isError, error, 
 }
 
 export default function DashboardPage() {
+  const voirFinances = useCan()("finances.voir");
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const periodValue = {
@@ -187,6 +189,7 @@ export default function DashboardPage() {
               value={nombreEnRetard}
               tone={nombreEnRetard > 0 ? "danger" : "success"}
             />
+            {voirFinances && (
             <Kpi
               icon={CircleOff}
               label={t("dashboard.kpiNonPayees")}
@@ -194,6 +197,8 @@ export default function DashboardPage() {
               sub={t("dashboard.kpiNonPayeesSub")}
               tone={summaryQuery.data.commandes.nonPayees > 0 ? "warning" : "neutral"}
             />
+            )}
+            {voirFinances && (
             <Kpi
               icon={Wallet}
               label={t("dashboard.kpiEncaisse")}
@@ -201,6 +206,8 @@ export default function DashboardPage() {
               sub={t("dashboard.paiementsSub", { nombre: summaryQuery.data.finances.nombrePaiements })}
               tone="success"
             />
+            )}
+            {voirFinances && (
             <Kpi
               icon={Receipt}
               label={t("dashboard.kpiDepenses")}
@@ -208,6 +215,7 @@ export default function DashboardPage() {
               sub={t("dashboard.depensesSub", { nombre: summaryQuery.data.finances.nombreDepenses })}
               tone="neutral"
             />
+            )}
           </div>
         </section>
       )}
@@ -271,8 +279,8 @@ export default function DashboardPage() {
                   <th className="px-4 py-3 font-medium hidden md:table-cell">{t("dashboard.colModele")}</th>
                   <th className="px-4 py-3 font-medium">{t("dashboard.colStatut")}</th>
                   <th className="px-4 py-3 font-medium hidden sm:table-cell">{t("dashboard.colLivraison")}</th>
-                  <th className="px-4 py-3 font-medium text-right">{t("dashboard.colMontant")}</th>
-                  <th className="px-4 py-3 font-medium text-right hidden sm:table-cell">{t("dashboard.colReste")}</th>
+                  {voirFinances && <th className="px-4 py-3 font-medium text-right">{t("dashboard.colMontant")}</th>}
+                  {voirFinances && <th className="px-4 py-3 font-medium text-right hidden sm:table-cell">{t("dashboard.colReste")}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -291,8 +299,8 @@ export default function DashboardPage() {
                       <CommandeStatutBadge statut={c.statut} />
                     </td>
                     <td className="px-4 py-3 text-neutral-500 hidden sm:table-cell">{formatDate(c.dateLivraisonPrevue)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-neutral-900 dark:text-neutral-100">{c.prixTotal}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-neutral-500 hidden sm:table-cell">{c.solde}</td>
+                    {voirFinances && <td className="px-4 py-3 text-right tabular-nums text-neutral-900 dark:text-neutral-100">{c.prixTotal}</td>}
+                    {voirFinances && <td className="px-4 py-3 text-right tabular-nums text-neutral-500 hidden sm:table-cell">{c.solde}</td>}
                   </tr>
                 ))}
               </tbody>
@@ -301,7 +309,7 @@ export default function DashboardPage() {
         )}
       </section>
 
-      {summaryQuery.data && (
+      {summaryQuery.data && voirFinances && (
         <section className="space-y-3">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-600">
             {t("dashboard.financesPeriode")}
