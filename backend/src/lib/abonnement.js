@@ -1,9 +1,7 @@
-// LOGIQUE D'ABONNEMENT (Subscription) — volontairement indépendante du
-// paiement (voir lib/payments/, dormant tant qu'aucune clé API n'existe) :
-// aujourd'hui un abonnement est activé MANUELLEMENT par le SUPERADMIN (voir
-// ateliersAbonnement.routes.js) ; le jour où un paiement en ligne existe, il
-// appellera simplement les mêmes fonctions (activerAbonnement) — la logique
-// d'abonnement elle-même ne change pas.
+// LOGIQUE D'ABONNEMENT (Subscription) — règles PURES (états, accès, tarifs, renouvellement), indépendantes du
+// moyen de paiement. Un abonnement est activé soit à la main par le SUPERADMIN (ateliersAbonnement.routes.js), soit
+// à la confirmation d'un paiement (lib/souscription.js : paiement manuel vérifié ; lib/paiementEnLigne.js : Wave).
+// Vue d'ensemble : docs/ABONNEMENTS.md.
 
 // Calcule dateExpiration = dateDebut + dureeMois — arithmétique CALENDAIRE
 // (setUTCMonth), pas "+ dureeMois*30 jours" : un abonnement "3 mois" doit

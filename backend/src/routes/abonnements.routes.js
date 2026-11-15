@@ -17,10 +17,9 @@ import { paiementWaveActif, ErreurWave } from "../lib/wave.js";
 import { demarrerPaiementWave, reconcilierTransactionWave } from "../lib/paiementEnLigne.js";
 
 const router = Router();
-// L'abonnement est celui DE L'ATELIER (Phase 8). LECTURE SEULE : un ADMIN ne
-// peut ni souscrire ni activer quoi que ce soit — l'activation est une action
-// exclusive du SUPERADMIN (voir ateliersAbonnement.routes.js), et aucun
-// paiement en ligne n'existe encore (lib/payments/ est dormant).
+// L'abonnement est celui DE L'ATELIER. Un ADMIN peut consulter l'état, DÉCLARER un paiement (souscrire), le retirer
+// tant qu'il n'est pas traité, et télécharger ses justificatifs ; il ne peut JAMAIS activer un abonnement : seule la
+// confirmation du SUPERADMIN (ou la relecture d'un paiement Wave chez Wave) le fait. Voir docs/ABONNEMENTS.md.
 router.use(requireAuth, requireAtelier);
 router.param("id", requireValidIdParam);
 
