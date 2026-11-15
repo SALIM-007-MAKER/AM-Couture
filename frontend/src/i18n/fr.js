@@ -12,6 +12,7 @@ import paiementsAbo from "./parts/paiementsAbo.fr.js";
 import employes from "./parts/employes.fr.js";
 import production from "./parts/production.fr.js";
 import fournisseurs from "./parts/fournisseurs.fr.js";
+import achats from "./parts/achats.fr.js";
 
 export default {
   ...shared,
@@ -24,6 +25,7 @@ export default {
   ...employes,
   ...production,
   ...fournisseurs,
+  ...achats,
   common: {
     save: "Enregistrer",
     cancel: "Annuler",
@@ -68,6 +70,7 @@ export default {
     employees: "Employés",
     production: "Production",
     suppliers: "Fournisseurs",
+    purchases: "Achats",
     finances: "Finances",
     notifications: "Notifications",
     unreadNotifications: "{{count}} notification(s) non lue(s)",
