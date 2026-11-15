@@ -30,6 +30,7 @@ import stockRouter from "./routes/stock.routes.js";
 import moiRouter from "./routes/moi.routes.js";
 import demandesRouter from "./routes/demandes.routes.js";
 import webhooksRouter from "./routes/webhooks.routes.js";
+import commerceRouter from "./routes/commerce.routes.js";
 
 // Pas de app.listen() ici : ce fichier est importé à la fois par
 // backend/src/server.js (dev local) et par api/index.js (Vercel Function).
@@ -90,6 +91,8 @@ app.use("/api/notifications", notificationsRouter);
 app.use("/api/compte", compteRouter);
 app.use("/api/abonnements", abonnementsRouter);
 app.use("/api/plans-abonnement", plansRouter);
+// Tableau de bord commercial : monté AVANT /api/plateforme, dont le routeur s'applique à tout son préfixe.
+app.use("/api/plateforme/commerce", commerceRouter);
 app.use("/api/plateforme", plateformeRouter);
 app.use("/api/stock", stockRouter);
 // Espace client final (§ plan rôle USER, Phase 3) — réservé aux comptes

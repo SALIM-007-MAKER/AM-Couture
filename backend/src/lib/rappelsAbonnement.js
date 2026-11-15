@@ -9,7 +9,7 @@
 //    suspendu, pour un abonnement suspendu, ni pour un atelier antérieur à l'essai gratuit ;
 //  - les rappels « terminé » ne concernent que les échéances récentes (grâce + 3 jours) : au premier déploiement,
 //    aucun atelier abandonné depuis longtemps ne reçoit de courriel.
-import { etatAbonnementAtelier } from "./abonnement.js";
+import { etatAbonnementAtelier, finDeChaine } from "./abonnement.js";
 import { log, messageErreur } from "./logger.js";
 import { notificationAbonnementTemplate } from "./emailTemplates.js";
 
@@ -30,33 +30,6 @@ export function formatDateFr(date) {
 }
 const cleDe = (date) => new Date(date).toISOString().slice(0, 10);
 const joursAvant = (date, now) => Math.ceil((new Date(date).getTime() - now.getTime()) / JOUR);
-
-// Un renouvellement qui commence moins d'un jour après l'échéance en cours la prolonge : une activation manuelle
-// peut démarrer le lendemain à 00h00, sans que l'atelier ait eu un seul jour sans abonnement.
-const TOLERANCE_CONTINUITE_MS = JOUR;
-
-/** Fin de la couverture continue qui part de l'abonnement actif : les renouvellements planifiés à la suite la prolongent. */
-function finDeChaine(abonnements, now) {
-  const confirmes = abonnements.filter((a) => a.statut === "CONFIRME" && a.dateDebut && a.dateExpiration);
-  let fin = null;
-  for (const a of confirmes) {
-    if (new Date(a.dateDebut) <= now && new Date(a.dateExpiration) > now) {
-      if (!fin || new Date(a.dateExpiration) > fin) fin = new Date(a.dateExpiration);
-    }
-  }
-  if (!fin) return null;
-  let prolonge = true;
-  while (prolonge) {
-    prolonge = false;
-    for (const a of confirmes) {
-      if (new Date(a.dateDebut).getTime() <= fin.getTime() + TOLERANCE_CONTINUITE_MS && new Date(a.dateExpiration) > fin) {
-        fin = new Date(a.dateExpiration);
-        prolonge = true;
-      }
-    }
-  }
-  return fin;
-}
 
 /**
  * Détermine le rappel dû aujourd'hui pour un atelier, ou null. Fonction pure.

@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 154 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 157 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -295,6 +295,9 @@ Aucune de ces routes ne donne accès aux données métier d'un atelier (clientes
 | `GET /api/plateforme/factures/:id/pdf` | SuperAdmin | Justificatif de paiement en PDF. |
 | `GET /api/plateforme/parametres-abonnement` | SuperAdmin | `{ joursGrace }` — jours d'accès complet après l'échéance avant la lecture seule (7 par défaut). |
 | `PUT /api/plateforme/parametres-abonnement` | SuperAdmin | `{ joursGrace }` entier de 0 à 90. |
+| `GET /api/plateforme/commerce/synthese` | SuperAdmin | Tableau de bord commercial : ateliers par état d'abonnement (`ACTIF`, `ESSAI`, `EN_ATTENTE`, `EXPIRE`, `SUSPENDU`, `AUCUN`) et par mode d'accès, revenus du mois et du mois précédent, cumul, revenu mensuel récurrent, paiements à vérifier (nombre, montant, plus ancien), anomalies Wave, conversion des essais et taux de renouvellement sur 90 jours. |
+| `GET /api/plateforme/commerce/revenus` | SuperAdmin | `?mois=12` (1 à 36), `atelierId=` — série mensuelle (encaissé à la date de confirmation, remboursé à la date de remboursement, net), totaux, ventilation par formule et par moyen de paiement, et abonnements activés à la main **sans paiement enregistré** (non comptés en revenus). |
+| `GET /api/plateforme/commerce/renouvellements` | SuperAdmin | `?jours=30` (1 à 180) — ateliers à relancer : échéance dans l'horizon (renouvellements planifiés pris en compte), abonnements récemment expirés non repris, essais qui se terminent ; avec contact de l'atelier et indicateur de paiement déjà déclaré ; taux de renouvellement. |
 | `GET /api/plateforme/journal-securite` | SuperAdmin | `?evenement=`, `atelierId=`, `userId=`, pagination (50 par défaut). |
 
 ## 15. Webhook de paiement
