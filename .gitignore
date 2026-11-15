@@ -10,3 +10,7 @@ backend/src/generated/
 
 .vercel
 .env*
+
+# Tests de bout en bout
+e2e-report/
+e2e-resultats/

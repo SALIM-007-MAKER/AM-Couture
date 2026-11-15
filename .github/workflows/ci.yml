@@ -93,3 +93,59 @@ jobs:
       - run: npm run test:integration
         env:
           TEST_DATABASE_URL: postgresql://test:test@localhost:5432/gestion_atelier_test
+
+  # Tests de BOUT EN BOUT (navigateur réel → frontend → API → Postgres) : parcours SUPERADMIN, PDG, CLIENT,
+  # permissions et isolation entre ateliers (voir e2e/ et docs/TESTS.md). Base jetable du service ci-dessous ;
+  # son nom contient « e2e », exigé par e2e/seed.js qui VIDE la base à chaque exécution.
+  #
+  # NON BLOQUANT (continue-on-error) tant qu'il n'a pas tourné au moins une fois sur GitHub : il a été validé
+  # en local (Windows, Chrome du système), pas encore sur ce runner. À retirer après une première exécution verte,
+  # puis à ajouter aux vérifications obligatoires de la branche main.
+  tests-e2e:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: gestion_atelier_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd=pg_isready
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma generate --schema prisma/schema.prisma
+        env:
+          DIRECT_URL: postgresql://test:test@localhost:5432/gestion_atelier_e2e
+
+      - run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/gestion_atelier_e2e
+          DIRECT_URL: postgresql://test:test@localhost:5432/gestion_atelier_e2e
+
+      - run: npm run test:e2e
+        env:
+          E2E_DATABASE_URL: postgresql://test:test@localhost:5432/gestion_atelier_e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-rapport
+          path: |
+            e2e-report/
+            e2e-resultats/
+          retention-days: 7

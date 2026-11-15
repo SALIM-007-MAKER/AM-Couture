@@ -29,3 +29,13 @@ export function messageUtilisateur(error, t) {
       return { message: error.message, reference: null };
   }
 }
+
+/**
+ * Vrai si `details` contient au moins une erreur de champ (valeur = liste de messages, voir formatZodError
+ * côté backend). Faux pour une erreur métier dont `details` décrit autre chose (ex. 409 « téléphone déjà
+ * utilisé » : identité de la cliente existante) — le message général doit alors être affiché, faute de champ
+ * où montrer une erreur.
+ */
+export function aDesErreursDeChamps(details) {
+  return !!details && typeof details === "object" && Object.values(details).some((v) => Array.isArray(v));
+}
