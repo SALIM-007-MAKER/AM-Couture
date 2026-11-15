@@ -64,11 +64,12 @@ export function useRestoreClienteMutation(id) {
 
 // Totaux agrégés (toutes les commandes du client, pas seulement la page
 // affichée) — voir ClienteDetailPage.jsx, bloc "Total commandes/payé/restant".
-export function useClienteTotauxQuery(clienteId) {
+// `actif: false` : pas de requête (le serveur répondrait 403 à un employé sans « finances.voir »).
+export function useClienteTotauxQuery(clienteId, { actif = true } = {}) {
   return useQuery({
     queryKey: ["clientes", clienteId, "totaux"],
     queryFn: () => clientesApi.totaux(clienteId),
-    enabled: Boolean(clienteId),
+    enabled: Boolean(clienteId) && actif,
   });
 }
 

@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useMeQuery, homePathForUser } from "../hooks/useAuth.js";
+import { peut } from "../features/employes/permissions.js";
 
 // Montés à l'intérieur de <ProtectedRoute/> : `user` est donc déjà résolu
 // (plus de useMeQuery().isPending à gérer ici) — voir App.jsx.
@@ -37,5 +38,14 @@ export function RequireSuperadmin() {
 export function RequireClient() {
   const { data: user } = useMeQuery();
   if (user && user.role !== "USER") return <Navigate to={homePathForUser(user)} replace />;
+  return <Outlet />;
+}
+
+// Écran de l'atelier réservé à un droit précis (ou au PDG : ADMIN_SEUL). Un employé qui n'y a pas droit est renvoyé vers
+// son premier écran autorisé, jamais vers une page qui ne lui répondrait que par des erreurs. Le PDG passe toujours
+// (sauf écrans de plateforme).
+export function RequirePermission({ permission }) {
+  const { data: user } = useMeQuery();
+  if (user && !peut(user, permission)) return <Navigate to={homePathForUser(user)} replace />;
   return <Outlet />;
 }

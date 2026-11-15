@@ -10,6 +10,8 @@ const COLORS = {
 };
 
 export default function PaiementStatutBadge({ statut }) {
+  // Sans « finances.voir », le serveur ne renvoie aucun statut de paiement : rien à afficher.
+  if (!statut) return null;
   const Icon = STATUT_PAIEMENT_ICONS[statut];
   return (
     <span

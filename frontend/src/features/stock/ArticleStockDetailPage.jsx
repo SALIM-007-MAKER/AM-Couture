@@ -78,7 +78,7 @@ export default function ArticleStockDetailPage() {
           tone={alerte ? "danger" : "neutral"}
         />
         <InfoRow label={t("stock.seuilAlerte")} value={article.seuilAlerte ? `${article.seuilAlerte} ${uniteLabel(article.unite)}` : null} />
-        <InfoRow label={t("stock.prixUnitaire")} value={article.prixUnitaire} />
+        {article.prixUnitaire !== undefined && <InfoRow label={t("stock.prixUnitaire")} value={article.prixUnitaire} />}
         <InfoRow label={t("stock.unite")} value={uniteLabel(article.unite)} />
         {article.notes && (
           <div className="sm:col-span-2">

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "../../i18n/index.js";
+import { useCan } from "../../hooks/usePermissions.js";
 import { useNavigate, useParams, useSearchParams, Link } from "react-router-dom";
 import { ClipboardList, Wallet, Save, X, Ruler } from "lucide-react";
 import { useCommandeQuery, useCreateCommandeMutation, useUpdateCommandeMutation } from "./hooks.js";
@@ -72,6 +73,7 @@ export default function CommandeFormPage({ mode }) {
 }
 
 function CommandeForm({ mode, initial }) {
+  const can = useCan();
   const { t } = useTranslation();
   const { id } = useParams();
   const navigate = useNavigate();
@@ -147,7 +149,7 @@ function CommandeForm({ mode, initial }) {
       observations: form.observations || undefined,
       photoTissuUrl: form.photoTissuUrl || undefined,
       photoModeleUrl: form.photoModeleUrl || undefined,
-      paiementInitial: form.avecPaiementInitial
+      paiementInitial: form.avecPaiementInitial && can("paiements.ecrire")
         ? {
             montant: form.paiementMontant,
             mode: form.paiementMode,
@@ -331,7 +333,7 @@ function CommandeForm({ mode, initial }) {
           </Field>
         </div>
 
-        {!isEdit && (
+        {!isEdit && can("paiements.ecrire") && (
           <Card variant="outlined" className="space-y-3">
             <label className="flex items-center gap-2 text-sm font-medium text-neutral-700 dark:text-neutral-300">
               <input

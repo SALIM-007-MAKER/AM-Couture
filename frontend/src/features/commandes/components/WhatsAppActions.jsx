@@ -30,7 +30,7 @@ import { useTranslation } from "../../../i18n/index.js";
  * simple lien wa.me avec un résumé texte, jamais un bouton qui prétend
  * partager un fichier sans le faire réellement.
  */
-export default function WhatsAppActions({ commande, atelier }) {
+export default function WhatsAppActions({ commande, atelier, avecMontants = true }) {
   const { t } = useTranslation();
   const [partageEnCours, setPartageEnCours] = useState(false);
   const [erreurPartage, setErreurPartage] = useState(null);
@@ -43,14 +43,11 @@ export default function WhatsAppActions({ commande, atelier }) {
     : buildStatutMessage({ commande, cliente, atelier, statutLabel: statutLabel(commande.statut) });
   const lienStatut = waMeLink(cliente.telephone, messageStatut);
 
-  const messageRecu = buildRecuMessage({
-    commande,
-    cliente,
-    atelier,
-    totalPaye: commande.totalPaye,
-    solde: commande.solde,
-  });
-  const lienRecuTexteSeul = waMeLink(cliente.telephone, messageRecu);
+  // Le reçu porte des montants : sans le droit de les voir, ni message de reçu ni partage de la fiche.
+  const messageRecu = avecMontants
+    ? buildRecuMessage({ commande, cliente, atelier, totalPaye: commande.totalPaye, solde: commande.solde })
+    : null;
+  const lienRecuTexteSeul = messageRecu ? waMeLink(cliente.telephone, messageRecu) : null;
 
   const partageFichierSupporte = peutPartagerFichier();
 
@@ -84,7 +81,7 @@ export default function WhatsAppActions({ commande, atelier }) {
             {estPrete ? t("cmd.waPretBtn") : t("cmd.waStatutBtn")}
           </Button>
         )}
-        {partageFichierSupporte ? (
+        {!avecMontants ? null : partageFichierSupporte ? (
           <Button
             variant="secondary"
             size="sm"
