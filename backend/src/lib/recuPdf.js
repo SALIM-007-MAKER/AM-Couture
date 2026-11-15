@@ -382,7 +382,7 @@ const TYPE_VETEMENT_LABELS = {
  * passés en paramètres, jamais stockés — voir computeSolde/statutPaiement,
  * commandes.routes.js) : jamais persisté, comme le Reçu.
  */
-export function streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde }) {
+export function streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde, avecMontants = true }) {
   const devise = sanitizeForPdf(atelier?.devise || "FCFA");
 
   res.setHeader("Content-Type", "application/pdf");
@@ -415,13 +415,18 @@ export function streamFicheCommandePdf(res, { commande, atelier, totalPaye, sold
     `Livraison prévue : ${formatDate(commande.dateLivraisonPrevue)}`,
   ]);
 
-  drawEncadreMontants(doc, [
-    { label: "Montant total", valeur: formatMontant(commande.prixTotal, devise), taille: 11 },
-    { label: "Montant payé", valeur: formatMontant(totalPaye, devise), taille: 11 },
-    { label: "Solde restant", valeur: formatMontant(solde, devise), taille: 15 },
-  ]);
+  // Sans le droit de voir les montants (employé), la fiche de travail ne porte aucun montant.
+  if (avecMontants) {
+    drawEncadreMontants(doc, [
+      { label: "Montant total", valeur: formatMontant(commande.prixTotal, devise), taille: 11 },
+      { label: "Montant payé", valeur: formatMontant(totalPaye, devise), taille: 11 },
+      { label: "Solde restant", valeur: formatMontant(solde, devise), taille: 15 },
+    ]);
+  }
 
-  drawPiedDePage(doc, { mention: "Document généré automatiquement — montants à jour au moment de l'émission." });
+  drawPiedDePage(doc, {
+    mention: avecMontants ? "Document généré automatiquement — montants à jour au moment de l'émission." : "Document généré automatiquement.",
+  });
 
   doc.end();
 }

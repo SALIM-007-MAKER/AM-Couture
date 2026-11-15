@@ -3,7 +3,9 @@ import { prisma } from "../lib/prisma.js";
 import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requirePermission } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
+import { aPermission } from "../lib/permissions.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { isUniqueConstraintViolation } from "../lib/prismaErrors.js";
@@ -43,6 +45,9 @@ router.post("/", idempotence, async (req, res) => {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
   const { dateLivraison, commentaire, paiementFinal } = parsed.data;
+  if (paiementFinal && !aPermission(req.user, "paiements.ecrire")) {
+    throw new HttpError(403, "Vous n'avez pas l'autorisation d'enregistrer un paiement.", { permission: "paiements.ecrire" });
+  }
   const { commandeId } = req.params;
 
   let result;
@@ -265,7 +270,7 @@ router.post("/:livraisonId/annuler", async (req, res) => {
 // (paiements.routes.js) : lecture seule, requireAuth explicite.
 // ───────────────────────────────────────────────────────────────────────
 export const livraisonsGlobalRouter = Router();
-livraisonsGlobalRouter.use(requireAuth, requireAtelier);
+livraisonsGlobalRouter.use(requireAuth, requireMembreAtelier, requirePermission("livraisons.lire"), masquerFinancesSiNonAutorise);
 
 const LIVRAISON_GLOBAL_INCLUDE = {
   commande: {

@@ -3,7 +3,9 @@ import { prisma } from "../lib/prisma.js";
 import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
+import { peutVoirFinances } from "../lib/permissions.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { quantiteArticle, quantitesArticles } from "../lib/stock.js";
@@ -20,7 +22,9 @@ const router = Router();
 
 // Toutes les routes Stock exigent une session valide et un compte ADMIN
 // rattaché à un atelier (Phase 8 — multi-tenant).
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+// Membres de l'atelier (PDG ou employé) ; l'employé doit en plus avoir la permission « stock.lire » (GET) ou
+// « stock.ecrire » (autres méthodes), contrôlée avant toute route.
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule("stock"), masquerFinancesSiNonAutorise);
 
 router.param("id", requireValidIdParam);
 
@@ -133,7 +137,7 @@ router.get("/export", async (req, res) => {
     { header: "Unité", accessor: "unite" },
     { header: "Quantité", accessor: (a) => quantites.get(a.id).toString() },
     { header: "Seuil d'alerte", accessor: "seuilAlerte" },
-    { header: "Prix unitaire", accessor: "prixUnitaire" },
+    ...(peutVoirFinances(req.user) ? [{ header: "Prix unitaire", accessor: "prixUnitaire" }] : []),
     { header: "Statut", accessor: (a) => (a.archivedAt ? "Archivé" : "Actif") },
   ]);
   envoyerCsv(res, `stock-${new Date().toISOString().slice(0, 10)}.csv`, csv);

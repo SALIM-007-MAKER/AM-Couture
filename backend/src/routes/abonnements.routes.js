@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
-import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier, requireMembreAtelier } from "../middlewares/auth.middleware.js";
 import { etatAbonnementAtelier, statutEffectif, joursRestants, modeAcces } from "../lib/abonnement.js";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { idempotence } from "../lib/idempotence.js";
@@ -20,7 +20,10 @@ const router = Router();
 // L'abonnement est celui DE L'ATELIER. Un ADMIN peut consulter l'état, DÉCLARER un paiement (souscrire), le retirer
 // tant qu'il n'est pas traité, et télécharger ses justificatifs ; il ne peut JAMAIS activer un abonnement : seule la
 // confirmation du SUPERADMIN (ou la relecture d'un paiement Wave chez Wave) le fait. Voir docs/ABONNEMENTS.md.
-router.use(requireAuth, requireAtelier);
+// Tout membre peut lire l'état d'accès (bandeau de grâce / lecture seule) ; tout le reste (souscription, paiements,
+// justificatifs) est réservé au PDG. Un employé ne reçoit de /etat qu'une version réduite, sans aucun montant.
+router.use(requireAuth, requireMembreAtelier);
+router.use((req, res, next) => (req.method === "GET" && req.path === "/etat" ? next() : requireAtelier(req, res, next)));
 router.param("id", requireValidIdParam);
 
 const JOURS_GRACE_PAR_DEFAUT = 7;
@@ -71,6 +74,14 @@ router.get("/etat", async (req, res) => {
   ]);
   const etat = etatAbonnementAtelier(atelier ?? { trialEndsAt: null }, abonnements);
   const a = etat.abonnement;
+  if (req.user.role === "EMPLOYE") {
+    // Un employé ne reçoit que l'état d'accès (pour le bandeau) : ni prix, ni paiements, ni instructions.
+    return res.json({
+      statut: etat.statut,
+      essai: etat.essai,
+      acces: modeAcces(etat, abonnements, { joursGrace: plateforme?.joursGrace ?? JOURS_GRACE_PAR_DEFAUT }),
+    });
+  }
   res.json({
     statut: etat.statut,
     essai: etat.essai,

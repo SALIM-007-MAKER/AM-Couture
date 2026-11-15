@@ -3,7 +3,16 @@ import { prisma } from "../lib/prisma.js";
 import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import {
+  requireAuth,
+  requireMembreAtelier,
+  requireAbonnementActif,
+  requirePermission,
+  requireUnePermission,
+  droitsParModule,
+} from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
+import { aPermission, peutVoirFinances } from "../lib/permissions.js";
 import { formatZodError } from "../lib/validation.js";
 import { nextNumero } from "../lib/numero.js";
 import { computeSolde, statutPaiement } from "../lib/money.js";
@@ -27,27 +36,33 @@ const router = Router();
 // Toutes les routes Commandes (et Paiements/Livraisons/Reçus, montées
 // ci-dessous) exigent une session valide et un compte ADMIN rattaché à un
 // atelier (Phase 8 — multi-tenant).
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+// Membres de l'atelier ; les permissions (commandes.*, paiements.*, livraisons.*) sont contrôlées route par route
+// ci-dessous et à l'entrée de chaque sous-module. Sans « finances.voir », les montants sont retirés des réponses.
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, masquerFinancesSiNonAutorise);
 
 // Valide le format de :id / :commandeId sur toutes les routes avant toute requête Prisma.
 router.param("id", requireValidIdParam);
 router.param("commandeId", requireValidIdParam);
 
 // Modules Paiements/Livraisons/Reçus — routes imbriquées sous /api/commandes/:commandeId/...
-router.use("/:commandeId/paiements", paiementsRouter);
-router.use("/:commandeId/livraisons", livraisonsRouter);
-router.use("/:commandeId/recus", recusCommandeRouter);
+router.use("/:commandeId/paiements", droitsParModule("paiements"), paiementsRouter);
+router.use("/:commandeId/livraisons", droitsParModule("livraisons"), livraisonsRouter);
+router.use("/:commandeId/recus", droitsParModule("paiements"), recusCommandeRouter);
 
 const CLIENTE_SUMMARY_SELECT = { id: true, nom: true, prenom: true, telephone: true, archivedAt: true };
 const MODELE_SUMMARY_SELECT = { id: true, nom: true, categorie: true, archivedAt: true };
 
 // POST /api/commandes — création (+ paiement initial optionnel, atomique)
-router.post("/", idempotence, async (req, res) => {
+router.post("/", requirePermission("commandes.ecrire"), idempotence, async (req, res) => {
   const parsed = createCommandeSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
   const data = parsed.data;
+  // Enregistrer un acompte est une opération d'argent : il faut le droit « paiements.ecrire » en plus de créer la commande.
+  if (data.paiementInitial && !aPermission(req.user, "paiements.ecrire")) {
+    throw new HttpError(403, "Vous n'avez pas l'autorisation d'enregistrer un paiement.", { permission: "paiements.ecrire" });
+  }
 
   const cliente = await prisma.cliente.findFirst({
     where: { id: data.clienteId, atelierId: req.user.atelierId },
@@ -159,7 +174,7 @@ function buildCommandesWhere(atelierId, { q, statut, priorite, clienteId, livrai
   return where;
 }
 
-router.get("/", async (req, res) => {
+router.get("/", requirePermission("commandes.lire"), async (req, res) => {
   const parsed = listCommandesQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
@@ -215,7 +230,8 @@ router.get("/", async (req, res) => {
 // pagination. Défini AVANT /:id (même raison que /export sur Clientes —
 // sinon Express matcherait "export" comme une valeur de :id).
 const LIMITE_EXPORT = 20_000;
-router.get("/export", async (req, res) => {
+// L'export contient prix, payé et solde de chaque commande : il exige « finances.voir ».
+router.get("/export", requirePermission("commandes.lire"), requirePermission("finances.voir"), async (req, res) => {
   const parsed = listCommandesQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
@@ -260,7 +276,7 @@ router.get("/export", async (req, res) => {
 });
 
 // GET /api/commandes/:id — détail : commande + cliente + modèle + paiements + livraisons + totaux calculés
-router.get("/:id", async (req, res) => {
+router.get("/:id", requirePermission("commandes.lire"), async (req, res) => {
   const commande = await prisma.commande.findFirst({
     where: { id: req.params.id, atelierId: req.user.atelierId },
     include: {
@@ -287,7 +303,7 @@ router.get("/:id", async (req, res) => {
 // (recus.routes.js) : ce document n'est jamais persisté et recalcule le
 // solde/statut en direct à chaque appel, contrairement au Reçu qui est un
 // instantané figé (voir commentaire dans recus.routes.js).
-router.get("/:id/fiche-pdf", async (req, res) => {
+router.get("/:id/fiche-pdf", requirePermission("commandes.lire"), async (req, res) => {
   const commande = await prisma.commande.findFirst({
     where: { id: req.params.id, atelierId: req.user.atelierId },
     include: {
@@ -304,11 +320,11 @@ router.get("/:id/fiche-pdf", async (req, res) => {
   // 8 (multi-tenant), voir requireAtelier : req.user.atelierId == commande.atelierId ici.
   const atelier = await prisma.atelier.findUnique({ where: { id: req.user.atelierId } });
 
-  streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde });
+  streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde, avecMontants: peutVoirFinances(req.user) });
 });
 
 // PATCH /api/commandes/:id — modification partielle des champs non financiers/non système
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", requirePermission("commandes.ecrire"), async (req, res) => {
   const parsed = updateCommandeSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
@@ -344,7 +360,8 @@ router.patch("/:id", async (req, res) => {
 });
 
 // POST /api/commandes/:id/statut — changement de statut via la machine à états dédiée
-router.post("/:id/statut", async (req, res) => {
+// Faire avancer une commande : « commandes.statut » (couturier) ou « commandes.ecrire ».
+router.post("/:id/statut", requireUnePermission("commandes.statut", "commandes.ecrire"), async (req, res) => {
   const parsed = changeStatutSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));

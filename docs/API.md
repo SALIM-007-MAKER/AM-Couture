@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 157 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 165 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -18,7 +18,7 @@ Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence �
 |---|---|---|
 | Public | aucune | — |
 | Session | cookie valide, tout rôle | 401 |
-| Atelier | compte `ADMIN` rattaché à un atelier actif, **et** essai en cours, abonnement actif ou période de grâce. Une fois la grâce écoulée, l'atelier est en **lecture seule** : `GET` (consultation, exports CSV, PDF) accepté, toute écriture refusée | 401, 403 (rôle ou atelier suspendu), 402 (écriture en lecture seule) |
+| Atelier | compte `ADMIN` (le PDG) rattaché à un atelier actif, **ou compte `EMPLOYE` disposant de la permission correspondante** (voir « Employés et permissions »), **et** essai en cours, abonnement actif ou période de grâce. Une fois la grâce écoulée, l'atelier est en **lecture seule** : `GET` (consultation, exports CSV, PDF) accepté, toute écriture refusée | 401, 403 (rôle ou atelier suspendu), 402 (écriture en lecture seule) |
 | Atelier¹ | comme Atelier, **sans** contrôle de l'abonnement | 401, 403 |
 | Cliente | compte `USER` (cliente finale) | 401, 403 |
 | SuperAdmin | compte `SUPERADMIN` | 401, 403 |
@@ -82,6 +82,41 @@ Politique de mot de passe : voir `backend/src/lib/passwordPolicy.js`.
 |---|---|---|
 | `PATCH /api/compte` | Session | `{ langue: "fr" \| "en" \| "ha" }` |
 | `PATCH /api/compte/mot-de-passe` | Session | `{ motDePasseActuel, nouveauMotDePasse }` (différent de l'actuel). Invalide les autres sessions ouvertes. |
+
+## 4 bis. Employés et permissions
+
+Le **PDG** (compte `ADMIN`) a tous les droits sur son atelier. Un **employé** (rôle `EMPLOYE`) n'a que les permissions que le PDG lui accorde ; elles sont relues en base à **chaque requête** (retirer un droit ou désactiver un compte prend effet immédiatement). Sans permission, toute route métier répond **403** sans rien révéler. L'administration de l'atelier (employés, paramètres, abonnement et ses paiements) n'est **jamais délégable** : un employé y reçoit toujours 403, sauf la lecture des paramètres et un état d'accès réduit (`GET /api/abonnements/etat`).
+
+| Permission | Donne accès à |
+|---|---|
+| `clientes.lire` / `clientes.ecrire` | clientes et mesures |
+| `modeles.lire` / `modeles.ecrire` | modèles |
+| `commandes.lire` | liste, détail et fiche PDF des commandes |
+| `commandes.ecrire` | créer et modifier une commande (un acompte exige aussi `paiements.ecrire`) |
+| `commandes.statut` | faire avancer le statut d'une commande, sans pouvoir la créer ni la modifier |
+| `livraisons.lire` / `livraisons.ecrire` | livraisons (un paiement final exige aussi `paiements.ecrire`) |
+| `demandes.lire` / `demandes.ecrire` | demandes de commande des clientes |
+| `stock.lire` / `stock.ecrire` | stock et mouvements |
+| `dashboard.lire` / `rapports.lire` | tableau de bord et rapports non financiers |
+| `notifications.lire` | lecture des alertes (hors impayés) ; l'état « lu » reste réservé au PDG |
+| **`paiements.lire` / `paiements.ecrire`** *(sensible)* | paiements, reçus ; implique `finances.voir` |
+| **`depenses.lire` / `depenses.ecrire`** *(sensible)* | dépenses |
+| **`finances.voir`** *(sensible)* | montants (prix, payé, solde, prix des modèles et du stock), exports financiers, rapports financiers, totaux d'une cliente, alertes d'impayés |
+
+Une permission d'écriture ajoute la lecture du même module. Sans `finances.voir`, **tous les montants sont retirés des réponses** (commandes, modèles, stock, tableau de bord, livraisons…) et des PDF de fiche de commande. **Postes** (modèles qui pré-remplissent les permissions, ajustables ensuite) : `COUTURIER`, `RECEPTIONNISTE`, `MAGASINIER`, `COMPTABLE`, `AUTRE`.
+
+**Opérations sensibles** : attribuer un droit sensible ou réinitialiser le mot de passe d'un employé exige `confirmationMotDePasse` (le mot de passe du PDG, 10 essais / 15 min ; indisponible pendant une impersonation). Retirer un droit n'exige rien.
+
+| Route | Accès | Corps / paramètres |
+|---|---|---|
+| `GET /api/employes/catalogue` | PDG | Permissions par module (avec les droits sensibles) et postes avec leurs modèles. |
+| `GET /api/employes` | PDG | `?q=`, `actif=true\|false\|all` (défaut `true`), pagination. |
+| `GET /api/employes/:id` | PDG | Un employé de l'atelier (404 pour tout autre compte). |
+| `POST /api/employes` | PDG, idempotente | `{ identifiant, password, prenom, nom }` + `poste? (défaut AUTRE), permissions? (défaut : celles du poste), email?, telephone?, confirmationMotDePasse?`. 409 si l'identifiant ou l'email est déjà pris ; 400 pour une permission inconnue (nommée). |
+| `PATCH /api/employes/:id` | PDG | `prenom?, nom?, poste?, permissions?, email?, telephone?, confirmationMotDePasse?`. Changer de poste **ne modifie pas** les permissions accordées. |
+| `POST /api/employes/:id/desactiver` | PDG | `{ motif? }` — le compte ne peut plus se connecter et sa session ouverte est coupée immédiatement ; rien n'est supprimé. Répétable (`dejaTraite`). |
+| `POST /api/employes/:id/reactiver` | PDG | Rétablit le compte. Répétable. |
+| `POST /api/employes/:id/mot-de-passe` | PDG | `{ nouveauMotDePasse, confirmationMotDePasse }` → `204` ; coupe les sessions de l'employé. |
 
 ## 5. Clientes et mesures
 

@@ -29,6 +29,7 @@ import cronRouter from "./routes/cron.routes.js";
 import stockRouter from "./routes/stock.routes.js";
 import moiRouter from "./routes/moi.routes.js";
 import demandesRouter from "./routes/demandes.routes.js";
+import employesRouter from "./routes/employes.routes.js";
 import webhooksRouter from "./routes/webhooks.routes.js";
 import commerceRouter from "./routes/commerce.routes.js";
 
@@ -100,6 +101,7 @@ app.use("/api/stock", stockRouter);
 app.use("/api/moi", moiRouter);
 // Gestion ADMIN des demandes de commande envoyées par des clients USER.
 app.use("/api/demandes", demandesRouter);
+app.use("/api/employes", employesRouter);
 // Webhooks de paiement (routes/webhooks.routes.js) : pas de requireAuth, Wave appelle cette route directement ;
 // la confiance vient de la signature HMAC. Montés mais INERTES tant que le paiement Wave n'est pas activé
 // (WAVE_ENABLED=1 + clés) : la route répond alors 503 sans rien traiter.
