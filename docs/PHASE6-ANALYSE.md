@@ -103,3 +103,27 @@ Plan ajusté : **6.1** employés et permissions (serveur) · **6.2** interface e
 - **Bug trouvé par l'E2E** : la réponse de `POST /api/auth/login` ne contenait pas `poste`/`permissions` → l'employé voyait une interface vide jusqu'au rechargement. Corrigé côté serveur.
 - **Tests** : 14 unitaires frontend sur les helpers (dont dérive par rapport au catalogue serveur), 4 E2E (`e2e/specs/employes.spec.js`) : création par l'interface, confirmation du droit sensible, session employé (navigation limitée, pages interdites redirigées, aucun écran d'erreur), désactivation puis connexion refusée. Suite E2E complète : 39 verts.
 - **Limites** : champs de prix des formulaires modèle/stock et liste des modèles non masqués pour un employé sans `finances.voir` (le serveur ne renvoie pas les montants, donc pas de fuite, mais l'affichage peut être vide) ; interface mobile et anglais non vérifiés visuellement ; le catalogue des postes reste une proposition à valider avec de vrais ateliers.
+
+## 10. Réalisé en 6.3 — affectation des commandes et suivi de production
+
+**Fonctionnement**
+- Une commande ouverte (ni livrée ni annulée) peut être confiée à **une** personne : un employé actif de l'atelier ou le PDG. Fiche commande → section « Affectation » (choisir, affecter, retirer). Le statut de la commande reste la seule représentation de l'avancement (décision du 15/11) : l'affectation dit *qui*, le statut dit *où en est le travail*.
+- **Historique** : chaque affectation, réaffectation ou retrait ajoute une ligne (qui, à qui, quand), jamais modifiée. Répéter la même affectation ne change rien.
+- **Retard** : commande ouverte dont la date de livraison prévue est antérieure au jour courant (le jour même n'est pas un retard). Pastille « En retard » dans la liste et sur la fiche.
+- **« Mes travaux »** : filtre `assigneA=moi` de la liste des commandes (accessible à tout employé qui peut lire les commandes) ; autres filtres : `aucun` (non affectées), un employé précis, `enRetard=true`.
+- **Page Production** (`/production`) : commandes en cours, en retard, non affectées, charge par personne avec lien vers ses travaux. Aucun montant.
+- **Désactivation d'un employé** : ses commandes ouvertes redeviennent non affectées, avec trace dans l'historique, dans la même transaction.
+
+**Nouvelle permission** : `commandes.affecter` (non sensible, implique `commandes.lire`), absente de tous les postes par défaut (le PDG l'accorde au cas par cas). Total : 22 permissions. L'affectation ne donne aucun droit supplémentaire à l'employé concerné (testé).
+
+**Base de données** (migration additive `20261122090000_affectation_commandes`) : colonnes `Commande.assigneAId` (FK `User`, `SET NULL`) et `Commande.assigneLe` ; table `AffectationCommande` (historique) ; index `(atelierId, assigneAId, statut)`. Retour arrière : supprimer la table, les deux colonnes et l'index (aucune donnée existante n'est modifiée).
+
+**API** : `PUT /api/commandes/:id/affectation`, `GET /api/commandes/production`, filtres et champs `assigneA`, `enRetard`, `affectations` ajoutés aux routes existantes (167 routes documentées).
+
+**Tests** : 15 d'intégration (droits, historique, idempotence, commande livrée, autre atelier, compte désactivé, retards, charge, absence de montant, désactivation), 4 unitaires backend, 1 test de dérive frontend, 3 E2E (affectation par le PDG, « Mes travaux » du couturier sans montant ni écran de production). Suites complètes : 333 unitaires backend, 318 intégration, 95 frontend, 42 E2E.
+
+**Limites**
+- Un employé qui peut changer le statut (`commandes.statut`) le peut sur **toute** commande, pas seulement les siennes : l'affectation organise, elle ne restreint pas. À durcir si des ateliers le demandent.
+- Pas de notification à l'employé lors d'une affectation ni d'un retard : prévu en 6.6.
+- Le retard se calcule en UTC (jour du serveur) ; pas de rapport de production par employé avant la 6.7.
+- Pas d'étapes de production détaillées par commande (décision du 15/11).
