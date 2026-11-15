@@ -27,6 +27,7 @@ export const PERMISSION_PAR_CHEMIN = {
   "/recus": "paiements.lire",
   "/rapports": "rapports.lire",
   "/calendrier": "commandes.lire",
+  "/production": "commandes.affecter",
   "/finances": "finances.voir",
   "/notifications": "notifications.lire",
   "/parametres": ADMIN_SEUL,
@@ -67,7 +68,7 @@ export const POSTES_AFFICHES = ["COUTURIER", "RECEPTIONNISTE", "MAGASINIER", "CO
  */
 export function completerPermissions(liste) {
   const ensemble = new Set(liste);
-  const implications = { "commandes.statut": ["commandes.lire"], "paiements.lire": ["finances.voir"] };
+  const implications = { "commandes.statut": ["commandes.lire"], "commandes.affecter": ["commandes.lire"], "paiements.lire": ["finances.voir"] };
   for (const p of [...ensemble]) if (p.endsWith(".ecrire")) implications[p] = [p.replace(".ecrire", ".lire")];
   let ajoute = true;
   while (ajoute) {

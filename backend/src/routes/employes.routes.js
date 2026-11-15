@@ -10,6 +10,7 @@ import { isUniqueConstraintViolation } from "../lib/prismaErrors.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
 import { rateLimitPersistant } from "../lib/rateLimiter.js";
 import { catalogueSerialise, normaliserPermissions, sensiblesAjoutees, POSTES } from "../lib/permissions.js";
+import { STATUTS_OUVERTS } from "../lib/production.js";
 import {
   createEmployeSchema,
   updateEmployeSchema,
@@ -201,10 +202,24 @@ router.post("/:id/desactiver", async (req, res) => {
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   const existant = await chargerEmploye(req);
   if (!existant.actif) return res.json({ ...existant, dejaTraite: true });
-  const employe = await prisma.user.update({
-    where: { id: existant.id },
-    data: { actif: false, desactiveLe: new Date(), sessionVersion: { increment: 1 } },
-    select: EMPLOYE_SELECT,
+  // Les commandes encore ouvertes qui lui étaient confiées redeviennent « non affectées » (avec trace dans l'historique) :
+  // personne ne doit attendre le travail d'un compte désactivé. Tout ou rien avec la désactivation.
+  const employe = await prisma.$transaction(async (tx) => {
+    const aRetirer = await tx.commande.findMany({
+      where: { atelierId: req.user.atelierId, assigneAId: existant.id, statut: { in: STATUTS_OUVERTS } },
+      select: { id: true },
+    });
+    if (aRetirer.length > 0) {
+      await tx.commande.updateMany({ where: { id: { in: aRetirer.map((c) => c.id) } }, data: { assigneAId: null, assigneLe: null } });
+      await tx.affectationCommande.createMany({
+        data: aRetirer.map((c) => ({ atelierId: req.user.atelierId, commandeId: c.id, employeId: null, parId: req.user.id })),
+      });
+    }
+    return tx.user.update({
+      where: { id: existant.id },
+      data: { actif: false, desactiveLe: new Date(), sessionVersion: { increment: 1 } },
+      select: EMPLOYE_SELECT,
+    });
   });
   await journaliserSecurite("EMPLOYE_DESACTIVE", { req, userId: req.user.id, atelierId: req.user.atelierId, details: { compteId: employe.id } });
   res.json({ ...employe, dejaTraite: false });

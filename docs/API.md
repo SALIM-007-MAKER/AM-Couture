@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 165 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 167 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -162,11 +162,13 @@ Schémas : `commande.schema.js`, `paiement.schema.js`, `livraison.schema.js`, `a
 | Route | Accès | Corps / paramètres |
 |---|---|---|
 | `POST /api/commandes` | Atelier, idempotente | `{ clienteId, typeVetement, prixTotal, dateLivraisonPrevue }` + `modeleId?, description?, couleur?, tissu?, quantite? (1–50), priorite? ("NORMALE" \| "URGENTE"), dateCommande?, observations?, photoTissuUrl?, photoModeleUrl?, paiementInitial? { montant, mode, reference?, commentaire? }` → `201` avec `totalPaye`, `solde`, `statutPaiement`. Numéro généré (`CMD-AAAA-NNNN`). |
-| `GET /api/commandes` | Atelier | `?q=` (numéro, nom, téléphone), `statut`, `priorite`, `clienteId`, `livraisonDu`, `livraisonAu`, pagination. Chaque ligne porte `totalPaye`, `solde`, `statutPaiement`. |
+| `GET /api/commandes` | Atelier | `?q=` (numéro, nom, téléphone), `statut`, `priorite`, `clienteId`, `assigneA` (`moi`, `aucun` ou un identifiant d'employé), `enRetard=true`, `livraisonDu`, `livraisonAu`, pagination. Chaque ligne porte `totalPaye`, `solde`, `statutPaiement`, `enRetard`, `assigneA`. |
 | `GET /api/commandes/export` | Atelier | CSV, mêmes filtres. |
-| `GET /api/commandes/:id` | Atelier | Détail avec cliente, modèle, historique complet des paiements et des livraisons (annulés compris) et `totalPaye`, `solde`. |
+| `GET /api/commandes/production` | Permission `commandes.affecter` | Production : `employes` (actifs, avec `ouvertes` et `enRetard`), `nonAffectees`, `nonAffecteesEnRetard`, `enRetard`, `ouvertes`. Aucun montant. |
+| `GET /api/commandes/:id` | Atelier | Détail avec cliente, modèle, historique complet des paiements et des livraisons (annulés compris), `assigneA`, `affectations` (historique) et `totalPaye`, `solde`. |
 | `GET /api/commandes/:id/fiche-pdf` | Atelier | Fiche de commande en PDF. |
 | `PATCH /api/commandes/:id` | Atelier | Champs modifiables : `modeleId, typeVetement, description, couleur, tissu, quantite, priorite, dateLivraisonPrevue, observations, photoTissuUrl, photoModeleUrl`. Le prix et la cliente ne se modifient pas. |
+| `PUT /api/commandes/:id/affectation` | Permission `commandes.affecter` | `{ employeId }` (employé actif ou PDG de l'atelier, ou `null` pour retirer) — commandes ouvertes seulement (409 sinon) ; historisé ; répéter la même affectation renvoie `dejaTraite: true`. |
 | `POST /api/commandes/:id/statut` | Atelier | `{ statut }` — transition contrôlée. |
 | `POST /api/commandes/:commandeId/paiements` | Atelier, idempotente | `{ montant, mode ("ESPECES" \| "MOBILE_MONEY" \| "VIREMENT" \| "AUTRE") }` + `reference?, commentaire?`. 409 si le montant dépasse le solde. |
 | `GET /api/commandes/:commandeId/paiements` | Atelier | Paiements de la commande, annulés compris (avec motif), paginés. |

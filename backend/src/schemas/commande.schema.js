@@ -124,8 +124,16 @@ export const listCommandesQuerySchema = z.object({
   statut: z.preprocess(emptyToUndefined, z.enum(STATUTS_COMMANDE).optional()),
   priorite: z.preprocess(emptyToUndefined, z.enum(PRIORITES).optional()),
   clienteId: z.preprocess(emptyToUndefined, z.string().trim().min(1).optional()),
+  // Production : « moi » (mes travaux), « aucun » (non affectées) ou l'identifiant d'un employé ; enRetard=true.
+  assigneA: z.preprocess(emptyToUndefined, z.string().trim().min(1).optional()),
+  enRetard: z.preprocess(emptyToUndefined, z.enum(["true", "false"]).optional()),
   livraisonDu: z.preprocess(emptyToUndefined, dateField.optional()),
   livraisonAu: z.preprocess(emptyToUndefined, dateField.optional()),
   page: z.coerce.number().int().min(1).optional().default(1),
   pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
+
+// Affectation : un employé (ou le PDG) à qui confier la commande, ou null pour la retirer.
+export const affectationSchema = z
+  .object({ employeId: z.union([z.string().trim().min(1, "Identifiant requis."), z.null()]) })
+  .strict();

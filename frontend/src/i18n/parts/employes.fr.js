@@ -80,6 +80,7 @@ export default {
       "commandes.lire": "Consulter les commandes",
       "commandes.ecrire": "Créer et modifier les commandes",
       "commandes.statut": "Faire avancer le statut des commandes",
+      "commandes.affecter": "Affecter les commandes aux employés",
       "livraisons.lire": "Consulter les livraisons",
       "livraisons.ecrire": "Enregistrer les livraisons",
       "demandes.lire": "Consulter les demandes",

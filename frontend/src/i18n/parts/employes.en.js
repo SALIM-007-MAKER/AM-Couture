@@ -79,6 +79,7 @@ export default {
       "commandes.lire": "View orders",
       "commandes.ecrire": "Create and edit orders",
       "commandes.statut": "Move order status forward",
+      "commandes.affecter": "Assign orders to employees",
       "livraisons.lire": "View deliveries",
       "livraisons.ecrire": "Record deliveries",
       "demandes.lire": "View requests",

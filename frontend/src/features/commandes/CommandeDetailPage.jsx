@@ -19,6 +19,8 @@ import StatutTransitions from "./components/StatutTransitions.jsx";
 import WhatsAppActions from "./components/WhatsAppActions.jsx";
 import PaiementsSection from "./components/PaiementsSection.jsx";
 import LivraisonSection from "./components/LivraisonSection.jsx";
+import AffectationSection from "./components/AffectationSection.jsx";
+import BadgeRetard from "../production/BadgeRetard.jsx";
 import RecusSection from "../recus/components/RecusSection.jsx";
 import { useRecusQuery } from "../recus/hooks.js";
 import { ApiError } from "../../lib/apiClient.js";
@@ -79,6 +81,7 @@ function CommandeDetailContent({ id, commande }) {
         subtitle={
           <span className="flex items-center gap-2 flex-wrap">
             <CommandeStatutBadge statut={commande.statut} />
+            {commande.enRetard && <BadgeRetard />}
             {voirFinances && <PaiementStatutBadge statut={commande.statutPaiement} />}
             {prioriteLabel(commande.priorite)}
           </span>
@@ -99,6 +102,8 @@ function CommandeDetailContent({ id, commande }) {
 
       {(can("commandes.statut") || can("commandes.ecrire")) && <StatutTransitions commandeId={id} statutActuel={commande.statut} />}
       <WhatsAppActions commande={commande} atelier={atelier} avecMontants={voirFinances} />
+
+      <AffectationSection commande={commande} />
 
       <div className="space-y-2">
         <SectionTitle icon={User}>{t("cmd.sectionClient")}</SectionTitle>

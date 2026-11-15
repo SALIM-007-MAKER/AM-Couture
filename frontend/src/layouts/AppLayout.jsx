@@ -22,6 +22,7 @@ import {
   ChevronsRight,
   Inbox,
   UserCog,
+  Hammer,
 } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { peutAcceder, filtrerNavigation } from "../features/employes/permissions.js";
@@ -54,6 +55,7 @@ const NAV_GROUPS = [
       { labelKey: "nav.models", to: "/modeles", icon: Shirt },
       { labelKey: "nav.stock", to: "/stock", icon: Package },
       { labelKey: "nav.orders", to: "/commandes", icon: ClipboardList },
+      { labelKey: "nav.production", to: "/production", icon: Hammer },
       { labelKey: "nav.requests", to: "/demandes", icon: Inbox },
       { labelKey: "nav.deliveries", to: "/livraisons", icon: Truck },
     ],
@@ -110,6 +112,7 @@ const MOBILE_DRAWER_GROUPS = [
   {
     key: "secondaire",
     items: [
+      { labelKey: "nav.production", to: "/production", icon: Hammer },
       { labelKey: "nav.deliveries", to: "/livraisons", icon: Truck },
       { labelKey: "nav.stock", to: "/stock", icon: Package },
       { labelKey: "nav.requests", to: "/demandes", icon: Inbox },

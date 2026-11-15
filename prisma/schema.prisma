@@ -199,6 +199,9 @@ model User {
   // Présent UNIQUEMENT pour un compte USER (voir Cliente.userId) — null pour
   // ADMIN/SUPERADMIN, qui ne sont jamais reliés à une Cliente.
   cliente      Cliente?      @relation
+  commandesAssignees  Commande[]            @relation("CommandesAssignees")
+  affectationsRecues  AffectationCommande[] @relation("AffectationEmploye")
+  affectationsFaites  AffectationCommande[] @relation("AffectationAuteur")
 
   @@index([atelierId])
 }
@@ -408,9 +411,16 @@ model Commande {
   photoTissuUrl  String?
   photoModeleUrl String?
 
+  // Production (Phase 6.3) : employé à qui la commande est confiée (un seul à la fois ; l'historique complet est dans
+  // AffectationCommande). Aucune incidence sur le statut, ni sur les droits : l'affectation organise le travail.
+  assigneAId String?
+  assigneA   User?     @relation("CommandesAssignees", fields: [assigneAId], references: [id], onDelete: SetNull)
+  assigneLe  DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  affectations        AffectationCommande[]
   paiements           Paiement[]
   // Livraison[] (et non Livraison? comme avant) : une livraison peut être
   // annulée (annuleAt) pour cause d'erreur de saisie, auquel cas une
@@ -435,6 +445,7 @@ model Commande {
   @@index([clienteId])
   @@index([statut])
   @@index([dateLivraisonPrevue])
+  @@index([atelierId, assigneAId, statut])
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1009,4 +1020,21 @@ model CleIdempotence {
 
   @@unique([portee, cle])
   @@index([expireLe])
+}
+
+// Historique des affectations d'une commande (Phase 6.3) : qui l'a confiée à qui, et quand. employeId null = la commande
+// a été retirée à son employé (désaffectée, ou compte désactivé). Jamais modifié ni supprimé.
+model AffectationCommande {
+  id         String   @id @default(cuid())
+  atelierId  String
+  commandeId String
+  commande   Commande @relation(fields: [commandeId], references: [id], onDelete: Restrict)
+  employeId  String?
+  employe    User?    @relation("AffectationEmploye", fields: [employeId], references: [id], onDelete: SetNull)
+  parId      String?
+  par        User?    @relation("AffectationAuteur", fields: [parId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([commandeId, createdAt])
+  @@index([atelierId])
 }

@@ -18,6 +18,7 @@ const AteliersPage = lazy(() => import("./pages/superadmin/AteliersPage.jsx"));
 const AtelierDetailPage = lazy(() => import("./pages/superadmin/AtelierDetailPage.jsx"));
 const SuperadminDashboardPage = lazy(() => import("./pages/superadmin/SuperadminDashboardPage.jsx"));
 const GestionAbonnementsPage = lazy(() => import("./pages/superadmin/GestionAbonnementsPage.jsx"));
+const ProductionPage = lazy(() => import("./features/production/ProductionPage.jsx"));
 const EmployesPage = lazy(() => import("./features/employes/EmployesPage.jsx"));
 const EmployeFormPage = lazy(() => import("./features/employes/EmployeFormPage.jsx"));
 const GestionPlansPage = lazy(() => import("./pages/superadmin/GestionPlansPage.jsx"));
@@ -181,6 +182,9 @@ export default function App() {
             </Route>
             <Route element={<RequirePermission permission="commandes.lire" />}>
               <Route path="/calendrier" element={<CalendrierPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="commandes.affecter" />}>
+              <Route path="/production" element={<ProductionPage />} />
             </Route>
             <Route element={<RequirePermission permission="notifications.lire" />}>
               <Route path="/notifications" element={<NotificationsPage />} />
