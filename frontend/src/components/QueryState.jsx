@@ -1,6 +1,14 @@
 import { Loader2, AlertCircle, Inbox, RotateCcw } from "lucide-react";
 import { ApiError } from "../lib/apiClient.js";
 import { useTranslation } from "../i18n/index.js";
+import { messageUtilisateur } from "../lib/errorMessage.js";
+
+/** Référence à communiquer au support (erreurs serveur uniquement) : retrouve la ligne de journal. */
+function Reference({ reference }) {
+  const { t } = useTranslation();
+  if (!reference) return null;
+  return <span className="block text-xs opacity-70 mt-0.5 select-all break-all">{t("ui.errorReference", { ref: reference })}</span>;
+}
 
 export function LoadingState({ label }) {
   const { t } = useTranslation();
@@ -16,12 +24,15 @@ export function LoadingState({ label }) {
  * on affiche son message tel quel, jamais une nouvelle formulation inventée. */
 export function ErrorState({ error, onRetry }) {
   const { t } = useTranslation();
-  const message = error instanceof ApiError ? error.message : t("ui.errorGeneric");
+  const { message, reference } = messageUtilisateur(error, t);
   return (
     <div className="rounded-2xl bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 text-sm px-4 py-3 flex items-center justify-between gap-3 animate-fade-in">
       <span className="flex items-center gap-2">
         <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
-        {message}
+        <span>
+          {message}
+          <Reference reference={reference} />
+        </span>
       </span>
       {onRetry && (
         <button
@@ -73,6 +84,7 @@ export function GlobalFormError({ error }) {
       </p>
     );
   }
+  const { message, reference } = messageUtilisateur(error, t);
   // Un message de détail par champ est déjà affiché près du champ concerné —
   // ici on ne montre que les erreurs sans champ précis (_global) ou l'absence
   // totale de détail (ex : 409 métier, 404).
@@ -81,7 +93,10 @@ export function GlobalFormError({ error }) {
     return (
       <p className="flex items-center gap-2 rounded-xl bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 text-sm px-3 py-2 animate-fade-in">
         <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
-        {globalMessages ? globalMessages.join(" ") : error.message}
+        <span>
+          {globalMessages ? globalMessages.join(" ") : message}
+          <Reference reference={reference} />
+        </span>
       </p>
     );
   }

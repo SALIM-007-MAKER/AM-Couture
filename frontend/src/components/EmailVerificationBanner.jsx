@@ -1,6 +1,6 @@
 import { MailWarning, CheckCircle2 } from "lucide-react";
 import { useMeQuery, useRenvoyerVerificationEmailMutation } from "../hooks/useAuth.js";
-import { ApiError } from "../lib/apiClient.js";
+import { messageUtilisateur } from "../lib/errorMessage.js";
 import Button from "./Button.jsx";
 import { useTranslation } from "../i18n/index.js";
 
@@ -17,7 +17,7 @@ export default function EmailVerificationBanner() {
 
   if (!user?.email || user.emailVerifieLe) return null;
 
-  const message = mutation.error instanceof ApiError ? mutation.error.message : null;
+  const message = mutation.error ? messageUtilisateur(mutation.error, t).message : null;
 
   return (
     <div className="flex items-center justify-between gap-3 flex-wrap bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-900 px-4 py-2 text-sm">

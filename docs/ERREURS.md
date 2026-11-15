@@ -85,3 +85,29 @@ réponse) ; après, 503 en ~2 s avec un délai de connexion de 1 s, et en ~16 s 
 - **Interface** : les écrans n'affichent pas encore `requestId` ni de message dédié « hors ligne »
   (sous-phase 3.6).
 - **Pool de connexions** (`max: 20` par instance) : inchangé ; réglage à mesurer en 3.5.
+
+## 5. Affichage dans l'interface (sous-phase 4.3)
+
+`frontend/src/lib/apiError.js` classe chaque échec (`ApiError.kind`) et `lib/errorMessage.js`
+(`messageUtilisateur`) choisit le texte affiché :
+
+| Cas | `kind` | Texte affiché | Référence |
+|---|---|---|---|
+| Erreur métier ou de validation (4xx, dont 409 et 429) | `client` | message du serveur, tel quel | non |
+| Aucune réponse (coupure, hors ligne) | `network` | « Vérifiez votre connexion… » | non |
+| Aucune réponse en 40 s | `timeout` | « Le serveur met trop de temps… » | non |
+| 503 | `unavailable` | « Service momentanément indisponible… » | oui |
+| 413 | `tooLarge` | « Données trop volumineuses… » | non |
+| Autre 5xx (dont 502/504 de la plateforme, corps non JSON) | `server` | « Une erreur est survenue de notre côté… » | oui |
+| Exception non prévue côté interface | — | message générique | non |
+
+- Les messages de panne sont **traduits** (fr/en) côté interface : le serveur n'envoie qu'une phrase française.
+- La **référence** (`requestId`, lue dans le corps ou l'en-tête `X-Request-Id`) s'affiche, sélectionnable,
+  sous les erreurs serveur ; l'utilisateur la communique et l'on retrouve la requête dans les logs
+  (voir `JOURNALISATION.md`).
+- Avant : une coupure réseau n'affichait **rien** dans plusieurs boutons (annulation, reçu, renvoi de
+  vérification) ; une requête sans réponse laissait l'écran en chargement indéfiniment ; aucune référence
+  n'était montrée.
+- Une annulation voulue par le code (changement de page) n'est pas traitée comme une panne.
+- Limite : le délai de 40 s est un réglage unique (`DELAI_REQUETE_MS`) ; un envoi d'image très lent sur
+  une mauvaise connexion pourrait l'atteindre.

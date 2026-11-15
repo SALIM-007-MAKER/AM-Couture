@@ -1,5 +1,5 @@
 import { queryClient } from "./queryClient.js";
-import { ApiError } from "./apiError.js";
+import { ApiError, erreurDepuisReponse } from "./apiError.js";
 import { useAbonnementStore } from "../stores/abonnementStore.js";
 
 // Ré-exportée pour compatibilité : tout le code existant importe `ApiError`
@@ -13,13 +13,26 @@ export { ApiError };
  * cookie de session HttpOnly part automatiquement avec chaque requête
  * same-origin.
  */
+// Au-delà, la requête est abandonnée : sans délai, une connexion qui ne répond plus laissait
+// l'écran en « chargement » indéfiniment.
+export const DELAI_REQUETE_MS = 40_000;
+
 async function request(path, { method = "GET", body, signal } = {}) {
-  const res = await fetch(`/api${path}`, {
-    method,
-    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    signal,
-  });
+  const delai = AbortSignal.timeout(DELAI_REQUETE_MS);
+  let res;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: signal ? AbortSignal.any([signal, delai]) : delai,
+    });
+  } catch (err) {
+    // Annulation voulue par l'appelant (changement de page, TanStack Query) : ce n'est pas une panne.
+    if (signal?.aborted) throw err;
+    // Aucune réponse : coupure réseau / hors ligne, ou délai dépassé.
+    throw new ApiError(0, "Le serveur n'a pas répondu.", undefined, { kind: delai.aborted ? "timeout" : "network" });
+  }
 
   if (res.status === 204) return null;
 
@@ -49,7 +62,7 @@ async function request(path, { method = "GET", body, signal } = {}) {
     if (res.status === 402) {
       useAbonnementStore.getState().setBloque(true);
     }
-    throw new ApiError(res.status, payload?.error ?? "Une erreur est survenue.", payload?.details);
+    throw erreurDepuisReponse(res.status, payload, res.headers);
   }
 
   // Une requête réussie prouve que l'atelier n'est plus bloqué (ex : juste

@@ -41,6 +41,11 @@ export default {
     },
     errorGeneric: "Une erreur est survenue.",
     errorNetwork: "Une erreur est survenue. Vérifiez votre connexion et réessayez.",
+    errorTimeout: "Le serveur met trop de temps à répondre. Réessayez dans un instant.",
+    errorUnavailable: "Service momentanément indisponible. Réessayez dans un instant.",
+    errorServer: "Une erreur est survenue de notre côté. Réessayez ; si le problème persiste, communiquez la référence ci-dessous.",
+    errorTooLarge: "Les données envoyées sont trop volumineuses (une image est peut-être trop lourde).",
+    errorReference: "Référence : {{ref}}",
     retry: "Réessayer",
     statut: {
       activeF: "Active",
