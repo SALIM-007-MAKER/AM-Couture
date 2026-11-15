@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { CreditCard, CheckCircle2, CalendarClock, Hourglass, Ban, Pencil, History, Save, X } from "lucide-react";
+import { CreditCard, CheckCircle2, CalendarClock, Hourglass, Ban, Pencil, History, Save, X, PauseCircle, PlayCircle } from "lucide-react";
 import {
   useAtelierAbonnementQuery,
   useActiverAbonnementMutation,
   useModifierAbonnementMutation,
   useExpirerAbonnementMutation,
   useDesactiverAbonnementMutation,
+  useSuspendreAbonnementMutation,
+  useReactiverAbonnementMutation,
 } from "../hooks.js";
 import { usePlansTousQuery } from "../../plansAdmin/hooks.js";
 import EtatAbonnementBadge from "./EtatAbonnementBadge.jsx";
@@ -79,10 +81,13 @@ function ActionsCourant({ atelierId, abonnement }) {
   const modifier = useModifierAbonnementMutation(atelierId);
   const expirer = useExpirerAbonnementMutation(atelierId);
   const desactiver = useDesactiverAbonnementMutation(atelierId);
-  const [mode, setMode] = useState(null); // "dates" | "expirer" | "desactiver"
+  const suspendre = useSuspendreAbonnementMutation(atelierId);
+  const reactiver = useReactiverAbonnementMutation(atelierId);
+  const [mode, setMode] = useState(null); // "dates" | "expirer" | "desactiver" | "suspendre" | "reactiver"
+  const [motif, setMotif] = useState("");
   const [form, setForm] = useState({ dateDebut: jour(abonnement.dateDebut), dateExpiration: jour(abonnement.dateExpiration), note: "" });
   const details = modifier.error instanceof ApiError ? modifier.error.details : undefined;
-  const erreur = modifier.error || expirer.error || desactiver.error;
+  const erreur = modifier.error || expirer.error || desactiver.error || suspendre.error || reactiver.error;
   const peutExpirer = abonnement.statut === "CONFIRME" && abonnement.statutEffectif !== "EXPIRE";
 
   function fermer() {
@@ -90,6 +95,9 @@ function ActionsCourant({ atelierId, abonnement }) {
     modifier.reset();
     expirer.reset();
     desactiver.reset();
+    suspendre.reset();
+    reactiver.reset();
+    setMotif("");
   }
 
   function handleModifier(e) {
@@ -123,6 +131,33 @@ function ActionsCourant({ atelierId, abonnement }) {
             {t("common.save")}
           </Button>
           <Button type="button" variant="secondary" size="sm" icon={X} onClick={fermer}>
+            {t("common.cancel")}
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (mode === "suspendre" || mode === "reactiver") {
+    const mutation = mode === "suspendre" ? suspendre : reactiver;
+    return (
+      <Card variant="outlined" className="space-y-3" data-testid="formulaire-suspension">
+        <GlobalFormError error={erreur} />
+        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+          {mode === "suspendre" ? t("saSub.actions.suspendHelp") : t("saSub.actions.reactivateHelp")}
+        </p>
+        <input value={motif} maxLength={300} onChange={(e) => setMotif(e.target.value)} className={inputClass} aria-label={t("saSub.form.note")} />
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant={mode === "suspendre" ? "danger" : "primary"}
+            size="sm"
+            loading={mutation.isPending}
+            disabled={motif.trim().length < 3}
+            onClick={() => mutation.mutate({ abonnementId: abonnement.id, note: motif.trim() }, { onSuccess: fermer })}
+          >
+            {mode === "suspendre" ? t("saSub.actions.confirmSuspend") : t("saSub.actions.confirmReactivate")}
+          </Button>
+          <Button variant="secondary" size="sm" onClick={fermer}>
             {t("common.cancel")}
           </Button>
         </div>
@@ -167,6 +202,16 @@ function ActionsCourant({ atelierId, abonnement }) {
         {peutExpirer && (
           <Button variant="danger-ghost" size="sm" icon={Hourglass} onClick={() => setMode("expirer")}>
             {t("saSub.actions.expire")}
+          </Button>
+        )}
+        {abonnement.statut === "CONFIRME" && abonnement.statutEffectif === "ACTIF" && (
+          <Button variant="danger-ghost" size="sm" icon={PauseCircle} onClick={() => setMode("suspendre")}>
+            {t("saSub.actions.suspend")}
+          </Button>
+        )}
+        {abonnement.statut === "SUSPENDU" && (
+          <Button variant="secondary" size="sm" icon={PlayCircle} onClick={() => setMode("reactiver")}>
+            {t("saSub.actions.reactivate")}
           </Button>
         )}
         {abonnement.statut !== "ANNULE" && (

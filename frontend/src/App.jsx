@@ -19,6 +19,8 @@ const AtelierDetailPage = lazy(() => import("./pages/superadmin/AtelierDetailPag
 const SuperadminDashboardPage = lazy(() => import("./pages/superadmin/SuperadminDashboardPage.jsx"));
 const GestionAbonnementsPage = lazy(() => import("./pages/superadmin/GestionAbonnementsPage.jsx"));
 const GestionPlansPage = lazy(() => import("./pages/superadmin/GestionPlansPage.jsx"));
+const PaiementsAbonnementPage = lazy(() => import("./pages/superadmin/PaiementsAbonnementPage.jsx"));
+const CommercePage = lazy(() => import("./pages/superadmin/CommercePage.jsx"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
 const FinancesPage = lazy(() => import("./pages/FinancesPage.jsx"));
 import NotFoundPage from "./pages/NotFoundPage.jsx";
@@ -153,6 +155,8 @@ export default function App() {
             <Route path="/ateliers" element={<AteliersPage />} />
             <Route path="/ateliers/:id" element={<AtelierDetailPage />} />
             <Route path="/gestion-abonnements" element={<GestionAbonnementsPage />} />
+            <Route path="/paiements-abonnement" element={<PaiementsAbonnementPage />} />
+            <Route path="/commerce" element={<CommercePage />} />
             <Route path="/tarifs-abonnement" element={<GestionPlansPage />} />
             <Route path="/mon-compte" element={<ComptePage />} />
           </Route>

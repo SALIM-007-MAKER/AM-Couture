@@ -1,4 +1,4 @@
-import { Gift, CheckCircle2, XCircle, Hourglass, Minus } from "lucide-react";
+import { Gift, CheckCircle2, XCircle, Hourglass, Minus, PauseCircle } from "lucide-react";
 import { useLocaleStore } from "../../stores/localeStore.js";
 
 // Statuts affichés au PDG (voir GET /api/abonnements/etat) — mêmes tons que
@@ -9,6 +9,7 @@ export const STATUT_ABONNEMENT_STYLES = {
   ACTIF: { icon: CheckCircle2, tone: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400" },
   EXPIRE: { icon: XCircle, tone: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" },
   EN_ATTENTE: { icon: Hourglass, tone: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" },
+  SUSPENDU: { icon: PauseCircle, tone: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" },
   AUCUN: { icon: Minus, tone: "bg-neutral-200 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400" },
 };
 

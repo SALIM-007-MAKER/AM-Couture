@@ -9,6 +9,8 @@ export const ETATS = {
   superadmin: resolve(ici, ".auth/superadmin.json"),
   pdg: resolve(ici, ".auth/pdg.json"),
   client: resolve(ici, ".auth/client.json"),
+  gamma: resolve(ici, ".auth/gamma.json"),
+  delta: resolve(ici, ".auth/delta.json"),
 };
 
 // Les serveurs (webServer) sont déjà démarrés quand ce fichier s'exécute. Une connexion par rôle suffit :
@@ -28,6 +30,8 @@ export default async function globalSetup(config) {
     ["superadmin", COMPTES.superadmin],
     ["pdg", COMPTES.pdgAlpha],
     ["client", COMPTES.clientAlpha],
+    ["gamma", COMPTES.pdgGamma],
+    ["delta", COMPTES.pdgDelta],
   ]) {
     const ctx = await request.newContext({ baseURL: base });
     const res = await ctx.post("/api/auth/login", { data: { identifiant, password: MOT_DE_PASSE } });

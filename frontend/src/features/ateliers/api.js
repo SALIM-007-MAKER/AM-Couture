@@ -31,6 +31,10 @@ export const ateliersApi = {
     api.patch(`/ateliers/${atelierId}/abonnement/${abonnementId}`, data),
   expirerAbonnement: (atelierId, abonnementId, data) =>
     api.post(`/ateliers/${atelierId}/abonnement/${abonnementId}/expirer`, data ?? {}),
+  suspendreAbonnement: (atelierId, abonnementId, data) =>
+    api.post(`/ateliers/${atelierId}/abonnement/${abonnementId}/suspendre`, data),
+  reactiverAbonnement: (atelierId, abonnementId, data) =>
+    api.post(`/ateliers/${atelierId}/abonnement/${abonnementId}/reactiver`, data),
   desactiverAbonnement: (atelierId, abonnementId, data) =>
     api.post(`/ateliers/${atelierId}/abonnement/${abonnementId}/desactiver`, data ?? {}),
 };

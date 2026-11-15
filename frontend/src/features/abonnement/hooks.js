@@ -1,12 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { abonnementsApi, plansApi } from "./api.js";
 
-// Rafraîchi tout seul (30 s + au retour sur l'onglet) : une activation ou
-// désactivation faite par le SUPERADMIN apparaît chez le PDG sans qu'il ait à
-// recharger la page.
+const ETAT_KEY = ["abonnements", "etat"];
+const TRANSACTIONS_KEY = ["abonnements", "transactions"];
+
+// Rafraîchi tout seul (30 s + au retour sur l'onglet) : une activation, un paiement confirmé ou une suspension faits
+// par la plateforme apparaissent chez le PDG sans qu'il ait à recharger la page.
 export function useEtatAbonnementQuery() {
   return useQuery({
-    queryKey: ["abonnements", "etat"],
+    queryKey: ETAT_KEY,
     queryFn: () => abonnementsApi.etat(),
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,
@@ -15,10 +17,37 @@ export function useEtatAbonnementQuery() {
 
 export function usePlansQuery() {
   return useQuery({
-    queryKey: ["plans-abonnement"], queryFn: () => plansApi.list(),
-    // Même source que SuperAdmin > Tarification : un plan créé, modifié ou
-    // désactivé là-bas apparaît ici sans recharger la page.
+    queryKey: ["plans-abonnement"],
+    queryFn: () => plansApi.list(),
+    // Même source que SuperAdmin > Tarification : un plan créé, modifié ou désactivé là-bas apparaît ici.
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
   });
 }
+
+export function useTransactionsAbonnementQuery() {
+  return useQuery({
+    queryKey: TRANSACTIONS_KEY,
+    queryFn: () => abonnementsApi.transactions(),
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/** Toute opération de paiement change l'état d'abonnement ET l'historique : les deux sont relus. */
+function useOperationPaiement(mutationFn) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    // Pas de « return » : une promesse renvoyée ici serait attendue avant les rappels passés à mutate(), et le
+    // composant (retiré de l'écran par la relecture de l'état) ne recevrait jamais son onSuccess.
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["abonnements"] });
+    },
+  });
+}
+
+export const useSouscrireMutation = () => useOperationPaiement(({ corps, cle }) => abonnementsApi.souscrire(corps, cle));
+export const usePayerWaveMutation = () => useOperationPaiement(({ corps, cle }) => abonnementsApi.payerWave(corps, cle));
+export const useAnnulerDeclarationMutation = () => useOperationPaiement((id) => abonnementsApi.annuler(id));
+export const useVerifierPaiementMutation = () => useOperationPaiement((id) => abonnementsApi.verifier(id));

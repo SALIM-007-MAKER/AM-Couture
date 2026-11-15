@@ -17,13 +17,13 @@ export { ApiError };
 // l'écran en « chargement » indéfiniment.
 export const DELAI_REQUETE_MS = 40_000;
 
-async function request(path, { method = "GET", body, signal } = {}) {
+async function request(path, { method = "GET", body, signal, headers } = {}) {
   const delai = AbortSignal.timeout(DELAI_REQUETE_MS);
   let res;
   try {
     res = await fetch(`/api${path}`, {
       method,
-      headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
+      headers: body !== undefined || headers ? { ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...headers } : undefined,
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: signal ? AbortSignal.any([signal, delai]) : delai,
     });

@@ -207,3 +207,31 @@ Trois routes réservées au SUPERADMIN, en lecture seule (`/api/plateforme/comme
 **Correction d'un indicateur existant.** `GET /api/ateliers/tendances` datait le revenu d'un paiement par `updatedAt`, qui change à chaque modification (un remboursement, par exemple). Il utilise maintenant la date de confirmation.
 
 **Tests.** 19 unitaires (dates fixes) et 16 d'intégration avec de vraies requêtes SQL (mois à cheval, remboursements, ventilations, droits d'accès, paramètres invalides). Deux mutations détectées (revenu mensuel récurrent comptant les abonnements suspendus, renouvellement sans limite de grâce). Un défaut de présentation corrigé en cours de route : les montants issus du SQL s'écrivaient « 27000.00 » alors que le reste de l'API écrit « 27000 ».
+
+## 13. Réalisé en 5.7 — interface
+
+**Côté atelier (PDG)**
+- **Bandeau d'accès**, dans tout l'espace de l'atelier : ambre pendant la période de grâce (avec la date de fin), rouge en lecture seule, rouge « suspendu par la plateforme ». Aucun bandeau pendant une impersonation SUPERADMIN. Le bandeau du tableau de bord ne double plus l'avertissement d'expiration.
+- **Page Abonnement** : bouton « Souscrire » sur chaque formule → formulaire de déclaration (moyen, opérateur, référence obligatoire sauf espèces, précision) avec les **instructions de paiement** saisies par la plateforme ; une seule déclaration à la fois ; carte « paiement en attente » avec retrait ; **historique des paiements** avec justificatif PDF.
+- **Clé d'idempotence** : nouvelle à chaque modification de la saisie et après chaque succès, conservée sur une réémission après coupure réseau.
+- **Wave** : bouton et retour de paiement prêts, **visibles seulement si Wave est activé** côté serveur. Le retour de Wave (`?paiement=retour&transaction=…`) demande au serveur de relire le paiement chez Wave ; « confirmé » n'est affiché que si Wave l'a dit.
+- Une saisie refusée en lecture seule affiche le message du serveur à l'endroit de la saisie (plus de redirection).
+
+**Côté SUPERADMIN**
+- **Paiements d'abonnement** (`/paiements-abonnement`) : file des paiements à vérifier (filtre par statut), confirmation en deux temps (rapprochement avec le relevé), rejet et remboursement avec motif obligatoire, lien vers le justificatif. Un paiement Wave n'a pas de bouton de confirmation.
+- **Tableau de bord commercial** (`/commerce`) : ateliers par état et par accès, revenus (mois, précédent, cumul, revenu mensuel récurrent), paiements à vérifier, anomalies Wave, conversion et renouvellement, revenus par mois avec ventilation, renouvellements à suivre (horizon 7/30/60 jours) avec contact, **réglages** (jours de grâce, instructions de paiement).
+- **Fiche atelier** : suspendre (motif obligatoire) et réactiver un abonnement.
+
+**Backend ajouté.** Champ `instructionsPaiement` (migration additive `20261120090000`), lu et écrit par `/api/plateforme/parametres-abonnement`, exposé aux ateliers par `/api/abonnements/etat`. Test d'intégration ajouté.
+
+**Défaut trouvé par les tests de bout en bout.** Après une déclaration réussie, le message de confirmation n'apparaissait pas : le hook renvoyait la promesse de relecture de l'état, que TanStack Query attend avant d'appeler les rappels de `mutate()` ; or la relecture retirait le formulaire de l'écran, qui ne recevait jamais son `onSuccess`. Corrigé (la relecture n'est plus attendue). Aucun test unitaire n'aurait pu le voir.
+
+**Tests.** 11 unitaires de logique pure (validation, corps de requête sans montant, bandeau d'accès, retour de Wave) et 5 de formatage ; **8 parcours de bout en bout dans un navigateur réel** (grâce, lecture seule, souscription, confirmation par le SUPERADMIN, accès rétabli, justificatif PDF, isolation du justificatif, tableau de bord, réglages). Pas de tests de composants React (pas d'outillage installé).
+
+**Limites :**
+- le parcours Wave **n'est pas testé dans un navigateur** (Wave est inactif dans le jeu de données) ; sa logique serveur l'est contre le faux serveur Wave ;
+- interface testée en **français** dans le navigateur ; l'anglais est couvert par le test de parité des traductions (aucune clé manquante) mais pas par un parcours ;
+- pas de vérification visuelle sur mobile ni de test d'accessibilité automatisé ;
+- les textes anglais ont été écrits sans relecture par un locuteur natif ;
+- les tableaux du tableau de bord commercial n'ont ni graphique ni export ; les barres sont de simples éléments HTML ;
+- aucune notification dans l'application (cloche) pour un paiement à vérifier : le SUPERADMIN le voit dans la page Paiements et par courriel s'il a une adresse.

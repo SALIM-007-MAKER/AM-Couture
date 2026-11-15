@@ -7,6 +7,7 @@ import clientes from "./parts/clientes.en.js";
 import superadmin from "./parts/superadmin.en.js";
 import abonnement from "./parts/abonnement.en.js";
 import superadminAbo from "./parts/superadminAbo.en.js";
+import paiementsAbo from "./parts/paiementsAbo.en.js";
 
 export default {
   ...shared,
@@ -15,6 +16,7 @@ export default {
   ...superadmin,
   ...abonnement,
   ...superadminAbo,
+  ...paiementsAbo,
   common: {
     save: "Save",
     cancel: "Cancel",

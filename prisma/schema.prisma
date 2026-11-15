@@ -878,11 +878,14 @@ model HistoriqueAbonnement {
 /// Réglages globaux de la plateforme (ligne unique, id "plateforme") —
 /// aujourd'hui : le contact WhatsApp affiché aux PDG sur la page Abonnement.
 model ParametresPlateforme {
-  id              String   @id @default("plateforme")
-  contactWhatsapp String?
+  id                   String   @id @default("plateforme")
+  contactWhatsapp      String?
   // Jours de grâce après la fin d'un essai ou d'un abonnement : accès complet avec bandeau, puis lecture seule.
-  joursGrace      Int      @default(7)
-  updatedAt       DateTime @updatedAt
+  joursGrace           Int      @default(7)
+  // Texte libre affiché à l'atelier qui souscrit : où et comment payer (numéro de mobile money, compte bancaire...).
+  // Saisi par le SUPERADMIN ; la plateforme n'en déduit rien.
+  instructionsPaiement String?
+  updatedAt            DateTime @updatedAt
 }
 
 // ─────────────────────────────────────────────────────────────────────────
