@@ -3,10 +3,10 @@
 | Niveau | Où | Outil | Commande | Effectif (15/11/2026) | Dans la CI |
 |---|---|---|---|---|---|
 | Unitaires backend | `backend/src/**/__tests__` | `node --test` | `npm test` | 302 (dont 4 de cohérence de `docs/API.md`) | oui (`verifier`) |
-| Unitaires frontend | `frontend/src/**/__tests__` | `node --test` | `npm test` | 64 | oui (`verifier`) |
+| Unitaires frontend | `frontend/src/**/__tests__` | `node --test` | `npm test` | 80 | oui (`verifier`) |
 | Déploiement | `scripts/__tests__` | `node --test` | `npm test` | 7 | oui (`verifier`) |
-| Intégration (API + Prisma + Postgres) | `backend/src/integration-tests` | `node --test` | `npm run test:integration` | 268 (267 + 1 `TODO` volontaire) | oui (`tests-integration`) |
-| End-to-end (navigateur réel → frontend → API → Postgres) | `e2e/specs` | Playwright | `npm run test:e2e` | 27 | job `tests-e2e`, **non bloquant** (jamais exécuté sur GitHub) |
+| Intégration (API + Prisma + Postgres) | `backend/src/integration-tests` | `node --test` | `npm run test:integration` | 269 (268 + 1 `TODO` volontaire) | oui (`tests-integration`) |
+| End-to-end (navigateur réel → frontend → API → Postgres) | `e2e/specs` | Playwright | `npm run test:e2e` | 35 | job `tests-e2e`, **non bloquant** (jamais exécuté sur GitHub) |
 | Cohérence schéma Prisma / migrations | `prisma/` | `prisma migrate diff` | voir `.github/workflows/ci.yml` | 1 contrôle | oui (`tests-integration`) |
 | Vulnérabilités des dépendances d'exécution | `package-lock.json` | `npm audit --omit=dev` | `npm audit --omit=dev --audit-level=high` | 0 constaté le 15/11/2026 | job `audit-dependances`, non bloquant |
 
@@ -51,6 +51,7 @@ captures et traces dans `e2e-resultats/` (`npx playwright show-trace <trace.zip>
 | `pdg.spec.js` | création de cliente, doublon de téléphone, règle « pas de commande sans mesure », commande + paiement (le solde diminue), refus d'un paiement supérieur au solde, isolation, espace plateforme fermé |
 | `client.spec.js` | profil, commande avec payé / reste, aucune donnée d'un autre atelier, espace de gestion fermé |
 | `securite.spec.js` | 401 sans session, 403 par rôle, 404 sur les ressources d'un autre atelier (lecture et écriture), garde d'origine (CSRF), erreurs sans fuite technique |
+| `abonnement.spec.js` | période de grâce, lecture seule avec saisie refusée, souscription (instructions, référence obligatoire, une seule déclaration à la fois), confirmation par le SUPERADMIN, accès rétabli, justificatif PDF (non accessible à un autre atelier), tableau de bord commercial, réglages |
 
 Limites : une seule connexion par rôle (session réutilisée) pour rester sous le limiteur de débit ; un seul navigateur
 (Chrome) ; pas de parcours d'inscription d'un atelier, de livraison, de stock, de dépenses, d'abonnement ni

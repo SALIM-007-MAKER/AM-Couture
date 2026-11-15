@@ -1,6 +1,12 @@
-import { useState } from "react";
-import { CreditCard, Clock3, Gift, Layers } from "lucide-react";
-import { useEtatAbonnementQuery, usePlansQuery } from "./hooks.js";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { CreditCard, Clock3, Gift, Layers, CheckCircle2 } from "lucide-react";
+import { useEtatAbonnementQuery, usePlansQuery, useVerifierPaiementMutation } from "./hooks.js";
+import { abonnementsApi } from "./api.js";
+import { peutDeclarer, retourPaiement } from "./paiement.js";
+import DeclarationPaiement from "./components/DeclarationPaiement.jsx";
+import PaiementEnAttente from "./components/PaiementEnAttente.jsx";
+import HistoriquePaiements from "./components/HistoriquePaiements.jsx";
 import { formatDateFr, formatPrix } from "./constants.js";
 import StatutAbonnementBadge from "./components/StatutAbonnementBadge.jsx";
 import PlanCard from "./components/PlanCard.jsx";
@@ -23,11 +29,10 @@ function InfoRow({ label, value }) {
   );
 }
 
-// Page Abonnement du PDG — LECTURE SEULE : aucun paiement en ligne n'existe
-// encore, l'abonnement est activé manuellement par le SUPERADMIN (voir
-// backend/src/routes/ateliersAbonnement.routes.js). Aucune action possible ici,
-// aucun clic n'est jamais une confirmation : l'état affiché vient uniquement
-// du serveur (GET /api/abonnements/etat, rafraîchi automatiquement).
+// Page Abonnement du PDG : état, formules, souscription et historique des paiements.
+// Souscrire = DÉCLARER un paiement fait hors de l'application (ou, si Wave est activé, l'ouvrir en ligne). Aucun clic
+// n'est jamais une confirmation : l'abonnement n'est activé qu'après vérification du paiement par le serveur, et
+// l'état affiché vient uniquement du serveur (GET /api/abonnements/etat, rafraîchi automatiquement).
 export default function AbonnementPage() {
   const { t } = useTranslation();
   const etatQuery = useEtatAbonnementQuery();
@@ -37,6 +42,43 @@ export default function AbonnementPage() {
   const essai = etat?.essai;
   const whatsapp = etat?.contact?.whatsapp;
   const plans = plansQuery.data ?? [];
+  const [choix, setChoix] = useState(null); // { plan, tarif } : formule choisie pour souscrire
+  const [message, setMessage] = useState(null); // { type: "ok" | "info" | "erreur", cle }
+  const location = useLocation();
+  const navigate = useNavigate();
+  const verifier = useVerifierPaiementMutation();
+  const retourTraite = useRef(false);
+
+  // Retour de Wave (?paiement=retour|echec&transaction=<numéro>) : le navigateur ne prouve rien. On demande au serveur de
+  // relire le paiement chez Wave, et on n'affiche « confirmé » que si c'est ce que Wave a répondu.
+  useEffect(() => {
+    const retour = retourPaiement(location.search);
+    if (!retour || retourTraite.current) return;
+    retourTraite.current = true;
+    (async () => {
+      setMessage({ type: "info", cle: "subPay.returnChecking" });
+      try {
+        const { data } = await abonnementsApi.transactions();
+        const tx = data.find((x) => x.numero === retour.transaction);
+        if (!tx) {
+          setMessage({ type: "erreur", cle: "subPay.returnFailed" });
+        } else {
+          const apres = await verifier.mutateAsync(tx.id);
+          setMessage(
+            apres.statut === "REUSSIE"
+              ? { type: "ok", cle: "subPay.returnOk" }
+              : apres.statut === "EN_ATTENTE" && retour.resultat === "retour"
+                ? { type: "info", cle: "subPay.returnPending" }
+                : { type: "erreur", cle: "subPay.returnFailed" },
+          );
+        }
+      } catch {
+        setMessage({ type: "erreur", cle: "subPay.returnUnavailable" });
+      } finally {
+        navigate("/abonnement", { replace: true });
+      }
+    })();
+  }, [location.search, navigate, verifier]);
 
   // Durées proposées = union des tarifs de tous les plans (données serveur).
   // Par défaut : la durée de l'abonnement actif si elle existe, sinon la plus courte.
@@ -49,6 +91,23 @@ export default function AbonnementPage() {
   return (
     <div className="max-w-5xl space-y-6">
       <PageHeader icon={CreditCard} title={t("nav.subscription")} subtitle={t("sub.subtitle")} />
+
+      {message && (
+        <p
+          role="status"
+          data-testid="message-paiement"
+          className={`flex items-center gap-2 rounded-xl px-4 py-3 text-sm ${
+            message.type === "ok"
+              ? "bg-green-50 text-green-800 dark:bg-green-950/60 dark:text-green-300"
+              : message.type === "erreur"
+                ? "bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300"
+                : "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+          }`}
+        >
+          <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
+          {t(message.cle)}
+        </p>
+      )}
 
       <div className="space-y-2">
         <SectionTitle icon={Clock3}>{t("sub.currentStatus")}</SectionTitle>
@@ -112,8 +171,26 @@ export default function AbonnementPage() {
         </div>
       )}
 
+      {etat?.paiementEnAttente && <PaiementEnAttente paiement={etat.paiementEnAttente} />}
+
+      {choix && peutDeclarer(etat) && (
+        <DeclarationPaiement
+          key={`${choix.plan.id}-${choix.tarif.dureeMois}`}
+          plan={choix.plan}
+          tarif={choix.tarif}
+          instructions={etat?.instructionsPaiement}
+          waveDisponible={Boolean(etat?.paiementsEnLigne?.wave)}
+          onClose={() => setChoix(null)}
+          onDeclare={() => {
+            setChoix(null);
+            setMessage({ type: "ok", cle: "subPay.declared" });
+          }}
+        />
+      )}
+
       <div className="space-y-4">
         <SectionTitle icon={Layers}>{t("sub.plansTitle")}</SectionTitle>
+        {etat?.paiementEnAttente && <p className="text-sm text-neutral-500">{t("subPay.onlyOne")}</p>}
         {plansQuery.isPending && <LoadingState label={t("common.loading")} />}
         {plansQuery.isError && <ErrorState error={plansQuery.error} onRetry={plansQuery.refetch} />}
         {plansQuery.data && plans.length === 0 && <EmptyState icon={Layers}>{t("sub.plansEmpty")}</EmptyState>}
@@ -128,6 +205,7 @@ export default function AbonnementPage() {
                   dureeMois={duree}
                   courant={etat?.statut === "ACTIF" && abonnement?.planNom === plan.nom}
                   whatsapp={whatsapp}
+                  onSouscrire={peutDeclarer(etat) ? (p, tarif) => setChoix({ plan: p, tarif }) : undefined}
                 />
               ))}
             </div>
@@ -135,6 +213,8 @@ export default function AbonnementPage() {
           </>
         )}
       </div>
+
+      <HistoriquePaiements />
 
       <PlansFaq />
 

@@ -42,8 +42,19 @@ export const listTransactionsQuerySchema = z.object({
 });
 
 export const parametresAbonnementSchema = z
-  .object({ joursGrace: z.number().int().min(0, "0 minimum.").max(90, "90 maximum.") })
-  .strict();
+  .object({
+    joursGrace: z.number().int().min(0, "0 minimum.").max(90, "90 maximum.").optional(),
+    // null ou chaîne vide = effacer les instructions.
+    instructionsPaiement: z
+      .string()
+      .trim()
+      .max(1000, "1000 caractères maximum.")
+      .nullable()
+      .optional()
+      .transform((v) => (v === "" ? null : v)),
+  })
+  .strict()
+  .refine((d) => d.joursGrace !== undefined || d.instructionsPaiement !== undefined, { message: "Aucune donnée à modifier." });
 
 export const suspensionSchema = z
   .object({ note: z.string().trim().min(3, "Motif requis.").max(300).transform(normalizeText) })

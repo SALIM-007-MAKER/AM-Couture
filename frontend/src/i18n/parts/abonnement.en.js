@@ -8,6 +8,7 @@ export default {
       ACTIF: "Active",
       EXPIRE: "Expired",
       EN_ATTENTE: "Awaiting activation",
+      SUSPENDU: "Suspended",
       AUCUN: "No subscription",
     },
     plan: "Plan",

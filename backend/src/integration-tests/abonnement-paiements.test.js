@@ -291,6 +291,18 @@ describe("Souscription et paiements d'abonnement", () => {
       assert.equal(res.body.data[0].atelierNom, "Atelier Souscription A");
     });
 
+    test("instructions de paiement : saisies par la plateforme, visibles de l'atelier, effaçables", async () => {
+      const texte = "Airtel Money 90 00 00 00 (AM Couture). Indiquez la référence reçue par SMS.";
+      assert.equal((await superApi.put("/api/plateforme/parametres-abonnement", { instructionsPaiement: texte })).body.instructionsPaiement, texte);
+      assert.equal((await etat(apiA)).instructionsPaiement, texte);
+      assert.equal((await superApi.put("/api/plateforme/parametres-abonnement", { instructionsPaiement: "x".repeat(1001) })).status, 400);
+      assert.equal((await superApi.put("/api/plateforme/parametres-abonnement", {})).status, 400, "au moins un champ");
+      assert.equal((await apiA.put("/api/plateforme/parametres-abonnement", { instructionsPaiement: "piratage" })).status, 403);
+      const efface = await superApi.put("/api/plateforme/parametres-abonnement", { instructionsPaiement: "" });
+      assert.equal(efface.body.instructionsPaiement, null);
+      assert.equal((await etat(apiA)).instructionsPaiement, null);
+    });
+
     test("jours de grâce : bornés entre 0 et 90", async () => {
       assert.equal((await superApi.put("/api/plateforme/parametres-abonnement", { joursGrace: 91 })).status, 400);
       assert.equal((await superApi.put("/api/plateforme/parametres-abonnement", { joursGrace: -1 })).status, 400);

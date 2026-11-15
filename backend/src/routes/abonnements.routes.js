@@ -77,6 +77,8 @@ router.get("/etat", async (req, res) => {
     essai: etat.essai,
     // Contact WhatsApp de l'administrateur (réglé par le SUPERADMIN) — null si non configuré.
     contact: { whatsapp: plateforme?.contactWhatsapp ?? null },
+    // Où et comment payer (texte saisi par la plateforme), affiché avec le formulaire de déclaration.
+    instructionsPaiement: plateforme?.instructionsPaiement ?? null,
     // Accès actuel : COMPLET, GRACE (bandeau, tout fonctionne encore) ou LECTURE_SEULE.
     acces: modeAcces(etat, abonnements, { joursGrace: plateforme?.joursGrace ?? JOURS_GRACE_PAR_DEFAUT }),
     // Déclaration de paiement en attente de confirmation par la plateforme, s'il y en a une.

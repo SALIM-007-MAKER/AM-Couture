@@ -1,7 +1,10 @@
 // Jeu de données déterministe des tests de bout en bout. VIDE toute la base puis recrée :
 //  - 1 SUPERADMIN ;
 //  - atelier ALPHA : 1 PDG, 2 clientes (dont « Awa Alpha » avec compte client et une commande acomptée) ;
-//  - atelier BETA : 1 PDG, 1 cliente « Secrète Beta » avec commande — sert à prouver l'isolation entre ateliers.
+//  - atelier BETA : 1 PDG, 1 cliente « Secrète Beta » avec commande — sert à prouver l'isolation entre ateliers ;
+//  - atelier GAMMA : essai terminé depuis 30 jours (lecture seule) ; atelier DELTA : essai terminé depuis 3 jours
+//    (période de grâce) ; une formule « Plan E2E » et des instructions de paiement — parcours d'abonnement.
+//  Alpha et Beta n'ont pas d'échéance d'essai : jamais restreints, les autres parcours ne sont pas touchés.
 //
 // Garde-fous : refuse toute base dont le nom ne contient pas « e2e » ou dont l'hôte n'est pas local.
 import bcrypt from "bcryptjs";
@@ -12,6 +15,8 @@ export const COMPTES = {
   pdgAlpha: "e2e-pdg-alpha",
   pdgBeta: "e2e-pdg-beta",
   clientAlpha: "e2e-client-alpha",
+  pdgGamma: "e2e-pdg-gamma",
+  pdgDelta: "e2e-pdg-delta",
 };
 
 function verifierBase(url) {
@@ -78,6 +83,32 @@ export async function reinitialiserEtSemer() {
       atelierId: beta.id, clienteId: secrete.id, numero: "E2E-BETA-001", typeVetement: "ROBE",
       prixTotal: "99999", dateLivraisonPrevue: livraison,
     },
+  });
+
+  const jours = (n) => new Date(Date.now() + n * 86_400_000);
+  const gamma = await prisma.atelier.create({ data: { nom: "Atelier E2E Gamma", devise: "FCFA", trialEndsAt: jours(-30) } });
+  await prisma.user.create({
+    data: { identifiant: COMPTES.pdgGamma, passwordHash, role: "ADMIN", atelierId: gamma.id, prenom: "Gaelle", nom: "Gamma" },
+  });
+  const delta = await prisma.atelier.create({ data: { nom: "Atelier E2E Delta", devise: "FCFA", trialEndsAt: jours(-3) } });
+  await prisma.user.create({
+    data: { identifiant: COMPTES.pdgDelta, passwordHash, role: "ADMIN", atelierId: delta.id, prenom: "Didier", nom: "Delta" },
+  });
+  await prisma.planAbonnement.create({
+    data: {
+      nom: "Plan E2E",
+      prixMensuel: "10000",
+      fonctionnalites: ["Clientes illimitées"],
+      tarifsDuree: [
+        { dureeMois: 1, remisePourcent: 0 },
+        { dureeMois: 3, remisePourcent: 10 },
+      ],
+    },
+  });
+  await prisma.parametresPlateforme.upsert({
+    where: { id: "plateforme" },
+    create: { id: "plateforme", instructionsPaiement: "Airtel Money 90 00 00 00 (AM Couture E2E)" },
+    update: { instructionsPaiement: "Airtel Money 90 00 00 00 (AM Couture E2E)" },
   });
 
   await prisma.$disconnect();

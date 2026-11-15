@@ -212,18 +212,22 @@ router.get("/factures/:id/pdf", async (req, res) => {
 // GET/PUT /api/plateforme/parametres-abonnement — jours de grâce avant la lecture seule (0 à 90).
 router.get("/parametres-abonnement", async (req, res) => {
   const p = await prisma.parametresPlateforme.findUnique({ where: { id: "plateforme" } });
-  res.json({ joursGrace: p?.joursGrace ?? 7 });
+  res.json({ joursGrace: p?.joursGrace ?? 7, instructionsPaiement: p?.instructionsPaiement ?? null });
 });
 
 router.put("/parametres-abonnement", async (req, res) => {
   const parsed = parametresAbonnementSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
+  const donnees = {
+    ...(parsed.data.joursGrace !== undefined ? { joursGrace: parsed.data.joursGrace } : {}),
+    ...(parsed.data.instructionsPaiement !== undefined ? { instructionsPaiement: parsed.data.instructionsPaiement } : {}),
+  };
   const p = await prisma.parametresPlateforme.upsert({
     where: { id: "plateforme" },
-    create: { id: "plateforme", joursGrace: parsed.data.joursGrace },
-    update: { joursGrace: parsed.data.joursGrace },
+    create: { id: "plateforme", ...donnees },
+    update: donnees,
   });
-  res.json({ joursGrace: p.joursGrace });
+  res.json({ joursGrace: p.joursGrace, instructionsPaiement: p.instructionsPaiement });
 });
 
 export default router;

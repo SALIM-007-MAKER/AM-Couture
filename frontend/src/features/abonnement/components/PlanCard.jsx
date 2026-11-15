@@ -1,6 +1,7 @@
-import { Check, MessageCircle } from "lucide-react";
+import { Check, MessageCircle, ShoppingCart } from "lucide-react";
 import { formatPrix, lienWhatsapp } from "../constants.js";
 import Card from "../../../components/Card.jsx";
+import Button from "../../../components/Button.jsx";
 import { useTranslation } from "../../../i18n/index.js";
 
 // Une formule (style « page de tarifs »). `courant` = la formule de
@@ -9,7 +10,7 @@ import { useTranslation } from "../../../i18n/index.js";
 // (plan.tarifs[].total) — seuls « soit X / mois » et le prix barré sont
 // dérivés pour l'AFFICHAGE. Aucune action d'achat : au plus un lien de contact
 // WhatsApp, si le SUPERADMIN a réglé un numéro.
-export default function PlanCard({ plan, dureeMois, courant, whatsapp }) {
+export default function PlanCard({ plan, dureeMois, courant, whatsapp, onSouscrire }) {
   const { t } = useTranslation();
   const tarif = plan.tarifs.find((x) => x.dureeMois === dureeMois);
   const remise = tarif?.remisePourcent ?? 0;
@@ -86,6 +87,12 @@ export default function PlanCard({ plan, dureeMois, courant, whatsapp }) {
         </ul>
       ) : (
         <div className="flex-1" />
+      )}
+
+      {onSouscrire && tarif && (
+        <Button variant={sombre ? "accent" : "primary"} icon={ShoppingCart} onClick={() => onSouscrire(plan, tarif)} data-testid={`souscrire-${plan.nom}`}>
+          {t("subPay.subscribe")}
+        </Button>
       )}
 
       {whatsapp && (

@@ -30,6 +30,7 @@ import { useTranslation } from "../i18n/index.js";
 import EmailVerificationBanner from "../components/EmailVerificationBanner.jsx";
 import ImpersonationBanner from "../components/ImpersonationBanner.jsx";
 import PaywallBanner from "../components/PaywallBanner.jsx";
+import AccesBanner from "../features/abonnement/components/AccesBanner.jsx";
 import LanguageSwitcher from "../components/LanguageSwitcher.jsx";
 import LocaleSync from "../components/LocaleSync.jsx";
 
@@ -340,6 +341,7 @@ export default function AppLayout() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <PaywallBanner />
+        <AccesBanner />
         <ImpersonationBanner />
         <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-4 py-3">
           <div className="flex items-center gap-3 min-w-0">
