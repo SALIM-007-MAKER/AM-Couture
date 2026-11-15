@@ -57,7 +57,7 @@ RÉSOLUE. Résultats **mesurés** (Postgres 16 et 17).
 
 | # | Anomalie | Mesure initiale (3.1) | Statut | Sous-phase |
 |---|---|---|---|---|
-| 1 | Reçu émis sur un paiement annulé quand annulation et émission arrivent en même temps (I5) | 25 tours sur 25 : une violation à chaque tour | **OUVERTE** (test `todo` qui échoue) | 3.3 |
+| 1 | Reçu émis sur un paiement annulé quand annulation et émission arrivent en même temps (I5) | 25 tours sur 25 : une violation à chaque tour | **RÉSOLUE en 3.3** : cause corrigée. L'annulation et l'émission du reçu prennent le même verrou (la commande) et re-vérifient leurs conditions sous ce verrou. Test bloquant stable sur 20 exécutions consécutives ; la suppression de l'un ou l'autre verrou est détectée (mutation) | 3.3 |
 | 2 | Invitations simultanées de la même cliente | 5 requêtes → 1 succès, 1 refus 409, **3 erreurs 500** | **ATTÉNUÉE en 3.2** : les perdantes reçoivent 409 au lieu de 500 (classement central de `P2002`). **Cause ouverte** : la route vérifie « existe déjà ? » puis crée, sans atomicité ; la contrainte `UNIQUE` rattrape la course après coup | 3.3 (cause) |
 | 3 | Inscriptions simultanées avec le même email | 5 requêtes → 1 succès, **4 erreurs 500** | **ATTÉNUÉE en 3.2** (même mécanisme). **Cause ouverte** (même schéma « vérifier puis créer »). Le message de conflit est générique, sans nom de champ | 3.3 (cause) |
 | 4 | Même téléphone dans deux ateliers | le second atelier reçoit 409 « compte déjà existant » | **OUVERTE** (test `todo` qui échoue) : identité de connexion globale à revoir, orientation validée | 3.7 |

@@ -8,6 +8,7 @@ import { requireValidIdParam } from "../lib/idParam.js";
 import { computeSolde } from "../lib/money.js";
 import { nextNumero } from "../lib/numero.js";
 import { isUniqueConstraintViolation } from "../lib/prismaErrors.js";
+import { verrouillerCommande } from "../lib/verrous.js";
 import { RECU_INCLUDE } from "../lib/recuInclude.js";
 import {
   createPaiementSchema,
@@ -169,37 +170,46 @@ router.post("/:paiementId/annuler", async (req, res) => {
   }
   const { commandeId, paiementId } = req.params;
 
-  const paiement = await prisma.paiement.findUnique({ where: { id: paiementId } });
-  if (!paiement || paiement.commandeId !== commandeId) {
-    throw new HttpError(404, "Paiement introuvable.");
-  }
-  if (paiement.annuleAt) {
-    throw new HttpError(409, "Ce paiement est déjà annulé.");
-  }
+  // Tout dans UNE transaction, sous le verrou de la commande : même verrou que la création de
+  // paiement, la livraison et l'émission de reçu. Les vérifications « pas de reçu » et « pas déjà
+  // annulé » sont faites À L'INTÉRIEUR du verrou, donc plus aucun reçu ne peut apparaître entre la
+  // vérification et l'écriture (anomalie 1).
+  const misAJour = await prisma.$transaction(
+    async (tx) => {
+      await verrouillerCommande(tx, commandeId);
 
-  // Un reçu est un document déjà remis à la cliente attestant cet
-  // encaissement précis : l'annuler rendrait ce reçu mensonger. Le blocage
-  // est volontaire — aucune route ne permet de supprimer un Recu non plus.
-  const recu = await prisma.recu.findUnique({ where: { paiementId }, select: { id: true, numero: true } });
-  if (recu) {
-    throw new HttpError(
-      409,
-      "Un reçu a déjà été émis pour ce paiement : annulation impossible.",
-      { recuId: recu.id, numero: recu.numero },
-    );
-  }
+      const paiement = await tx.paiement.findUnique({ where: { id: paiementId } });
+      if (!paiement || paiement.commandeId !== commandeId) {
+        throw new HttpError(404, "Paiement introuvable.");
+      }
+      if (paiement.annuleAt) {
+        throw new HttpError(409, "Ce paiement est déjà annulé.");
+      }
 
-  // updateMany + condition annuleAt:null : même garde atomique contre une
-  // double-annulation concurrente que archiver/restaurer (Clientes, Modèles).
-  const result = await prisma.paiement.updateMany({
-    where: { id: paiementId, annuleAt: null },
-    data: { annuleAt: new Date(), annuleMotif: parsed.data.motif },
-  });
-  if (result.count === 0) {
-    throw new HttpError(409, "Ce paiement est déjà annulé.");
-  }
+      // Un reçu est un document déjà remis à la cliente attestant cet
+      // encaissement précis : l'annuler rendrait ce reçu mensonger. Le blocage
+      // est volontaire — aucune route ne permet de supprimer un Recu non plus.
+      const recu = await tx.recu.findUnique({ where: { paiementId }, select: { id: true, numero: true } });
+      if (recu) {
+        throw new HttpError(
+          409,
+          "Un reçu a déjà été émis pour ce paiement : annulation impossible.",
+          { recuId: recu.id, numero: recu.numero },
+        );
+      }
 
-  const misAJour = await prisma.paiement.findUnique({ where: { id: paiementId } });
+      // updateMany + condition annuleAt:null : garde conservée en défense en profondeur.
+      const result = await tx.paiement.updateMany({
+        where: { id: paiementId, annuleAt: null },
+        data: { annuleAt: new Date(), annuleMotif: parsed.data.motif },
+      });
+      if (result.count === 0) {
+        throw new HttpError(409, "Ce paiement est déjà annulé.");
+      }
+      return tx.paiement.findUnique({ where: { id: paiementId } });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
   res.json(misAJour);
 });
 
@@ -214,32 +224,34 @@ router.post("/:paiementId/recu", async (req, res) => {
   }
   const { commandeId, paiementId } = req.params;
 
-  const paiement = await prisma.paiement.findUnique({ where: { id: paiementId } });
-  // Le paiement doit appartenir à LA commande de l'URL — jamais consultable/
-  // utilisable via l'URL d'une autre commande (IDOR), même logique que GET ci-dessus.
-  if (!paiement || paiement.commandeId !== commandeId) {
-    throw new HttpError(404, "Paiement introuvable.");
-  }
-  // Symétrique du garde-fou de POST .../annuler : un paiement annulé n'a
-  // jamais eu lieu pour la comptabilité — aucun reçu ne peut l'attester.
-  if (paiement.annuleAt) {
-    throw new HttpError(409, "Ce paiement est annulé : aucun reçu ne peut être émis.");
-  }
-
-  // Garde applicative avant l'INSERT, en plus de la contrainte @unique sur
-  // Recu.paiementId (backstop en cas de course concurrente, voir catch
-  // ci-dessous) — même schéma que la prévention de double-livraison.
-  const dejaEmis = await prisma.recu.findUnique({ where: { paiementId } });
-  if (dejaEmis) {
-    throw new HttpError(409, "Un reçu a déjà été émis pour ce paiement.", {
-      recuId: dejaEmis.id,
-      numero: dejaEmis.numero,
-    });
-  }
-
   let recu;
   try {
     recu = await prisma.$transaction(async (tx) => {
+      // Même verrou que l'annulation du paiement : les vérifications ci-dessous (« pas annulé »,
+      // « pas déjà de reçu ») sont faites sous ce verrou, donc cohérentes avec l'écriture qui suit
+      // (anomalie 1 : sans lui, un reçu pouvait être émis pendant l'annulation du même paiement).
+      await verrouillerCommande(tx, commandeId);
+
+      const paiement = await tx.paiement.findUnique({ where: { id: paiementId } });
+      // Le paiement doit appartenir à LA commande de l'URL — jamais consultable/
+      // utilisable via l'URL d'une autre commande (IDOR), même logique que GET ci-dessus.
+      if (!paiement || paiement.commandeId !== commandeId) {
+        throw new HttpError(404, "Paiement introuvable.");
+      }
+      // Symétrique du garde-fou de POST .../annuler : un paiement annulé n'a
+      // jamais eu lieu pour la comptabilité — aucun reçu ne peut l'attester.
+      if (paiement.annuleAt) {
+        throw new HttpError(409, "Ce paiement est annulé : aucun reçu ne peut être émis.");
+      }
+      // En plus de la contrainte @unique sur Recu.paiementId (backstop, voir catch ci-dessous).
+      const dejaEmis = await tx.recu.findUnique({ where: { paiementId } });
+      if (dejaEmis) {
+        throw new HttpError(409, "Un reçu a déjà été émis pour ce paiement.", {
+          recuId: dejaEmis.id,
+          numero: dejaEmis.numero,
+        });
+      }
+
       const numero = await nextNumero(tx, "REC");
       const nouveauRecu = await tx.recu.create({
         data: { commandeId, paiementId, montantPaye: paiement.montant, numero },
@@ -252,7 +264,7 @@ router.post("/:paiementId/recu", async (req, res) => {
         message: `Un reçu est disponible pour votre commande ${req.commande.numero}.`,
       });
       return nouveauRecu;
-    });
+    }, { maxWait: 10_000, timeout: 15_000 });
   } catch (err) {
     if (isUniqueConstraintViolation(err, "paiementId")) {
       throw new HttpError(409, "Un reçu a déjà été émis pour ce paiement.");

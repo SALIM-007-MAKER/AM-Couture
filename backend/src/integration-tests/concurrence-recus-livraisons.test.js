@@ -66,12 +66,11 @@ describe("Concurrence — reçus et livraisons", () => {
     assert.deepEqual(await toutesViolations(ctx.atelier.id), []);
   });
 
-  // Défaut CONFIRMÉ (mesuré : un reçu sur paiement annulé à chaque tour) : l'annulation vérifie
-  // « pas de reçu » puis annule, sans verrou commun avec l'émission du reçu. Marqué `todo` :
-  // décrit le comportement ATTENDU, échoue tant que l'écart n'est pas corrigé (sous-phase 3.3),
-  // sans faire échouer la CI. Atelier DÉDIÉ : les données incohérentes qu'il produit ne doivent
-  // pas contaminer les vérifications des autres scénarios.
-  it("[écart connu → 3.3] annulation de paiement et émission de reçu simultanées : jamais de reçu sur un paiement annulé", { todo: "défaut confirmé, voir docs/INVARIANTS.md §4" }, async () => {
+  // Anomalie 1 (registre : docs/INVARIANTS.md §4) : mesurée à 25 tours sur 25 avant la 3.3. Cause :
+  // l'annulation et l'émission du reçu ne partageaient aucun verrou. Corrigé en 3.3 (verrou commun sur
+  // la commande, vérifications faites sous ce verrou). Atelier DÉDIÉ : si le test échoue un jour, les
+  // données incohérentes qu'il produit ne contaminent pas les autres scénarios.
+  it("annulation de paiement et émission de reçu simultanées : jamais de reçu sur un paiement annulé (anomalie 1)", async () => {
     const iso = await preparerAtelier(baseUrl, "Atelier Course Reçu Annulation");
     try {
       const c = await creerCommandeApi(iso.api, iso.cliente.id, { prixTotal: "100000" });
@@ -85,6 +84,29 @@ describe("Concurrence — reçus et livraisons", () => {
       }
       const violations = (await violationsFinancieres(iso.atelier.id)).filter((v) => v.startsWith("I5"));
       assert.deepEqual(violations, [], `${violations.length} reçu(s) sur paiement annulé sur ${TOURS} tours`);
+    } finally {
+      await nettoyerAtelier(iso.atelier.id, [iso.admin.id]);
+    }
+  });
+
+  it("plusieurs annulations ET plusieurs émissions de reçu simultanées sur le même paiement : un seul des deux effets, jamais les deux", async () => {
+    // Règle exclusive : le paiement est annulé SANS reçu, ou bien il a UN reçu et n'est PAS annulé.
+    const iso = await preparerAtelier(baseUrl, "Atelier Exclusion Reçu Annulation");
+    try {
+      const c = await creerCommandeApi(iso.api, iso.cliente.id, { prixTotal: "100000" });
+      for (let tour = 0; tour < 12; tour++) {
+        const p = (await payer(iso.api, c.id, 1000)).body;
+        const reponses = await Promise.all([
+          ...Array.from({ length: 3 }, () => iso.api.post(`/api/commandes/${c.id}/paiements/${p.id}/annuler`, { motif: "Course exclusion" })),
+          ...Array.from({ length: 3 }, () => iso.api.post(`/api/commandes/${c.id}/paiements/${p.id}/recu`, {})),
+        ]);
+        for (const r of reponses) assert.ok([200, 201, 409].includes(r.status), `tour ${tour} : statut inattendu ${r.status} ${JSON.stringify(r.body)}`);
+        const apres = await prisma.paiement.findUnique({ where: { id: p.id } });
+        const recus = await prisma.recu.count({ where: { paiementId: p.id } });
+        if (apres.annuleAt) assert.equal(recus, 0, `tour ${tour} : paiement annulé ET reçu émis`);
+        else assert.equal(recus, 1, `tour ${tour} : paiement actif sans reçu alors qu'une émission a été demandée`);
+      }
+      assert.deepEqual(await toutesViolations(iso.atelier.id), []);
     } finally {
       await nettoyerAtelier(iso.atelier.id, [iso.admin.id]);
     }

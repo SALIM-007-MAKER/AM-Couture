@@ -6,6 +6,7 @@ import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewa
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { nextNumero } from "../lib/numero.js";
+import { verrouillerCommande } from "../lib/verrous.js";
 import { streamRecuPdf } from "../lib/recuPdf.js";
 import { RECU_INCLUDE } from "../lib/recuInclude.js";
 import { createRecuSchema, listRecusQuerySchema, listRecusGlobalQuerySchema } from "../schemas/recu.schema.js";
@@ -47,6 +48,8 @@ recusCommandeRouter.post("/", async (req, res) => {
 
   const recu = await prisma.$transaction(
     async (tx) => {
+      // Même verrou que les paiements : le total « encaissé » du reçu correspond à un état réellement atteint.
+      await verrouillerCommande(tx, commandeId);
       const commande = await tx.commande.findUnique({
         where: { id: commandeId },
         select: { id: true, numero: true, clienteId: true },
