@@ -95,3 +95,11 @@ Plan ajusté : **6.1** employés et permissions (serveur) · **6.2** interface e
 - Pas de limite du nombre d'employés par formule (les limites de formule ne sont pas appliquées).
 - Pas d'obligation de changer le mot de passe à la première connexion.
 - Le catalogue de permissions et les postes sont une proposition à valider avec des ateliers réels.
+
+## 9. Réalisé en 6.2 — interface employés et permissions
+
+- **Gestion par le PDG** (`/employes`, `/employes/nouveau`, `/employes/:id`) : liste filtrable (actifs / désactivés / tous) et recherchable ; formulaire d'identité, choix du poste (ses droits servent de point de départ à la création ; en modification, un bouton explicite les réapplique), cases de permissions regroupées par module avec badge « sensible » ; la case « lire » est verrouillée tant que « écrire » est cochée ; ajouter un droit sensible fait apparaître la confirmation par mot de passe ; désactivation en deux étapes, réactivation, réinitialisation du mot de passe.
+- **Côté employé** : navigation filtrée sur ses permissions (`filtrerNavigation`), pages protégées par `RequirePermission` (redirection vers son premier écran autorisé, « Mon compte » au pire), pages existantes rendues tolérantes à l'absence des montants (champs financiers masqués par le serveur).
+- **Bug trouvé par l'E2E** : la réponse de `POST /api/auth/login` ne contenait pas `poste`/`permissions` → l'employé voyait une interface vide jusqu'au rechargement. Corrigé côté serveur.
+- **Tests** : 14 unitaires frontend sur les helpers (dont dérive par rapport au catalogue serveur), 4 E2E (`e2e/specs/employes.spec.js`) : création par l'interface, confirmation du droit sensible, session employé (navigation limitée, pages interdites redirigées, aucun écran d'erreur), désactivation puis connexion refusée. Suite E2E complète : 39 verts.
+- **Limites** : champs de prix des formulaires modèle/stock et liste des modèles non masqués pour un employé sans `finances.voir` (le serveur ne renvoie pas les montants, donc pas de fuite, mais l'affichage peut être vide) ; interface mobile et anglais non vérifiés visuellement ; le catalogue des postes reste une proposition à valider avec de vrais ateliers.
