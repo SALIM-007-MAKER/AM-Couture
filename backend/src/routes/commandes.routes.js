@@ -25,11 +25,13 @@ import {
   updateCommandeSchema,
   changeStatutSchema,
   listCommandesQuerySchema,
+  affectationSchema,
   STATUT_TRANSITIONS,
 } from "../schemas/commande.schema.js";
 import paiementsRouter from "./paiements.routes.js";
 import livraisonsRouter from "./livraisons.routes.js";
 import { recusCommandeRouter } from "./recus.routes.js";
+import { STATUTS_OUVERTS, debutDuJour, estEnRetard, estAffectable } from "../lib/production.js";
 
 const router = Router();
 
@@ -51,6 +53,7 @@ router.use("/:commandeId/recus", droitsParModule("paiements"), recusCommandeRout
 
 const CLIENTE_SUMMARY_SELECT = { id: true, nom: true, prenom: true, telephone: true, archivedAt: true };
 const MODELE_SUMMARY_SELECT = { id: true, nom: true, categorie: true, archivedAt: true };
+const EMPLOYE_SUMMARY_SELECT = { id: true, prenom: true, nom: true, identifiant: true, actif: true };
 
 // POST /api/commandes — création (+ paiement initial optionnel, atomique)
 router.post("/", requirePermission("commandes.ecrire"), idempotence, async (req, res) => {
@@ -151,8 +154,14 @@ router.post("/", requirePermission("commandes.ecrire"), idempotence, async (req,
 // GET /api/commandes — liste, recherche, filtres, pagination (sans N+1 : un seul findMany avec select imbriqué)
 // Filtre partagé entre GET / (paginé) et GET /export (tout en un CSV) —
 // même principe que buildClientesWhere (clientes.routes.js).
-function buildCommandesWhere(atelierId, { q, statut, priorite, clienteId, livraisonDu, livraisonAu }) {
+function buildCommandesWhere(atelierId, { q, statut, priorite, clienteId, livraisonDu, livraisonAu, assigneA, enRetard }, userId) {
   const where = { atelierId };
+  if (assigneA === "aucun") where.assigneAId = null;
+  else if (assigneA) where.assigneAId = assigneA === "moi" ? userId : assigneA;
+  if (enRetard === "true") {
+    where.statut = { in: STATUTS_OUVERTS };
+    where.dateLivraisonPrevue = { lt: debutDuJour() };
+  }
   if (statut) where.statut = statut;
   if (priorite) where.priorite = priorite;
   if (clienteId) where.clienteId = clienteId;
@@ -180,7 +189,7 @@ router.get("/", requirePermission("commandes.lire"), async (req, res) => {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
   }
   const { page, pageSize } = parsed.data;
-  const where = buildCommandesWhere(req.user.atelierId, parsed.data);
+  const where = buildCommandesWhere(req.user.atelierId, parsed.data, req.user.id);
 
   const [rows, total] = await Promise.all([
     prisma.commande.findMany({
@@ -204,6 +213,8 @@ router.get("/", requirePermission("commandes.lire"), async (req, res) => {
         observations: true,
         createdAt: true,
         updatedAt: true,
+        assigneLe: true,
+        assigneA: { select: EMPLOYE_SUMMARY_SELECT },
         cliente: { select: CLIENTE_SUMMARY_SELECT },
         modele: { select: MODELE_SUMMARY_SELECT },
         // annuleAt: null — seuls les paiements actifs entrent dans le calcul
@@ -217,7 +228,7 @@ router.get("/", requirePermission("commandes.lire"), async (req, res) => {
 
   const data = rows.map(({ paiements, ...commande }) => {
     const { totalPaye, solde } = computeSolde(commande.prixTotal, paiements);
-    return { ...commande, totalPaye, solde, statutPaiement: statutPaiement(commande.prixTotal, totalPaye) };
+    return { ...commande, enRetard: estEnRetard(commande), totalPaye, solde, statutPaiement: statutPaiement(commande.prixTotal, totalPaye) };
   });
 
   res.json({
@@ -236,7 +247,7 @@ router.get("/export", requirePermission("commandes.lire"), requirePermission("fi
   if (!parsed.success) {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
   }
-  const where = buildCommandesWhere(req.user.atelierId, parsed.data);
+  const where = buildCommandesWhere(req.user.atelierId, parsed.data, req.user.id);
 
   const rows = await prisma.commande.findMany({
     where,
@@ -275,6 +286,45 @@ router.get("/export", requirePermission("commandes.lire"), requirePermission("fi
   envoyerCsv(res, `commandes-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 });
 
+// GET /api/commandes/production — tableau de bord de la production : charge de chaque employé (commandes ouvertes, dont
+// en retard), commandes non affectées et retards. Sert aussi de liste des personnes à qui l'on peut affecter une commande.
+// Défini AVANT /:id. Réservé à qui peut affecter (le PDG, ou un employé avec « commandes.affecter »).
+router.get("/production", requirePermission("commandes.affecter"), async (req, res) => {
+  const { atelierId } = req.user;
+  const ouvertes = await prisma.commande.findMany({
+    where: { atelierId, statut: { in: STATUTS_OUVERTS } },
+    select: { id: true, statut: true, dateLivraisonPrevue: true, assigneAId: true },
+  });
+  const personnes = await prisma.user.findMany({
+    where: { atelierId, actif: true, role: { in: ["ADMIN", "EMPLOYE"] } },
+    orderBy: [{ role: "asc" }, { prenom: "asc" }, { nom: "asc" }],
+    select: { id: true, prenom: true, nom: true, identifiant: true, role: true, poste: true },
+  });
+  const maintenant = new Date();
+  const charge = new Map(personnes.map((p) => [p.id, { ouvertes: 0, enRetard: 0 }]));
+  let nonAffectees = 0;
+  let nonAffecteesEnRetard = 0;
+  for (const c of ouvertes) {
+    const retard = estEnRetard(c, maintenant);
+    const ligne = c.assigneAId ? charge.get(c.assigneAId) : undefined;
+    if (ligne) {
+      ligne.ouvertes += 1;
+      if (retard) ligne.enRetard += 1;
+    } else {
+      // Non affectée, ou affectée à un compte désormais inactif : dans les deux cas, personne ne s'en occupe.
+      nonAffectees += 1;
+      if (retard) nonAffecteesEnRetard += 1;
+    }
+  }
+  res.json({
+    employes: personnes.map((p) => ({ ...p, ...charge.get(p.id) })),
+    nonAffectees,
+    nonAffecteesEnRetard,
+    enRetard: ouvertes.filter((c) => estEnRetard(c, maintenant)).length,
+    ouvertes: ouvertes.length,
+  });
+});
+
 // GET /api/commandes/:id — détail : commande + cliente + modèle + paiements + livraisons + totaux calculés
 router.get("/:id", requirePermission("commandes.lire"), async (req, res) => {
   const commande = await prisma.commande.findFirst({
@@ -287,6 +337,11 @@ router.get("/:id", requirePermission("commandes.lire"), async (req, res) => {
       // disparaître. Seuls les totaux ci-dessous les excluent.
       paiements: { orderBy: { date: "desc" } },
       livraisons: { orderBy: { createdAt: "desc" } },
+      assigneA: { select: EMPLOYE_SUMMARY_SELECT },
+      affectations: {
+        orderBy: { createdAt: "desc" },
+        select: { id: true, createdAt: true, employe: { select: EMPLOYE_SUMMARY_SELECT }, par: { select: EMPLOYE_SUMMARY_SELECT } },
+      },
     },
   });
   if (!commande) throw new HttpError(404, "Commande introuvable.");
@@ -295,7 +350,7 @@ router.get("/:id", requirePermission("commandes.lire"), async (req, res) => {
     commande.prixTotal,
     commande.paiements.filter((p) => !p.annuleAt),
   );
-  res.json({ ...commande, totalPaye, solde, statutPaiement: statutPaiement(commande.prixTotal, totalPaye) });
+  res.json({ ...commande, enRetard: estEnRetard(commande), totalPaye, solde, statutPaiement: statutPaiement(commande.prixTotal, totalPaye) });
 });
 
 // GET /api/commandes/:id/fiche-pdf — fiche commande à jour (PDF), à partager
@@ -357,6 +412,48 @@ router.patch("/:id", requirePermission("commandes.ecrire"), async (req, res) => 
 
   const commande = await prisma.commande.update({ where: { id }, data });
   res.json(commande);
+});
+
+// PUT /api/commandes/:id/affectation — confie la commande à un employé actif de l'atelier (ou au PDG), ou la retire
+// (employeId: null). Seules les commandes ouvertes se réaffectent. Répéter la même affectation ne change rien.
+// L'affectation organise le travail : elle ne donne aucun droit supplémentaire à l'employé concerné.
+router.put("/:id/affectation", requirePermission("commandes.affecter"), async (req, res) => {
+  const parsed = affectationSchema.safeParse(req.body);
+  if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
+  const { employeId } = parsed.data;
+  const { id } = req.params;
+  const { atelierId } = req.user;
+  const RESUME = { id: true, assigneAId: true, assigneLe: true, assigneA: { select: EMPLOYE_SUMMARY_SELECT } };
+
+  const commande = await prisma.commande.findFirst({ where: { id, atelierId }, select: { statut: true, assigneAId: true } });
+  if (!commande) throw new HttpError(404, "Commande introuvable.");
+  if (!estAffectable(commande.statut)) {
+    throw new HttpError(409, "Cette commande est livrée ou annulée : elle ne peut plus être affectée.", { statut: commande.statut });
+  }
+  if (employeId) {
+    // Même atelier, compte actif, rôle ADMIN ou EMPLOYE : jamais une cliente, jamais un autre atelier.
+    const cible = await prisma.user.findFirst({
+      where: { id: employeId, atelierId, actif: true, role: { in: ["ADMIN", "EMPLOYE"] } },
+      select: { id: true },
+    });
+    if (!cible) throw new HttpError(404, "Employé introuvable ou désactivé.");
+  }
+  if ((commande.assigneAId ?? null) === employeId) {
+    const inchangee = await prisma.commande.findUnique({ where: { id }, select: RESUME });
+    return res.json({ ...inchangee, dejaTraite: true });
+  }
+
+  const misAJour = await prisma.$transaction(async (tx) => {
+    // Compare-and-swap : l'affectation n'est changée que si personne d'autre ne l'a modifiée entre-temps.
+    const r = await tx.commande.updateMany({
+      where: { id, atelierId, statut: { in: STATUTS_OUVERTS }, assigneAId: commande.assigneAId },
+      data: { assigneAId: employeId, assigneLe: employeId ? new Date() : null },
+    });
+    if (r.count === 0) throw new HttpError(409, "L'affectation a changé entre-temps, réessayez.");
+    await tx.affectationCommande.create({ data: { atelierId, commandeId: id, employeId, parId: req.user.id } });
+    return tx.commande.findUnique({ where: { id }, select: RESUME });
+  });
+  res.json({ ...misAJour, dejaTraite: false });
 });
 
 // POST /api/commandes/:id/statut — changement de statut via la machine à états dédiée

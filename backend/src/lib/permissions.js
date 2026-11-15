@@ -19,6 +19,7 @@ export const CATALOGUE = {
   "commandes.lire": { module: "commandes", sensible: false },
   "commandes.ecrire": { module: "commandes", sensible: false },
   "commandes.statut": { module: "commandes", sensible: false },
+  "commandes.affecter": { module: "commandes", sensible: false },
   "livraisons.lire": { module: "livraisons", sensible: false },
   "livraisons.ecrire": { module: "livraisons", sensible: false },
   "demandes.lire": { module: "demandes", sensible: false },
@@ -41,7 +42,7 @@ export const PERMISSIONS_SENSIBLES = new Set(PERMISSIONS.filter((p) => CATALOGUE
 
 // Une permission d'écriture suppose la lecture du même module ; changer le statut d'une commande suppose de la lire ;
 // consulter ou enregistrer des paiements suppose de voir les montants des commandes (solde, prix).
-const IMPLICATIONS = { "commandes.statut": ["commandes.lire"], "paiements.lire": ["finances.voir"] };
+const IMPLICATIONS = { "commandes.statut": ["commandes.lire"], "commandes.affecter": ["commandes.lire"], "paiements.lire": ["finances.voir"] };
 for (const p of PERMISSIONS) {
   if (p.endsWith(".ecrire")) IMPLICATIONS[p] = [...(IMPLICATIONS[p] ?? []), p.replace(".ecrire", ".lire")];
 }
