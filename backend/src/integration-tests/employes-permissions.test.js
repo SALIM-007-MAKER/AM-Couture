@@ -325,16 +325,18 @@ describe("Employés et permissions", () => {
       }
     });
 
-    it("notifications : alertes d'impayé et compteur de demandes absents ; aucune modification de l'état partagé", async () => {
+    it("notifications : alertes d'impayé et compteur de demandes absents ; l'état du PDG n'est jamais modifié", async () => {
       const pdg = await pdgA.get("/api/notifications?pageSize=100");
       assert.ok(pdg.body.data.some((x) => x.type === "IMPAYE"), "le PDG voit l'alerte d'impayé");
       const emp = await api.get("/api/notifications?pageSize=100");
       assert.equal(emp.status, 200);
       assert.ok(!emp.body.data.some((x) => x.type === "IMPAYE"));
       assert.ok(!contientCle(emp.body, "prixTotal"));
-      const id = emp.body.data[0]?.id ?? pdg.body.data[0].id;
-      assert.equal((await api.patch(`/api/notifications/${id}`, { lu: true })).status, 403);
-      assert.equal((await api.post("/api/notifications/marquer-lu", { ids: [id] })).status, 403);
+      // Une notification que l'employé ne voit pas (commande qui ne lui est pas confiée) lui est inaccessible : 404, jamais modifiée.
+      const id = pdg.body.data.find((x) => !emp.body.data.some((e) => e.id === x.id)).id;
+      assert.equal((await api.patch(`/api/notifications/${id}`, { lu: true })).status, 404);
+      assert.equal((await api.post("/api/notifications/marquer-lu", { ids: [id] })).body.count, 0);
+      assert.equal((await api.post("/api/notifications/supprimer", { ids: [id] })).status, 403);
       assert.equal((await prisma.notification.findUnique({ where: { id } })).lu, false);
     });
   });

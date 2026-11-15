@@ -149,7 +149,7 @@ export async function supprimerAtelier(atelierId) {
   // commandeId) sont toutes en onDelete: Restrict.
   await prisma.demandeCommande.deleteMany({ where: { atelierId } });
   await prisma.affectationCommande.deleteMany({ where: { atelierId } });
-  await prisma.notification.deleteMany({ where: { commandeId: { in: commandeIds } } });
+  await prisma.notification.deleteMany({ where: { atelierId } });
   await prisma.recu.deleteMany({ where: { commandeId: { in: commandeIds } } });
   await prisma.livraison.deleteMany({ where: { commandeId: { in: commandeIds } } });
   await prisma.paiement.deleteMany({ where: { commandeId: { in: commandeIds } } });
