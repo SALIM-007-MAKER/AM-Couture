@@ -60,3 +60,28 @@ Lue le 15/11/2026 sur docs.wave.com (pages Checkout et Webhooks).
 - Les pages de documentation Wave ont été lues par un outil de lecture automatique ; les noms de champs ci-dessus sont à reconfirmer à l'implémentation.
 - Aucune API de prestataire n'a été appelée.
 - Les tarifs en base sont des valeurs temporaires de migration ; je n'ai pas lu les valeurs réelles de la base de production.
+
+## 6. Décisions du 15/11/2026 et plan
+
+| Décision | Choix |
+|---|---|
+| Paiement | **Manuel vérifié d'abord** : l'atelier déclare son paiement, le SUPERADMIN confirme, tout est tracé. Wave est préparé (conformité à la documentation, rattrapage, remboursement) mais **inactif** tant que Wave Business n'est pas confirmé au Niger |
+| Après l'échéance | **Grâce puis lecture seule** : accès complet pendant `joursGrace` jours (7 par défaut, réglable 0 à 90 par le SUPERADMIN) avec bandeau, puis consultation et export seulement. Rien n'est supprimé. Abonnement suspendu : lecture seule immédiate |
+| Limites par formule | Structure prévue (`PlanAbonnement.limites`, vide), **non appliquée** |
+
+| Sous-phase | Contenu |
+|---|---|
+| 5.1 | Modèle de données (transactions manuelles, factures, abonnement suspendu, jours de grâce), état d'accès, renouvellement sans perte de jours |
+| 5.2 | Souscription par l'atelier, déclaration de paiement, confirmation / rejet / remboursement par le SUPERADMIN, facture PDF |
+| 5.3 | Application de la lecture seule (écritures refusées, lectures et exports conservés) |
+| 5.4 | Rappels avant expiration et fin d'essai (courriel, une seule fois par échéance) |
+| 5.5 | Wave durci (inactif par défaut) : événements dédoublonnés, verrou, échec de paiement, rattrapage des sessions expirées, remboursement ; testé contre un faux serveur Wave |
+| 5.6 | Tableau de bord SUPERADMIN : revenus, renouvellements à venir, transactions |
+| 5.7 | Interface : page Abonnement de l'atelier, écrans de confirmation du SUPERADMIN |
+| 5.8 | Documentation et bilan |
+
+## 7. Réalisé en 5.1
+
+- Migration `20261117090000_abonnement_paiements_factures` : **additive**, rejouée sur une base contenant déjà un abonnement et une transaction (lignes inchangées, `atelierId` de la transaction déduit de son abonnement). Une seule transaction en attente par abonnement (index unique partiel) ; contraintes `CHECK` en `NOT VALID`.
+- `lib/abonnement.js` : état `SUSPENDU`, `modeAcces()` (complet, grâce, lecture seule), `dateDebutSouscription()` (un renouvellement anticipé commence à l'échéance en cours, aucun jour perdu).
+- 23 tests unitaires (`lib/__tests__/abonnement.test.js`), deux mutations détectées.

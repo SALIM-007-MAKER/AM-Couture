@@ -22,6 +22,7 @@ export function calculerDateExpiration(dateDebut, dureeMois) {
 // confirmé avec une date de début dans le futur (activation planifiée).
 export function statutEffectif(abonnement, now = new Date()) {
   if (abonnement.statut === "ANNULE") return "ANNULE";
+  if (abonnement.statut === "SUSPENDU") return "SUSPENDU";
   if (abonnement.statut === "EN_ATTENTE") return "EN_ATTENTE";
   // CONFIRME
   if (abonnement.dateDebut && new Date(abonnement.dateDebut) > now) return "EN_ATTENTE";
@@ -58,6 +59,12 @@ export function etatAbonnementAtelier({ trialEndsAt }, abonnements, now = new Da
 
   const planifies = parStatut("EN_ATTENTE").sort((a, b) => new Date(a.dateDebut) - new Date(b.dateDebut));
   if (planifies[0]) return { statut: "EN_ATTENTE", abonnement: planifies[0], essai };
+  // Abonnement suspendu par la plateforme et dont la période n'est pas échue : état à part (ni actif, ni simplement
+  // expiré) pour que l'atelier et le SUPERADMIN voient POURQUOI l'accès est restreint.
+  const suspendus = abonnements
+    .filter((a) => a.statut === "SUSPENDU" && a.dateExpiration && new Date(a.dateExpiration) > now)
+    .sort((a, b) => new Date(b.dateExpiration) - new Date(a.dateExpiration));
+  if (suspendus[0]) return { statut: "SUSPENDU", abonnement: suspendus[0], essai };
 
   if (essai?.actif) return { statut: "ESSAI", abonnement: null, essai };
 
@@ -112,4 +119,51 @@ export function planAvecTarifs(plan) {
     ...plan,
     tarifs: tarifsDuree(plan).map((t) => ({ ...t, total: prixPourDuree(plan, t.dureeMois) })),
   };
+}
+
+// ── Accès selon l'état d'abonnement ───────────────────────────────────────
+// Règle (décision du 15/11/2026) : à la fin d'un essai ou d'un abonnement, l'atelier garde l'accès COMPLET pendant
+// `joursGrace` jours (bandeau d'avertissement), puis passe en LECTURE SEULE : il consulte et exporte ses données,
+// il n'en crée ni n'en modifie plus. Aucune donnée n'est jamais supprimée ni masquée. Un abonnement SUSPENDU par
+// la plateforme n'a pas de grâce : la suspension est une décision, pas un oubli de paiement.
+export const MODES_ACCES = ["COMPLET", "GRACE", "LECTURE_SEULE"];
+
+/**
+ * @param etat résultat de etatAbonnementAtelier()
+ * @param abonnements tous les abonnements de l'atelier (la grâce court depuis la fin des DERNIERS droits échus)
+ * @param {{ joursGrace: number }} options
+ * @returns {{ mode: "COMPLET"|"GRACE"|"LECTURE_SEULE", graceJusquAu: Date|null, joursGraceRestants: number|null }}
+ */
+export function modeAcces(etat, abonnements, { joursGrace }, now = new Date()) {
+  const complet = { mode: "COMPLET", graceJusquAu: null, joursGraceRestants: null };
+  if (etat.statut === "AUCUN" || etat.statut === "ACTIF" || etat.statut === "ESSAI") return complet;
+  if (etat.statut === "SUSPENDU") return { mode: "LECTURE_SEULE", graceJusquAu: null, joursGraceRestants: null };
+
+  // EXPIRE ou EN_ATTENTE (activation planifiée pas encore commencée) : la grâce court depuis la fin des derniers
+  // droits connus (essai ou abonnement échu), la plus tardive des deux.
+  const fins = [
+    etat.essai?.trialEndsAt,
+    ...abonnements.filter((a) => a.statut === "CONFIRME").map((a) => a.dateExpiration),
+  ]
+    .filter(Boolean)
+    .map((d) => new Date(d))
+    .filter((d) => d <= now);
+  if (fins.length === 0) return { mode: "LECTURE_SEULE", graceJusquAu: null, joursGraceRestants: null };
+  const finDroits = new Date(Math.max(...fins.map((d) => d.getTime())));
+  const graceJusquAu = new Date(finDroits.getTime() + joursGrace * MS_PAR_JOUR);
+  if (now < graceJusquAu) {
+    return { mode: "GRACE", graceJusquAu, joursGraceRestants: joursRestants(graceJusquAu, now) };
+  }
+  return { mode: "LECTURE_SEULE", graceJusquAu, joursGraceRestants: 0 };
+}
+
+/**
+ * Date de début d'un nouvel abonnement souscrit par un atelier : maintenant, ou la fin de l'abonnement confirmé qui
+ * court encore (le plus tardif), de sorte qu'un renouvellement ANTICIPÉ ne fait jamais perdre les jours restants.
+ */
+export function dateDebutSouscription(abonnements, now = new Date()) {
+  const fins = abonnements
+    .filter((a) => a.statut === "CONFIRME" && a.dateExpiration && new Date(a.dateExpiration) > now)
+    .map((a) => new Date(a.dateExpiration));
+  return fins.length > 0 ? new Date(Math.max(...fins.map((d) => d.getTime()))) : now;
 }
