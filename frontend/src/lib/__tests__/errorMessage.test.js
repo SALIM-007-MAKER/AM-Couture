@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { ApiError, erreurDepuisReponse, kindFromStatus } from "../apiError.js";
-import { messageUtilisateur } from "../errorMessage.js";
+import { messageUtilisateur, aDesErreursDeChamps } from "../errorMessage.js";
 
 const t = (cle) => `[${cle}]`;
 const entetes = (o) => ({ get: (n) => o[n] ?? null });
@@ -72,4 +72,20 @@ test("constructeur historique ApiError(status, message, details) inchangé", () 
   assert.equal(e.kind, "client");
   assert.deepEqual(e.details, { nom: ["requis"] });
   assert.equal(e.requestId, null);
+});
+
+test("aDesErreursDeChamps : table de listes → vrai", () => {
+  assert.equal(aDesErreursDeChamps({ nom: ["requis"] }), true);
+  assert.equal(aDesErreursDeChamps({ _global: ["x"], nom: ["y"] }), true);
+});
+
+test("aDesErreursDeChamps : details métier (identité de la cliente existante) → faux, le message général s'affiche", () => {
+  assert.equal(aDesErreursDeChamps({ clienteId: "c1", nom: "Alpha", prenom: "Awa", archivee: false }), false);
+});
+
+test("aDesErreursDeChamps : absent ou invalide → faux", () => {
+  assert.equal(aDesErreursDeChamps(undefined), false);
+  assert.equal(aDesErreursDeChamps(null), false);
+  assert.equal(aDesErreursDeChamps({}), false);
+  assert.equal(aDesErreursDeChamps("texte"), false);
 });

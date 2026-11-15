@@ -1,7 +1,7 @@
 import { Loader2, AlertCircle, Inbox, RotateCcw } from "lucide-react";
 import { ApiError } from "../lib/apiClient.js";
 import { useTranslation } from "../i18n/index.js";
-import { messageUtilisateur } from "../lib/errorMessage.js";
+import { messageUtilisateur, aDesErreursDeChamps } from "../lib/errorMessage.js";
 
 /** Référence à communiquer au support (erreurs serveur uniquement) : retrouve la ligne de journal. */
 function Reference({ reference }) {
@@ -64,7 +64,9 @@ export function EmptyState({ children, icon: Icon = Inbox }) {
 /** Erreurs de champ issues de `formatZodError()` (backend) : `{champ:
  * [messages]}`. Affiche tel quel, jamais une validation recalculée côté client. */
 export function FieldError({ messages }) {
-  if (!messages?.length) return null;
+  // `details` n'est pas toujours une table champ → liste de messages : un 409 « téléphone déjà utilisé »
+  // renvoie l'identité de la cliente existante ({ nom: "Alpha", … }). Tout ce qui n'est pas une liste est ignoré.
+  if (!Array.isArray(messages) || messages.length === 0) return null;
   return <p className="text-xs text-red-600 dark:text-red-400 mt-1">{messages.join(" ")}</p>;
 }
 
@@ -88,8 +90,8 @@ export function GlobalFormError({ error }) {
   // Un message de détail par champ est déjà affiché près du champ concerné —
   // ici on ne montre que les erreurs sans champ précis (_global) ou l'absence
   // totale de détail (ex : 409 métier, 404).
-  const globalMessages = error.details?._global;
-  if (!error.details || globalMessages) {
+  const globalMessages = Array.isArray(error.details?._global) ? error.details._global : null;
+  if (!aDesErreursDeChamps(error.details) || globalMessages) {
     return (
       <p className="flex items-center gap-2 rounded-xl bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 text-sm px-3 py-2 animate-fade-in">
         <AlertCircle className="size-4 shrink-0" aria-hidden="true" />
