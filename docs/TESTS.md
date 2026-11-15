@@ -7,6 +7,10 @@
 | Déploiement | `scripts/__tests__` | `node --test` | `npm test` | 7 | oui (`verifier`) |
 | Intégration (API + Prisma + Postgres) | `backend/src/integration-tests` | `node --test` | `npm run test:integration` | 188 (187 + 1 `TODO` volontaire) | oui (`tests-integration`) |
 | End-to-end (navigateur réel → frontend → API → Postgres) | `e2e/specs` | Playwright | `npm run test:e2e` | 27 | job `tests-e2e`, **non bloquant** (jamais exécuté sur GitHub) |
+| Cohérence schéma Prisma / migrations | `prisma/` | `prisma migrate diff` | voir `.github/workflows/ci.yml` | 1 contrôle | oui (`tests-integration`) |
+| Vulnérabilités des dépendances d'exécution | `package-lock.json` | `npm audit --omit=dev` | `npm audit --omit=dev --audit-level=high` | 0 constaté le 15/11/2026 | job `audit-dependances`, non bloquant |
+
+**Contrôle obligatoire de la CI : `ci-ok`** (= `verifier` + `tests-integration`). C'est lui qu'il faut exiger dans la protection de branche de `main` ; voir `docs/DEPLOIEMENT.md`, « Porte de déploiement ».
 
 `npm test` à la racine enchaîne backend, frontend et déploiement. Aucune dépendance de test n'est ajoutée : le
 lanceur natif de Node suffit pour la logique pure.

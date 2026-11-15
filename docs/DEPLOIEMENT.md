@@ -20,12 +20,24 @@ Interrupteur de secours : variable `SKIP_MIGRATIONS=1` → le build ne migre pas
 
 ## Avant de fusionner dans `main` (= déploiement de production)
 
-1. La CI est verte (lint, build, tests unitaires, tests d'intégration).
+1. La CI est verte : contrôle `ci-ok` (lint, build, tests unitaires backend, frontend et scripts, cohérence schéma/migrations, tests d'intégration). Les tests E2E et l'audit des dépendances sont visibles mais non bloquants.
 2. Si la fusion contient une migration : relire le SQL, lancer `scripts/preflight-contraintes.sql` si elle
    ajoute des contraintes, et **créer un point de restauration Neon** (branche ou instantané) ou lancer
    `scripts/backup-db.sh`.
 3. Les migrations restent **additives** (étendre puis contracter) : le code précédent doit fonctionner avec
    le nouveau schéma, ce qui rend le retour arrière du code sans risque.
+
+## Porte de déploiement : ce que la CI garantit, et ce qu'elle ne garantit pas
+
+Vercel déploie dès qu'un commit arrive sur `main`, **sans attendre GitHub Actions** : le fichier de workflow ne peut donc pas, seul, bloquer un déploiement. La porte se situe avant `main` :
+
+1. Le job `ci-ok` agrège les contrôles obligatoires (`verifier` et `tests-integration`). Il échoue si l'un d'eux échoue, **et** s'il est sauté (GitHub traite un contrôle sauté comme réussi, d'où `if: always()`).
+2. Dans GitHub → Settings → Branches → règle sur `main` : cocher « Require a pull request before merging », « Require status checks to pass before merging » et ajouter **`ci-ok`** ; cocher aussi « Do not allow bypassing the above settings » pour que l'administrateur y soit soumis.
+3. Avec cette règle, rien n'atteint `main` (donc Vercel) sans CI verte. Sans cette règle, un `git push` direct sur `main` déploie en production même si la CI est rouge — **cette règle n'est pas active tant que quelqu'un ne l'a pas réglée dans GitHub** (non faisable ni vérifiable depuis le dépôt).
+
+Conséquence sur le flux de travail actuel (fusion locale puis `push`) : il faut passer par une branche et une pull request.
+
+Limite : une CI rouge détectée **après** la fusion (par exemple un job qui ne tourne que sur `main`) n'arrête pas le déploiement déjà parti ; le retour arrière se fait alors comme décrit ci-dessous.
 
 ## Retour arrière
 
@@ -39,8 +51,7 @@ Interrupteur de secours : variable `SKIP_MIGRATIONS=1` → le build ne migre pas
 
 ## Réglages à faire dans les tableaux de bord (non vérifiables depuis le dépôt)
 
-- GitHub → Branch protection sur `main` : exiger les jobs `verifier` et `tests-integration` avant fusion.
-  Sans cela, Vercel déploie dès le push, que la CI soit verte ou non.
+- GitHub → Branch protection sur `main` : voir « Porte de déploiement » ci-dessous.
 - Vercel → variables : `DIRECT_URL` pour l'environnement Production uniquement ; pour Preview, utiliser
   idéalement une **branche Neon distincte** (`DATABASE_URL` Preview) plutôt que la base de production.
 - Vercel → `CRON_SECRET`, `JWT_SECRET`, `DATABASE_URL`, `RESEND_*` définis en Production.
