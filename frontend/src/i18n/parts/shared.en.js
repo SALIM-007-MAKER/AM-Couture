@@ -40,6 +40,11 @@ export default {
     },
     errorGeneric: "Something went wrong.",
     errorNetwork: "Something went wrong. Check your connection and try again.",
+    errorTimeout: "The server is taking too long to respond. Try again in a moment.",
+    errorUnavailable: "Service temporarily unavailable. Try again in a moment.",
+    errorServer: "Something went wrong on our side. Try again; if it keeps happening, quote the reference below.",
+    errorTooLarge: "The data sent is too large (an image may be too big).",
+    errorReference: "Reference: {{ref}}",
     retry: "Retry",
     statut: {
       activeF: "Active",

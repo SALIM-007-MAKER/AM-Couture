@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Ban, X } from "lucide-react";
-import { ApiError } from "../lib/apiClient.js";
+import { messageUtilisateur } from "../lib/errorMessage.js";
 import Button from "./Button.jsx";
 import { useTranslation } from "../i18n/index.js";
 
@@ -14,7 +14,7 @@ export default function AnnulerControl({ onAnnuler, isPending, error, label }) {
   const { t } = useTranslation();
   const [confirming, setConfirming] = useState(false);
   const [motif, setMotif] = useState("");
-  const message = error instanceof ApiError ? error.message : null;
+  const message = error ? messageUtilisateur(error, t).message : null;
 
   if (!confirming) {
     return (
