@@ -1,7 +1,9 @@
 // Sous-phase 3.1 — créations de comptes simultanées (invitations, inscriptions) et identité de
 // connexion. Les tests `todo` décrivent le comportement ATTENDU ; ils échouent tant que l'écart
 // n'est pas corrigé et ne font pas échouer la CI (voir docs/INVARIANTS.md §4). Les deux scénarios
-// « 500 sur course d'unicité » sont devenus BLOQUANTS en 3.2 (classement central des erreurs).
+// « 500 sur course d'unicité » sont BLOQUANTS depuis la 3.2 : ils protègent le comportement HTTP
+// ATTÉNUÉ (409 au lieu de 500), PAS la correction de la cause (vérifier puis créer, sans
+// atomicité), qui reste ouverte — registre : docs/INVARIANTS.md §4.
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { prisma } from "../lib/prisma.js";
@@ -55,7 +57,7 @@ describe("Concurrence — comptes (invitations et inscriptions)", () => {
     assert.equal((await inviter(A, cliente.id)).status, 409);
   });
 
-  it("5 invitations simultanées de la même cliente : 1 succès, 4 refus 409, jamais de 5xx (corrigé en 3.2 : classement central de P2002)", async () => {
+  it("5 invitations simultanées de la même cliente : 1 succès, 4 refus 409, jamais de 5xx (anomalie 2 ATTÉNUÉE en 3.2 : classement central de P2002, cause ouverte)", async () => {
     const cliente = await creerCliente(A.atelier.id, { telephone: telephoneUnique(3) });
     const reponses = await enParallele(5, () => inviter(A, cliente.id));
     const rep = repartition(reponses);
@@ -105,7 +107,7 @@ describe("Concurrence — comptes (invitations et inscriptions)", () => {
     assert.equal(await prisma.atelier.count({ where: { nom: `Atelier de ${prenom}` } }), 1, "atelier orphelin ou dupliqué");
   });
 
-  it("5 inscriptions simultanées avec le même email : les perdantes reçoivent une erreur 4xx claire, jamais de 5xx (corrigé en 3.2)", async () => {
+  it("5 inscriptions simultanées avec le même email : les perdantes reçoivent une erreur 4xx claire, jamais de 5xx (anomalie 3 ATTÉNUÉE en 3.2, cause ouverte)", async () => {
     const email = `course2-${process.pid}-${Date.now()}@example.test`;
     const prenom = `Course${process.pid}${Date.now() % 100000}b`;
     emailsCrees.push(email);

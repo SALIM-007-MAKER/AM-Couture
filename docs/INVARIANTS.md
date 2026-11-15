@@ -48,24 +48,24 @@ Format : `PRÉFIXE-AAAA-NNNN`. Un compteur par couple (préfixe, année UTC), pa
 | Reçu du même paiement N fois | Un seul succès, les autres reçoivent 409 |
 | Livraison de la même commande N fois | Un seul succès, les autres reçoivent 409 |
 
-## 4. Anomalies : état
+## 4. Registre des anomalies
 
 Un test `todo` décrit le comportement **attendu** ; il échoue tant que l'anomalie est ouverte et
-ne fait pas échouer la CI. **Une anomalie n'est fermée que lorsque son test est devenu bloquant et
-a été vérifié stable** — jamais simplement parce qu'il est marqué `todo`. Résultats **mesurés**
-(Postgres 16 et 17).
+ne fait pas échouer la CI. **Une anomalie n'est marquée résolue que lorsque sa CAUSE est corrigée**,
+pas lorsque son symptôme est masqué. Statuts : OUVERTE · ATTÉNUÉE (symptôme traité, cause ouverte) ·
+RÉSOLUE. Résultats **mesurés** (Postgres 16 et 17).
 
-| # | Anomalie | Mesure initiale (3.1) | État | Sous-phase |
+| # | Anomalie | Mesure initiale (3.1) | Statut | Sous-phase |
 |---|---|---|---|---|
 | 1 | Reçu émis sur un paiement annulé quand annulation et émission arrivent en même temps (I5) | 25 tours sur 25 : une violation à chaque tour | **OUVERTE** (test `todo` qui échoue) | 3.3 |
-| 2 | Invitations simultanées de la même cliente | 5 requêtes → 1 succès, 1 refus 409, **3 erreurs 500** | **CORRIGÉE en 3.2** : les perdantes reçoivent 409 (classement central de `P2002`). Test **bloquant**, 15 exécutions consécutives sans échec | 3.2 |
-| 3 | Inscriptions simultanées avec le même email | 5 requêtes → 1 succès, **4 erreurs 500** | **CORRIGÉE en 3.2** (même cause). Test **bloquant**, stable. Le message est générique (« Un enregistrement identique existe déjà ») : un message précis par champ reste possible plus tard | 3.2 |
+| 2 | Invitations simultanées de la même cliente | 5 requêtes → 1 succès, 1 refus 409, **3 erreurs 500** | **ATTÉNUÉE en 3.2** : les perdantes reçoivent 409 au lieu de 500 (classement central de `P2002`). **Cause ouverte** : la route vérifie « existe déjà ? » puis crée, sans atomicité ; la contrainte `UNIQUE` rattrape la course après coup | 3.3 (cause) |
+| 3 | Inscriptions simultanées avec le même email | 5 requêtes → 1 succès, **4 erreurs 500** | **ATTÉNUÉE en 3.2** (même mécanisme). **Cause ouverte** (même schéma « vérifier puis créer »). Le message de conflit est générique, sans nom de champ | 3.3 (cause) |
 | 4 | Même téléphone dans deux ateliers | le second atelier reçoit 409 « compte déjà existant » | **OUVERTE** (test `todo` qui échoue) : identité de connexion globale à revoir, orientation validée | 3.7 |
 
-La correction 2/3 traite le **symptôme visible** (500 → 409). La cause profonde — une vérification
-« existe déjà ? » suivie d'une création, sans atomicité — subsiste ; la sous-phase 3.3 la traitera
-avec l'idempotence. L'invariant de données (un seul compte, un seul atelier, aucun orphelin) tenait
-déjà et reste vérifié.
+Les tests des anomalies 2 et 3 sont **bloquants** (15 exécutions consécutives sans échec) : ils
+protègent le comportement HTTP atténué, pas la correction de la cause. Ils ne valent pas
+fermeture du registre. L'invariant de données (un seul compte, un seul atelier, aucun orphelin)
+tenait déjà avant la 3.2 et reste vérifié.
 
 Comportements **caractérisés** (le test affirme l'état actuel, à inverser dans la sous-phase
 indiquée) : absence d'idempotence des paiements (3.3), numérotation globale non continue par
