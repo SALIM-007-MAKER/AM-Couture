@@ -266,11 +266,11 @@ Périodes : `period=today\|week\|month\|quarter\|year`, ou `from` et `to` (dates
 | `GET /api/rapports/commandes/a-livrer` | Atelier | `?horizonJours=` (1–90, défaut 7), pagination. |
 | `GET /api/rapports/clientes` | Atelier | Période → clientes actives et archivées, nouvelles et ayant commandé, meilleures clientes par nombre de commandes. |
 | `GET /api/rapports/modeles` | Atelier | Catalogue par catégorie (hors période), modèles les plus utilisés dans les commandes de la période. |
-| `GET /api/notifications` | Atelier | `?lu=true\|false`, pagination. Réconcilie les alertes (retard, prête, livraison proche, impayée) avant de répondre. |
+| `GET /api/notifications` | Atelier (`notifications.lire`) | `?lu=true\|false`, pagination. Réconcilie les alertes avant de répondre : `RETARD`, `PRET`, `LIVRAISON_PROCHE`, `IMPAYE`, `TACHE_AFFECTEE` (travail confié, vue par l'employé concerné seul), `STOCK_BAS` (avec la quantité actuelle), `ACHAT_EN_RETARD`. Chaque personne ne reçoit que ce que ses droits permettent (voir docs/PHASE6-ANALYSE.md §13). `lu` est celui de la personne : drapeau partagé pour le PDG, individuel pour un employé. |
 | `GET /api/notifications/nombre-non-lues` | Atelier | `{ count, notifications, demandes }` (alertes non lues + demandes en attente) — sondée toutes les 60 s par l'interface. |
-| `PATCH /api/notifications/:id` | Atelier | `{ lu: boolean }` |
-| `POST /api/notifications/marquer-lu` | Atelier | `{ ids: [...] }` (1 à 200). Un identifiant d'un autre atelier est ignoré. |
-| `POST /api/notifications/supprimer` | Atelier | `{ ids: [...] }` (1 à 200). |
+| `PATCH /api/notifications/:id` | Atelier | `{ lu: boolean }` — pour la personne connectée seulement (un employé ne modifie jamais l'état du PDG). 404 si la notification n'est pas dans sa vue. |
+| `POST /api/notifications/marquer-lu` | Atelier | `{ ids: [...] }` (1 à 200). Un identifiant hors de la vue de la personne (autre atelier compris) est ignoré. |
+| `POST /api/notifications/supprimer` | PDG | `{ ids: [...] }` (1 à 200). Réservé au PDG (agit sur tout l'atelier) ; l'alerte réapparaît tant que sa cause existe. |
 
 ## 11. Paramètres de l'atelier et abonnement
 
