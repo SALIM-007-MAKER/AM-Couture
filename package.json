@@ -17,7 +17,8 @@
     "build": "npm run build -w frontend",
     "test": "npm run test -w backend && npm run test -w frontend && node --test scripts/__tests__/*.test.mjs",
     "test:integration": "npm run test:integration -w backend",
-    "test:e2e": "playwright test -c e2e"
+    "test:e2e": "playwright test -c e2e",
+    "perf": "node scripts/perf/mesure.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
