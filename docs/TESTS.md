@@ -2,10 +2,10 @@
 
 | Niveau | Où | Outil | Commande | Effectif (15/11/2026) | Dans la CI |
 |---|---|---|---|---|---|
-| Unitaires backend | `backend/src/**/__tests__` | `node --test` | `npm test` | 215 | oui (`verifier`) |
+| Unitaires backend | `backend/src/**/__tests__` | `node --test` | `npm test` | 219 (dont 4 de cohérence de `docs/API.md`) | oui (`verifier`) |
 | Unitaires frontend | `frontend/src/**/__tests__` | `node --test` | `npm test` | 62 | oui (`verifier`) |
 | Déploiement | `scripts/__tests__` | `node --test` | `npm test` | 7 | oui (`verifier`) |
-| Intégration (API + Prisma + Postgres) | `backend/src/integration-tests` | `node --test` | `npm run test:integration` | 186 (185 + 1 `TODO` volontaire) | oui (`tests-integration`) |
+| Intégration (API + Prisma + Postgres) | `backend/src/integration-tests` | `node --test` | `npm run test:integration` | 188 (187 + 1 `TODO` volontaire) | oui (`tests-integration`) |
 | End-to-end (navigateur réel → frontend → API → Postgres) | `e2e/specs` | Playwright | `npm run test:e2e` | 27 | job `tests-e2e`, **non bloquant** (jamais exécuté sur GitHub) |
 
 `npm test` à la racine enchaîne backend, frontend et déploiement. Aucune dépendance de test n'est ajoutée : le
