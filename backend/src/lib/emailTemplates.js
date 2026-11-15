@@ -88,3 +88,19 @@ export function rappelsQuotidiensTemplate({ prenom, lignes, lienNotifications })
     </div>
   `;
 }
+
+// Courriels d'abonnement (rappels avant échéance, décisions sur un paiement) : un titre, quelques paragraphes, un
+// bouton. Toute valeur interpolée passe par esc().
+export function notificationAbonnementTemplate({ prenom, titre, paragraphes, lien, libelleLien }) {
+  const corps = paragraphes.map((p) => `<p>${esc(p)}</p>`).join("");
+  return `
+    <div style="${STYLE_CORPS}">
+      <h2>${esc(titre)}${prenom ? ` — ${esc(prenom)}` : ""}</h2>
+      ${corps}
+      <a href="${esc(lien)}" style="${STYLE_BOUTON}">${esc(libelleLien)}</a>
+      <p style="${STYLE_PIED}">
+        Vous recevez ce message parce que vous administrez un atelier sur Gestion d'Atelier.
+      </p>
+    </div>
+  `;
+}

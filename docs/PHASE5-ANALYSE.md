@@ -131,3 +131,28 @@ Lue le 15/11/2026 sur docs.wave.com (pages Checkout et Webhooks).
 - la ligne `joursGrace` est globale à la plateforme (pas de durée par atelier) ;
 - `GET /api/notifications` réconcilie des alertes calculées en base même en lecture seule (données dérivées, pas des données métier) ;
 - la relecture de l'état d'abonnement après la fin d'essai coûte deux requêtes de plus par requête authentifiée (abonnements et réglages), uniquement pour les ateliers dans cette situation.
+
+## 10. Réalisé en 5.4 — rappels et courriels
+
+**Tâche quotidienne** (`/api/cron/rappels-quotidiens`, 07 h UTC). Pour chaque atelier actif ayant un administrateur avec adresse :
+
+| Situation | Rappel (une seule fois par échéance) |
+|---|---|
+| Essai : 3 jours ou moins / 1 jour ou moins avant la fin | `ESSAI_J3`, `ESSAI_J1` |
+| Abonnement actif : 7, 3, 1 jours avant la fin **de la chaîne de renouvellements** | `ABO_J7`, `ABO_J3`, `ABO_J1` |
+| Essai ou abonnement terminé depuis moins de (grâce + 3) jours | `ESSAI_FIN`, `ABO_FIN` : annonce la date de fin de grâce, la lecture seule, et que rien n'est supprimé |
+
+Aucun rappel : atelier suspendu, abonnement suspendu, paiement déjà déclaré et en attente de vérification, atelier antérieur à l'essai gratuit, atelier sans adresse. Les échéances terminées depuis longtemps ne déclenchent rien : **au premier déploiement, aucun atelier abandonné ne reçoit de courriel**.
+
+**Garanties (testées).** La table `RappelAbonnement` (unique par atelier, type et échéance) est réservée **avant** l'envoi : tâche rejouée ou lancée trois fois en parallèle = un seul courriel. Si personne n'a pu être joint (panne du service de courriel), la réservation est retirée et le rappel part le lendemain. Une panne n'arrête pas la tâche ni les rappels de commandes.
+
+**Courriels de paiement** (après validation en base, sans jamais faire échouer la décision, y compris sans clé Resend) : déclaration → comptes SUPERADMIN ayant une adresse ; confirmation (avec numéro de facture), rejet (avec motif), remboursement → administrateurs de l'atelier. Rejouer une décision n'envoie rien.
+
+**Un défaut trouvé par les tests, corrigé.** Un renouvellement planifié qui démarrait quelques millisecondes après l'échéance en cours n'était pas reconnu comme prolongation : l'atelier aurait reçu un rappel d'expiration alors qu'il avait renouvelé. La continuité tolère maintenant un écart d'un jour (une activation manuelle peut démarrer le lendemain à minuit). Le défaut est apparu seulement quand la suite complète tournait en parallèle (écart d'horloge entre deux créations), pas en exécution isolée.
+
+**Limites :**
+- le rappel est calculé une fois par jour : un atelier qui renouvelle après le courriel du matin le reçoit quand même ;
+- les courriels dépendent de Resend : sans `RESEND_API_KEY` (ou avec l'expéditeur de test `onboarding@resend.dev`), rien ne part ou la délivrabilité est mauvaise — configurer un domaine vérifié reste à faire (voir `docs/SECURITE.md`) ;
+- seuls les administrateurs de l'atelier avec une adresse sont prévenus ; aucun SMS ni notification dans l'application avant la 5.7 ;
+- les textes sont en français uniquement (comme les autres courriels existants) ;
+- les nouveaux ateliers inscrits avant la mise en ligne de cette fonction et dont l'essai finit dans les 3 jours suivant le déploiement recevront un rappel.
