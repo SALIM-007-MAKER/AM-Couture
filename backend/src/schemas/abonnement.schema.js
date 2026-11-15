@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { normalizeText } from "../lib/zodHelpers.js";
 
-// Activation MANUELLE par le SUPERADMIN (voir ateliersAbonnement.routes.js) —
-// aucune donnée de paiement ici : le paiement en ligne, quand il existera,
-// vivra dans lib/payments/ sans toucher à ces schémas.
+// Activation MANUELLE par le SUPERADMIN (voir ateliersAbonnement.routes.js) — aucune donnée de paiement ici : les
+// paiements d'abonnement ont leurs propres schémas (abonnementPaiement.schema.js).
 const dateField = z.coerce
   .date({ error: "Date invalide." })
   .refine((d) => d.getUTCFullYear() >= 2020 && d.getUTCFullYear() <= 2100, "Date invalide.");

@@ -171,12 +171,16 @@ Profil, mesures, liste et détail des commandes, paiements, reçus (PDF), fil de
 
 ## 6. Abonnement, essai gratuit et facturation
 
-1. **Essai gratuit de 15 jours** posé à la création de l'atelier (`trialEndsAt`). Les ateliers antérieurs (`trialEndsAt = null`) ne sont jamais bloqués.
-2. **Fin d'essai sans abonnement** : les routes métier répondent **402**, le frontend affiche un bandeau de paywall.
-3. **Activation manuelle par le SuperAdmin** (virement, espèces, Wave hors plateforme) avec plan, durée, dates ; possibilité de planifier une activation future.
-4. **États dérivés** : `ACTIF`, `EN_ATTENTE`, `ESSAI`, `EXPIRE`, `AUCUN`, calculés à la lecture ; arithmétique calendaire (`setUTCMonth`).
-5. **Historique immuable** (`HistoriqueAbonnement`) de chaque action.
-6. **Couche de paiement en ligne dormante** : `lib/payments/` (Wave, Nita, Amanata), `lib/wave.js`, `webhooks.routes.js` et le modèle `Transaction` existent mais **ne sont pas montés** ; aucun paiement en ligne n'est actif.
+> Section mise à jour à la fin de la phase 5. Référence complète : [docs/ABONNEMENTS.md](docs/ABONNEMENTS.md) ; bilan : [docs/BILAN-PHASE5.md](docs/BILAN-PHASE5.md).
+
+1. **Essai gratuit de 15 jours** posé à la création de l'atelier (`trialEndsAt`). Les ateliers antérieurs (`trialEndsAt = null`) ne sont jamais restreints.
+2. **Souscription par l'atelier** : choix d'une formule et d'une durée, puis **déclaration d'un paiement** fait hors application (référence obligatoire). Aucun accès n'est accordé à la déclaration.
+3. **Vérification par le SuperAdmin** : il rapproche la référence de son relevé, puis confirme (l'abonnement est activé, un justificatif PDF numéroté est émis) ou rejette. Remboursement total possible, avec motif. Toute décision est tracée et n'agit qu'une fois.
+4. **États dérivés** (jamais stockés) : `ACTIF`, `EN_ATTENTE`, `ESSAI`, `EXPIRE`, `SUSPENDU`, `AUCUN`. Un renouvellement anticipé commence à l'échéance en cours (aucun jour perdu).
+5. **Fin d'essai ou d'abonnement** : période de grâce (7 jours par défaut, réglable) avec accès complet, puis **lecture seule** (consultation et exports, aucune écriture, aucune donnée supprimée). Une suspension décidée par la plateforme passe en lecture seule sans grâce.
+6. **Rappels par courriel** (essai : 3 et 1 jours ; abonnement : 7, 3 et 1 jours ; fin de période) et courriels de décision sur les paiements.
+7. **Wave** : intégré (webhook signé, relecture serveur, rattrapage, remboursement) mais **inactif** tant que `WAVE_ENABLED=1` et les clés ne sont pas définis ; jamais essayé en réel.
+8. **Tableau de bord commercial** du SuperAdmin : ateliers par état, revenus, revenu mensuel récurrent, renouvellements, conversion, paiements à vérifier.
 
 ---
 
@@ -265,7 +269,7 @@ Profil, mesures, liste et détail des commandes, paiements, reçus (PDF), fil de
 - **Commentaire obsolète** : `schema.prisma` mentionne un essai de « 7 jours » alors que le code applique **15 jours** (`atelierProvisioning.js`). Aligner.
 - **README partiellement périmé** : il décrit encore le paiement Wave avec webhook automatique pour l'abonnement ; ce n'est plus le cas (activation manuelle). Il omet aussi l'espace client (rôle USER), les demandes de commande et la navigation mobile SuperAdmin. Remplacer par ce document ou le mettre à jour.
 - **Numérotation globale** des commandes (CMD-2026-0001 partagée entre ateliers) : un atelier voit des numéros non consécutifs et peut déduire le volume des autres. Passer à un compteur **par atelier**.
-- **Code dormant** : `lib/payments/`, `lib/wave.js`, `webhooks.routes.js`, `Transaction`, variables d'environnement de paiement. Soit les activer (§11), soit isoler pour éviter la confusion.
+- **Wave** : code actif mais désactivé par défaut (voir `docs/ABONNEMENTS.md` §10 pour l'activation) ; `NITA_API_KEY` et `AMANATA_API_KEY` ne sont lues nulle part.
 - **Absence de fichier de configuration ESLint** (le projet utilise oxlint) : documenter ce choix ; `npx eslint` échoue.
 - **Fichiers de log versionnés ou traînant** (`backend_dev.log`, `frontend_dev.log`) et dossier `.agents/` non suivi : les ajouter au `.gitignore`.
 - **Écritures CRLF/LF** : avertissements Git répétés ; ajouter un `.gitattributes` (`* text=auto eol=lf`).
