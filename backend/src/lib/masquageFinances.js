@@ -25,6 +25,9 @@ export const CLES_FINANCIERES = new Set([
   "totalRestant",
   "totalCommandes",
   "depenses",
+  "depense",
+  "depenseId",
+  "montantTotal",
 ]);
 
 /** Colonnes Decimal du schéma → financière (true, ou la clé masquée) ou non (false). Exhaustif, vérifié par test. */
@@ -38,6 +41,9 @@ export const CLASSEMENT_DECIMAL = {
   "Depense.montant": true, // module depenses.* uniquement
   "ArticleStock.seuilAlerte": false, // quantité
   "ArticleStock.prixUnitaire": true,
+  "LigneAchat.prixUnitaire": true, // achats : masqué sans finances.voir
+  "LigneAchat.quantite": false, // quantité
+  "LigneAchat.quantiteRecue": false, // quantité
   "MouvementStock.quantite": false, // quantité
   "FormuleAbonnement.prix": false, // abonnement de la PLATEFORME, jamais accessible à un employé (routes ADMIN)
   "Abonnement.prix": false,

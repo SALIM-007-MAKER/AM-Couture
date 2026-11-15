@@ -143,3 +143,28 @@ Plan ajusté : **6.1** employés et permissions (serveur) · **6.2** interface e
 **Test E2E et limiteur de connexion** : les sessions des employés créés pendant les tests sont ouvertes par l'API directement (`e2e/session.js`, IP de test distincte) au lieu du formulaire : le limiteur (10 tentatives / 15 min / IP) est conservé tel quel et les nouveaux parcours le saturaient. La connexion par l'interface reste testée (`auth.spec.js`, `employes.spec.js`).
 
 **Limites** : pas encore de lien article de stock ↔ fournisseur habituel (la 6.5 rattachera les achats aux fournisseurs et aux articles) ; un champ facultatif ne peut pas être vidé après coup (même comportement que les modèles : une valeur vide est ignorée) ; pas d'import de fournisseurs.
+
+## 12. Réalisé en 6.5 — achats, réception en stock, paiement en dépense
+
+**Fonctionnement** (décision du 15/11 : une seule saisie, l'argent suit les dépenses, la marchandise suit le stock)
+- **Achat** : bon de commande à un fournisseur (numéro `ACH-AAAA-NNNN`), 1 à 50 lignes (article, quantité, prix unitaire), date de livraison attendue facultative, notes. Total plafonné à celui d'une dépense (10 000 000). Fournisseur ou article archivé refusé.
+- **Réception** (totale ou partielle, autant de fois que nécessaire) : chaque quantité reçue crée **une entrée de stock** (`MouvementStock` ENTREE, motif « Réception achat … », reliée à la ligne) dans la même transaction que la mise à jour de la ligne. Recevoir plus que le reste à recevoir est refusé (409) ; une réception multi-lignes est tout ou rien.
+- **Paiement** : crée **une dépense** « Achats fournisseurs » du montant total, liée à l'achat. Si cette dépense est annulée plus tard dans le module Dépenses, l'achat redevient « non payé » et peut être payé de nouveau (l'état de paiement est lu sur la dépense, jamais stocké). Pas de double paiement.
+- **Annulation** (motif obligatoire) : seulement si rien n'est reçu et rien n'est payé. Une marchandise reçue se corrige par un mouvement de stock ; un achat payé s'annule en annulant d'abord la dépense. Les achats ne sont jamais supprimés.
+- Les états de **réception** (aucune, partielle, complète), de **paiement** et le **total** sont toujours calculés (lignes, dépense liée), jamais stockés.
+
+**Permissions** : `achats.lire` (consulter), `achats.recevoir` (réceptionner), `achats.ecrire` (créer, modifier, annuler, payer). Total : 27 permissions. Sans `finances.voir`, les prix, le total, le statut de paiement et la dépense liée sont retirés de toutes les réponses : un magasinier réceptionne sans voir un prix (testé, y compris par mutation). `achats.ecrire` est **sensible** (confirmation par mot de passe du PDG) et implique `finances.voir` et `achats.recevoir` ; payer exige en plus `depenses.ecrire`. Postes : « Magasinier » reçoit `achats.recevoir`, « Comptable » reçoit `achats.lire`.
+
+**Base de données** (migration additive `20261124090000_achats`) : tables `Achat` et `LigneAchat`, colonne `MouvementStock.ligneAchatId`, et un `CHECK` en base (`0 ≤ quantiteRecue ≤ quantite`, prix ≥ 0) qui garantit l'invariant même en écriture directe. Retour arrière : supprimer les deux tables, la colonne et la contrainte (aucune donnée existante n'est modifiée).
+
+**Sécurité des données** : le verrou de ligne sur l'achat sérialise réceptions, paiements et annulations (testé avec des requêtes parallèles : 2 réceptions de 4 sur 10 acceptées sur 6 tentatives, une seule dépense sur 5 paiements simultanés) ; clés d'idempotence acceptées à la création, à la réception et au paiement. Le garde-fou `masquageFinances` classe la nouvelle colonne décimale `LigneAchat.prixUnitaire` comme financière.
+
+**API** : 8 routes (`/api/achats` dont `/options` pour le formulaire), `docs/API.md` §9 ter ; 181 routes documentées. **Interface** : `/achats` (liste avec vues « à recevoir », « reçus », « annulés »), `/achats/nouveau` (lignes dynamiques, total en direct), fiche avec formulaire de réception (« Tout recevoir »), paiement en deux étapes et annulation avec motif.
+
+**Tests** : 22 d'intégration (création et refus, idempotence, réception partielle/complète, atomicité, concurrence, CHECK en base, paiement, dépense annulée puis repayée, annulation, filtres, isolation, droits et masquage) ; 4 mutations détectées (verrou du paiement, verrou de réception, masquage des prix, prise en compte de l'annulation de la dépense) ; 2 unitaires frontend (calcul du total) ; 6 E2E (création avec total en direct, réception partielle puis stock vérifié, dépassement refusé, magasinier sans aucun prix, paiement puis dépense vérifiée, annulation refusée). Suites complètes : 333 unitaires backend, 348 intégration, 97 frontend, 52 E2E.
+
+**Limites**
+- Un seul paiement du total (pas d'acompte ni de paiements échelonnés) ; plusieurs paiements demanderaient un registre de paiements d'achat distinct.
+- Les lignes et les prix ne se modifient pas après création : annuler et recréer (tant que rien n'est reçu ni payé). L'API permet de modifier la date attendue et les notes ; l'interface ne l'expose pas encore.
+- Recevoir ne modifie pas le prix unitaire de l'article de stock (comportement existant inchangé) ; pas de gestion de retours fournisseur.
+- Pas de rappel « achat attendu non reçu » avant la 6.6 ; pas de rapport par fournisseur avant la 6.7.

@@ -97,7 +97,7 @@ test("dérive : completerPermissions donne le même résultat que le serveur, po
 });
 
 test("dérive : les droits sensibles du serveur sont bien ceux qui ouvrent l'argent", () => {
-  assert.deepEqual([...PERMISSIONS_SENSIBLES].sort(), ["depenses.ecrire", "depenses.lire", "finances.voir", "paiements.ecrire", "paiements.lire"]);
+  assert.deepEqual([...PERMISSIONS_SENSIBLES].sort(), ["achats.ecrire", "depenses.ecrire", "depenses.lire", "finances.voir", "paiements.ecrire", "paiements.lire"]);
 });
 
 import { imposeePar, basculerPermission } from "../permissions.js";

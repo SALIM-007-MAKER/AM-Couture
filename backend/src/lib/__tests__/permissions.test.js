@@ -24,7 +24,7 @@ describe("catalogue et postes", () => {
   it("les droits qui donnent accès à l'argent sont les seuls sensibles", () => {
     assert.deepEqual(
       [...PERMISSIONS_SENSIBLES].sort(),
-      ["depenses.ecrire", "depenses.lire", "finances.voir", "paiements.ecrire", "paiements.lire"],
+      ["achats.ecrire", "depenses.ecrire", "depenses.lire", "finances.voir", "paiements.ecrire", "paiements.lire"],
     );
   });
 

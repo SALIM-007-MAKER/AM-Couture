@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 173 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 181 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -235,6 +235,21 @@ Permissions `fournisseurs.lire` (GET) et `fournisseurs.ecrire` (autres méthodes
 | `PATCH /api/fournisseurs/:id` | Atelier | Mêmes champs, optionnels. 409 si archivé. |
 | `POST /api/fournisseurs/:id/archiver` | Atelier | Archive (jamais de suppression). |
 | `POST /api/fournisseurs/:id/restaurer` | Atelier | Restaure. |
+
+## 9 ter. Achats aux fournisseurs
+
+Droits d'un employé : `achats.lire` (consulter), `achats.recevoir` (réceptionner, sans voir les prix), `achats.ecrire` (créer, modifier, annuler ; sensible, implique `finances.voir` et `achats.recevoir`). Payer exige en plus `depenses.ecrire`. Sans `finances.voir`, `prixUnitaire`, `montantTotal`, `statutPaiement`, `depense` et `depenseId` sont retirés des réponses. Les états de réception (`AUCUNE`, `PARTIELLE`, `COMPLETE`) et de paiement (`PAYE`, `NON_PAYE`) et le total sont toujours calculés, jamais stockés.
+
+| Route | Accès | Corps / paramètres |
+|---|---|---|
+| `POST /api/achats` | `achats.ecrire`, idempotente | `{ fournisseurId, lignes: [{ articleId, quantite, prixUnitaire }] }` (1 à 50 lignes, un article une seule fois) + `dateAttendue?, notes?`. Total ≤ 10 000 000. 409 si fournisseur ou article archivé. Numéro `ACH-AAAA-NNNN`. |
+| `GET /api/achats` | `achats.lire` | `?q=` (numéro, fournisseur), `statut=COMMANDE\|ANNULE`, `reception=attendu\|complete`, `paiement=paye\|nonpaye`, `fournisseurId`, pagination. |
+| `GET /api/achats/options` | `achats.ecrire` | Fournisseurs et articles actifs (`id`, `nom`, `unite`) pour le formulaire de création ; aucun prix. |
+| `GET /api/achats/:id` | `achats.lire` | Détail : fournisseur, lignes (`quantiteRecue`, `quantiteRestante`), dépense liée. |
+| `PATCH /api/achats/:id` | `achats.ecrire` | `dateAttendue?` (`null` pour l'effacer), `notes?`. Les lignes et les prix ne se modifient pas : annuler et recréer. 409 si annulé. |
+| `POST /api/achats/:id/receptions` | `achats.recevoir` ou `achats.ecrire`, idempotente | `{ lignes: [{ ligneId, quantite }] }` — réception totale ou partielle ; crée une entrée de stock par ligne dans la même transaction. 409 si la quantité dépasse le reste à recevoir, si l'achat est annulé ou l'article archivé. |
+| `POST /api/achats/:id/paiement` | `achats.ecrire` + `depenses.ecrire`, idempotente | `{ date? }` — crée la dépense « Achats fournisseurs » du montant total. 409 si déjà payé ou annulé. Si la dépense est annulée ensuite (module Dépenses), l'achat redevient non payé. |
+| `POST /api/achats/:id/annuler` | `achats.ecrire` | `{ motif }`. 409 si de la marchandise a été reçue ou si l'achat est payé (annuler d'abord la dépense). |
 
 ## 10. Tableau de bord, rapports et notifications
 

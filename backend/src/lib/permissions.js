@@ -24,6 +24,12 @@ export const CATALOGUE = {
   "livraisons.ecrire": { module: "livraisons", sensible: false },
   "demandes.lire": { module: "demandes", sensible: false },
   "demandes.ecrire": { module: "demandes", sensible: false },
+  // Achats : consulter et réceptionner ne montrent aucun prix (masqués sans « finances.voir ») ; créer, modifier, annuler
+  // et payer manipulent des prix : « achats.ecrire » est sensible et implique « finances.voir ». Payer exige en plus
+  // « depenses.ecrire » (le paiement crée une dépense).
+  "achats.lire": { module: "achats", sensible: false },
+  "achats.recevoir": { module: "achats", sensible: false },
+  "achats.ecrire": { module: "achats", sensible: true },
   "fournisseurs.lire": { module: "fournisseurs", sensible: false },
   "fournisseurs.ecrire": { module: "fournisseurs", sensible: false },
   "stock.lire": { module: "stock", sensible: false },
@@ -44,7 +50,7 @@ export const PERMISSIONS_SENSIBLES = new Set(PERMISSIONS.filter((p) => CATALOGUE
 
 // Une permission d'écriture suppose la lecture du même module ; changer le statut d'une commande suppose de la lire ;
 // consulter ou enregistrer des paiements suppose de voir les montants des commandes (solde, prix).
-const IMPLICATIONS = { "commandes.statut": ["commandes.lire"], "commandes.affecter": ["commandes.lire"], "paiements.lire": ["finances.voir"] };
+const IMPLICATIONS = { "commandes.statut": ["commandes.lire"], "commandes.affecter": ["commandes.lire"], "achats.recevoir": ["achats.lire"], "achats.ecrire": ["achats.recevoir", "finances.voir"], "paiements.lire": ["finances.voir"] };
 for (const p of PERMISSIONS) {
   if (p.endsWith(".ecrire")) IMPLICATIONS[p] = [...(IMPLICATIONS[p] ?? []), p.replace(".ecrire", ".lire")];
 }
@@ -65,7 +71,7 @@ export const POSTES = {
     "dashboard.lire",
     "notifications.lire",
   ],
-  MAGASINIER: ["stock.lire", "stock.ecrire", "fournisseurs.lire", "fournisseurs.ecrire", "modeles.lire", "notifications.lire"],
+  MAGASINIER: ["stock.lire", "stock.ecrire", "fournisseurs.lire", "fournisseurs.ecrire", "achats.recevoir", "modeles.lire", "notifications.lire"],
   COMPTABLE: [
     "clientes.lire",
     "commandes.lire",
@@ -73,6 +79,7 @@ export const POSTES = {
     "paiements.ecrire",
     "depenses.lire",
     "depenses.ecrire",
+    "achats.lire",
     "finances.voir",
     "rapports.lire",
     "dashboard.lire",
