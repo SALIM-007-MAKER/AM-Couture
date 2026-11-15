@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { ETATS } from "../global-setup.js";
 import { MOT_DE_PASSE } from "../seed.js";
+import { ouvrirSession } from "../session.js";
 
 // Production : le PDG crée un employé couturier, lui affecte une commande depuis la fiche, puis l'employé la retrouve
 // dans « Mes travaux » sans voir d'écran d'affectation ni de montant.
@@ -46,13 +47,12 @@ test("le PDG affecte la commande depuis sa fiche", async ({ page }) => {
 });
 
 test.describe("session du couturier", () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
-
-  test("retrouve la commande dans « Mes travaux », sans écran de production ni montant", async ({ page }) => {
-    await page.goto("/login");
-    await page.locator("#identifiant").fill(IDENTIFIANT);
-    await page.locator("#password").fill(MOT_DE_PASSE);
-    await page.getByRole("button", { name: "Se connecter" }).click();
+  test("retrouve la commande dans « Mes travaux », sans écran de production ni montant", async ({ browser }) => {
+    const { status, storageState } = await ouvrirSession(IDENTIFIANT);
+    expect(status).toBe(200);
+    const ctx = await browser.newContext({ storageState });
+    const page = await ctx.newPage();
+    await page.goto("/commandes");
     await expect(page).not.toHaveURL(/\/login/);
 
     await expect(page.getByRole("navigation").getByRole("link", { name: "Production" })).toHaveCount(0);
@@ -67,5 +67,6 @@ test.describe("session du couturier", () => {
     await expect(page.getByTestId("section-affectation")).toContainText("Confiée à Moussa Couturier");
     await expect(page.getByTestId("select-affectation")).toHaveCount(0);
     await expect(page.getByText("Une erreur inattendue")).toHaveCount(0);
+    await ctx.close();
   });
 });

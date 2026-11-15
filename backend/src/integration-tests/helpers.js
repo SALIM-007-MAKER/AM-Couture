@@ -161,6 +161,7 @@ export async function supprimerAtelier(atelierId) {
   await prisma.cliente.updateMany({ where: { atelierId }, data: { userId: null } });
   await prisma.cliente.deleteMany({ where: { atelierId } });
   await prisma.modele.deleteMany({ where: { atelierId } });
+  await prisma.fournisseur.deleteMany({ where: { atelierId } });
   await prisma.depense.deleteMany({ where: { atelierId } });
   const articles = await prisma.articleStock.findMany({ where: { atelierId }, select: { id: true } });
   await prisma.mouvementStock.deleteMany({ where: { articleId: { in: articles.map((a) => a.id) } } });

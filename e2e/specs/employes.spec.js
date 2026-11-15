@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { ETATS } from "../global-setup.js";
 import { MOT_DE_PASSE } from "../seed.js";
+import { ouvrirSession } from "../session.js";
 
 // Gestion des employés par le PDG, puis parcours de l'employé créé (navigation limitée, aucun montant, désactivation).
 test.use({ storageState: ETATS.pdg });
@@ -59,13 +60,12 @@ test.describe("session de l'employé", () => {
   });
 });
 
-test("le PDG désactive l'employé : la connexion est refusée", async ({ page, request }) => {
+test("le PDG désactive l'employé : la connexion est refusée", async ({ page }) => {
   await page.goto("/employes");
   await page.getByTestId(`employe-${IDENTIFIANT}`).getByRole("link", { name: "Gérer" }).click();
   await page.getByTestId("desactiver").click();
   await page.getByTestId("confirmer-desactivation").click();
   await expect(page.getByText(/Compte désactivé le/)).toBeVisible();
 
-  const res = await request.post("/api/auth/login", { data: { identifiant: IDENTIFIANT, password: MOT_DE_PASSE } });
-  expect(res.status()).toBe(403);
+  expect((await ouvrirSession(IDENTIFIANT)).status).toBe(403);
 });

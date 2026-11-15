@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 167 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 173 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -222,6 +222,19 @@ Schéma : `articleStock.schema.js`. Unités : `METRE, PIECE, KG, LITRE, ROULEAU,
 | `POST /api/stock/:id/restaurer` | Atelier | Restaure. |
 | `GET /api/stock/:id/mouvements` | Atelier | Historique des mouvements, paginé. |
 | `POST /api/stock/:id/mouvements` | Atelier, idempotente | `{ type ("ENTREE" \| "SORTIE"), quantite }` + `motif?`. 409 si l'article est archivé ou si la quantité est insuffisante pour une sortie. |
+
+## 9 bis. Fournisseurs
+
+Permissions `fournisseurs.lire` (GET) et `fournisseurs.ecrire` (autres méthodes) pour un employé ; le PDG a tout. Aucune donnée financière.
+
+| Route | Accès | Corps / paramètres |
+|---|---|---|
+| `POST /api/fournisseurs` | Atelier | `{ nom }` + `contact?, telephone?, email?, adresse?, notes?`. 409 si le nom existe déjà dans l'atelier (casse ignorée, archivés compris). |
+| `GET /api/fournisseurs` | Atelier | `?q=` (nom, contact, téléphone, email), `archived=true|false|all`, pagination. |
+| `GET /api/fournisseurs/:id` | Atelier | Fiche (archivé compris). |
+| `PATCH /api/fournisseurs/:id` | Atelier | Mêmes champs, optionnels. 409 si archivé. |
+| `POST /api/fournisseurs/:id/archiver` | Atelier | Archive (jamais de suppression). |
+| `POST /api/fournisseurs/:id/restaurer` | Atelier | Restaure. |
 
 ## 10. Tableau de bord, rapports et notifications
 
