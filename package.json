@@ -16,11 +16,13 @@
     "prisma:seed:superadmin": "node --experimental-strip-types --env-file=.env prisma/seedSuperadmin.js",
     "build": "npm run build -w frontend",
     "test": "npm run test -w backend && npm run test -w frontend && node --test scripts/__tests__/*.test.mjs",
-    "test:integration": "npm run test:integration -w backend"
+    "test:integration": "npm run test:integration -w backend",
+    "test:e2e": "playwright test -c e2e"
   },
   "devDependencies": {
-    "prisma": "^7.10.0",
-    "dotenv": "^17.2.3"
+    "@playwright/test": "^1.49.1",
+    "dotenv": "^17.2.3",
+    "prisma": "^7.10.0"
   },
   "overrides": {
     "mysql2": "^3.24.4",
