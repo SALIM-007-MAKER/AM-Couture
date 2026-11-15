@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 138 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 151 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -42,7 +42,7 @@ Un atelier n'accède jamais aux données d'un autre : une ressource d'un autre a
 
 **Pagination.** Les listes acceptent `page` (≥ 1, défaut 1) et `pageSize` (1 à 100, défaut 20 ; 50 pour le journal de sécurité) et répondent `{ "data": [...], "meta": { "page", "pageSize", "total", "totalPages" } }`. Les routes `/export` renvoient un CSV (`text/csv`) plafonné à 20 000 lignes, avec les mêmes filtres que la liste.
 
-**Idempotence.** Les 7 créations suivantes acceptent l'en-tête optionnel `Idempotency-Key` (8 à 128 caractères parmi lettres, chiffres, `- _ . :`) : rejouer la même requête avec la même clé renvoie la réponse d'origine sans recréer la ressource. Elles sont marquées « idempotente » ci-dessous. Détail : [IDEMPOTENCE.md](IDEMPOTENCE.md).
+**Idempotence.** Les 8 créations marquées « idempotente » ci-dessous acceptent l'en-tête optionnel `Idempotency-Key` (8 à 128 caractères parmi lettres, chiffres, `- _ . :`) : rejouer la même requête avec la même clé renvoie la réponse d'origine sans recréer la ressource. Détail : [IDEMPOTENCE.md](IDEMPOTENCE.md).
 
 **Limiteurs de débit** (par IP, persistés en base) : connexion 10 / 15 min · recherche de l'atelier d'un identifiant 30 / 15 min · inscription d'atelier 5 / h · renvoi de l'email de vérification 5 / h · mot de passe oublié 5 / h. Dépassement : 429.
 
@@ -214,7 +214,11 @@ Périodes : `period=today\|week\|month\|quarter\|year`, ou `from` et `to` (dates
 | `GET /api/parametres` | Atelier¹ | Informations de l'atelier. |
 | `PUT /api/parametres` | Atelier | Remplacement : `{ nom, devise }` + `logoUrl?, telephone?, adresse?, slogan?, recuConfig?`. |
 | `PATCH /api/parametres` | Atelier | Mêmes champs, tous optionnels. |
-| `GET /api/abonnements/etat` | Atelier¹ | État d'abonnement de l'atelier : essai, abonnement actif, jours restants. |
+| `GET /api/abonnements/etat` | Atelier¹ | État d'abonnement : `statut` (`ACTIF`, `EN_ATTENTE`, `ESSAI`, `EXPIRE`, `SUSPENDU`, `AUCUN`), essai, abonnement courant, `acces` (`mode` : `COMPLET`, `GRACE` ou `LECTURE_SEULE`, avec la fin de grâce) et `paiementEnAttente` (déclaration non encore tranchée, ou `null`). |
+| `POST /api/abonnements/souscrire` | Atelier¹, idempotente | `{ planId, dureeMois, moyenPaiement ("MOBILE_MONEY" \| "NITA" \| "AMANA" \| "VIREMENT" \| "ESPECES" \| "AUTRE") }` + `operateur?, reference` (obligatoire sauf espèces), `preuveNote?`. Déclare un paiement fait hors plateforme ; **n'accorde aucun accès** avant confirmation. Le montant est calculé par le serveur (un champ `montant` est refusé). La durée doit être proposée par la formule. 409 si une déclaration est déjà en attente. → `201 { id, numero, statut, montant }`. |
+| `GET /api/abonnements/transactions` | Atelier¹ | Historique des paiements de l'atelier (déclarés, confirmés, rejetés, remboursés), avec la facture éventuelle. |
+| `POST /api/abonnements/transactions/:id/annuler` | Atelier¹ | Retire une déclaration en attente. 409 si elle est déjà traitée ; la répéter est sans effet. |
+| `GET /api/abonnements/factures/:id/pdf` | Atelier¹ | Justificatif de paiement en PDF (404 si la facture appartient à un autre atelier). |
 | `GET /api/plans-abonnement` | Session | Plans actifs (tarifs, durées, remises). |
 
 ## 12. Demandes de commande
@@ -275,11 +279,20 @@ Aucune de ces routes ne donne accès aux données métier d'un atelier (clientes
 | `PATCH /api/ateliers/:atelierId/abonnement/:abonnementId` | SuperAdmin | `{ planId?, dateDebut?, dateExpiration?, note? }` |
 | `POST /api/ateliers/:atelierId/abonnement/:abonnementId/expirer` | SuperAdmin | `{ note? }` — met fin à l'abonnement maintenant. |
 | `POST /api/ateliers/:atelierId/abonnement/:abonnementId/desactiver` | SuperAdmin | `{ note? }` |
+| `POST /api/ateliers/:atelierId/abonnement/:abonnementId/suspendre` | SuperAdmin | `{ note }` (motif obligatoire) — pause : l'abonnement garde ses dates mais l'atelier passe en lecture seule immédiatement, sans grâce. Répétable. |
+| `POST /api/ateliers/:atelierId/abonnement/:abonnementId/reactiver` | SuperAdmin | `{ note }` — remet un abonnement suspendu en service. Répétable. |
 | `GET /api/plans-abonnement/tous` | SuperAdmin | Tous les plans, actifs ou non. |
 | `POST /api/plans-abonnement` | SuperAdmin | `{ nom, prixMensuel }` + `description?, fonctionnalites? (20 max), tarifsDuree? (8 max : { dureeMois, remisePourcent }), ordre?` |
 | `PATCH /api/plans-abonnement/:id` | SuperAdmin | Mêmes champs + `actif?`. |
 | `GET /api/plateforme/contact` | SuperAdmin | Numéro WhatsApp de contact de la plateforme. |
 | `PUT /api/plateforme/contact` | SuperAdmin | `{ whatsapp }` (8 à 15 chiffres avec indicatif). |
+| `GET /api/plateforme/transactions` | SuperAdmin | `?statut=EN_ATTENTE\|REUSSIE\|ECHOUEE\|ANNULEE\|EXPIREE\|REMBOURSEE`, `atelierId=`, pagination. Paiements d'abonnement de tous les ateliers, avec le nom de l'atelier. |
+| `POST /api/plateforme/transactions/:id/confirmer` | SuperAdmin | `{ note? }` — après rapprochement avec le relevé : active l'abonnement (début à l'échéance en cours s'il y en a une, aucun jour perdu) et émet la facture. Répéter l'appel renvoie `dejaTraitee: true` sans rien refaire. 409 si la transaction n'est plus en attente ou si le moyen est Wave. |
+| `POST /api/plateforme/transactions/:id/rejeter` | SuperAdmin | `{ motif }` — transaction `ECHOUEE`, abonnement annulé. Répétable. |
+| `POST /api/plateforme/transactions/:id/rembourser` | SuperAdmin | `{ motif }` — enregistre un remboursement **total** (l'argent est rendu hors plateforme) : transaction `REMBOURSEE`, facture marquée annulée (conservée), abonnement annulé. Répétable. 409 si le paiement n'est pas réussi. |
+| `GET /api/plateforme/factures/:id/pdf` | SuperAdmin | Justificatif de paiement en PDF. |
+| `GET /api/plateforme/parametres-abonnement` | SuperAdmin | `{ joursGrace }` — jours d'accès complet après l'échéance avant la lecture seule (7 par défaut). |
+| `PUT /api/plateforme/parametres-abonnement` | SuperAdmin | `{ joursGrace }` entier de 0 à 90. |
 | `GET /api/plateforme/journal-securite` | SuperAdmin | `?evenement=`, `atelierId=`, `userId=`, pagination (50 par défaut). |
 
 ## 15. Ce qui n'est pas exposé

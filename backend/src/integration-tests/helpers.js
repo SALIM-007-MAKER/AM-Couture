@@ -67,6 +67,8 @@ export function client(baseUrl) {
     return { status: res.status, body: json, headers: res.headers };
   }
   return {
+    // Cookie de session courant, pour les requêtes brutes (fichiers PDF) que ce client JSON ne sait pas lire.
+    cookie: () => cookie,
     get: (path, headers) => requete(path, { headers }),
     post: (path, body, headers) => requete(path, { method: "POST", body, headers }),
     patch: (path, body, headers) => requete(path, { method: "PATCH", body, headers }),
@@ -163,6 +165,7 @@ export async function supprimerAtelier(atelierId) {
   await prisma.mouvementStock.deleteMany({ where: { articleId: { in: articles.map((a) => a.id) } } });
   await prisma.articleStock.deleteMany({ where: { atelierId } });
   const abonnements = await prisma.abonnement.findMany({ where: { atelierId }, select: { id: true } });
+  await prisma.factureAbonnement.deleteMany({ where: { atelierId } });
   await prisma.transaction.deleteMany({ where: { abonnementId: { in: abonnements.map((a) => a.id) } } });
   await prisma.abonnement.deleteMany({ where: { atelierId } });
   await prisma.user.deleteMany({ where: { atelierId } });

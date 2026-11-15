@@ -46,11 +46,11 @@ clé utilisée par deux ateliers est indépendante : la réponse d'un atelier n'
   peut donc jamais voir « en cours » une opération déjà terminée dont le client a reçu la réponse.
 - Un échec d'écriture de la mémoire est journalisé et ne bloque jamais la réponse.
 
-## Opérations protégées (7)
+## Opérations protégées (8)
 
 `POST /api/commandes` · `POST /api/commandes/:id/paiements` · `POST /api/commandes/:id/livraisons`
 (avec paiement final éventuel) · `POST /api/stock/:id/mouvements` · `POST /api/depenses` ·
-`POST /api/clientes` · `POST /api/ateliers/:id/abonnement/activer` (SuperAdmin).
+`POST /api/clientes` · `POST /api/ateliers/:id/abonnement/activer` (SuperAdmin) · `POST /api/abonnements/souscrire` (déclaration de paiement d'abonnement).
 
 ## Limites connues
 
