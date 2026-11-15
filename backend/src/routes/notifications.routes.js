@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
+import { aPermission, peutVoirFinances } from "../lib/permissions.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { reconcilierNotifications } from "../lib/notifications.js";
@@ -12,7 +14,11 @@ import {
 } from "../schemas/notification.schema.js";
 
 const router = Router();
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission("notifications.lire"), masquerFinancesSiNonAutorise);
+router.use((req, res, next) => {
+  if (req.method === "GET" || req.user.role === "ADMIN") return next();
+  return next(new HttpError(403, "Seul le responsable de l'atelier peut modifier l'état des notifications."));
+});
 router.param("id", requireValidIdParam);
 
 // Champs commande nécessaires pour reconstruire l'affichage (client, modèle,
@@ -38,7 +44,12 @@ router.get("/", async (req, res) => {
 
   await reconcilierNotifications(prisma, req.user.atelierId);
 
-  const where = { commande: { atelierId: req.user.atelierId }, ...(lu === undefined ? {} : { lu }) };
+  const where = {
+    commande: { atelierId: req.user.atelierId },
+    ...(lu === undefined ? {} : { lu }),
+    // Une alerte « impayé » révèle qu'une commande n'a reçu aucun paiement : information financière.
+    ...(peutVoirFinances(req.user) ? {} : { type: { not: "IMPAYE" } }),
+  };
   const [data, total] = await Promise.all([
     prisma.notification.findMany({
       where,
@@ -67,9 +78,18 @@ router.get("/", async (req, res) => {
 // expliquer le total affiché par la cloche (jamais un chiffre muet).
 router.get("/nombre-non-lues", async (req, res) => {
   await reconcilierNotifications(prisma, req.user.atelierId);
+  // Un employé ne compte ni les alertes d'impayé (financières) ni les demandes de commande (sans « demandes.lire »).
   const [notifications, demandes] = await Promise.all([
-    prisma.notification.count({ where: { lu: false, commande: { atelierId: req.user.atelierId } } }),
-    prisma.demandeCommande.count({ where: { atelierId: req.user.atelierId, statut: "EN_ATTENTE" } }),
+    prisma.notification.count({
+      where: {
+        lu: false,
+        commande: { atelierId: req.user.atelierId },
+        ...(peutVoirFinances(req.user) ? {} : { type: { not: "IMPAYE" } }),
+      },
+    }),
+    aPermission(req.user, "demandes.lire")
+      ? prisma.demandeCommande.count({ where: { atelierId: req.user.atelierId, statut: "EN_ATTENTE" } })
+      : 0,
   ]);
   res.json({ count: notifications + demandes, notifications, demandes });
 });

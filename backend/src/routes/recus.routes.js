@@ -2,7 +2,8 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { nextNumero } from "../lib/numero.js";
@@ -132,7 +133,8 @@ recusCommandeRouter.get("/", async (req, res) => {
 // ───────────────────────────────────────────────────────────────────────
 const router = Router();
 
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+// Un reçu porte des montants : consultation réservée à qui a « paiements.lire ».
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission("paiements.lire"), masquerFinancesSiNonAutorise);
 router.param("id", requireValidIdParam);
 
 // GET /api/recus — liste globale (tous reçus, toutes commandes confondues),

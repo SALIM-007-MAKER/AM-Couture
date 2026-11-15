@@ -68,3 +68,30 @@ Chaque sous-phase est testée contre les anciens modules (isolation entre atelie
 
 - Lecture du code uniquement ; aucune donnée de production n'a été consultée (nombre réel de comptes ADMIN par atelier, usages réels du stock et des dépenses).
 - Les noms de postes et la liste exacte des permissions sont une proposition à valider avec les ateliers.
+
+## 7. Décisions du 15/11/2026
+
+Les quatre options recommandées ont été retenues : postes + permissions par employé ; achats liés aux dépenses (une seule saisie) ; production = affectation + statut existant ; notifications dans l'application vers le PDG et l'employé concerné.
+
+Plan ajusté : **6.1** employés et permissions (serveur) · **6.2** interface employés · **6.3** affectation et production · **6.4** fournisseurs · **6.5** achats et réception · **6.6** notifications · **6.7** rapports · **6.8** documentation et bilan.
+
+## 8. Réalisé en 6.1 — employés, postes, permissions (serveur)
+
+**Base de données** (migration additive `20261121090000`) : valeur de rôle `EMPLOYE` ; sur `User` : `actif`, `desactiveLe`, `poste`, `permissions`, `telephone`. Tous les comptes existants sont actifs ; aucune ligne modifiée.
+
+**Contrôle d'accès.** Trois niveaux de middleware : `requireAtelier` (PDG seulement, administration), `requireMembreAtelier` (PDG ou employé, appartenance à un atelier actif) puis `requirePermission` / `droitsParModule` (lecture ou écriture d'un module). Appliqué à **tous** les routeurs métier (clientes, modèles, commandes, paiements, livraisons, reçus, dépenses, stock, demandes, tableau de bord, rapports, notifications). Permissions, rôle et état actif sont relus en base à chaque requête dans la lecture déjà faite par `requireAuth` : aucune requête SQL supplémentaire.
+
+**Aucune fuite financière.** Sans `finances.voir`, un middleware retire des réponses toutes les clés qui portent un montant (prix, payé, solde, paiements, prix des modèles et du stock, dépenses du tableau de bord…) ; l'export des commandes est refusé, l'export du stock perd sa colonne de prix, la fiche PDF n'a plus de bloc de montants, les alertes d'impayé sont masquées. Un acompte ou un paiement final exige en plus `paiements.ecrire`. **Garde-fou** : un test lit `schema.prisma` et échoue si une colonne `Decimal` n'est pas classée financière ou non : impossible d'ajouter un montant sans le décider.
+
+**Validations avant opération sensible.** Attribuer un droit sensible (paiements, dépenses, `finances.voir`) ou réinitialiser le mot de passe d'un employé exige le mot de passe du PDG (10 essais par 15 minutes, indisponible pendant une impersonation). Toute opération est inscrite au journal de sécurité (`EMPLOYE_*`).
+
+**Désactivation** : session coupée immédiatement, connexion refusée, rien supprimé, réversible. L'état « désactivé » coupe une session à lui seul, indépendamment de la version de session.
+
+**Tests.** 18 + 9 unitaires (catalogue, implications, masquage, garde-fou du schéma) et 35 d'intégration (isolation entre ateliers, matrice « aucune permission = aucun accès » sur 27 routes, couturier / réceptionniste / comptable, effet immédiat, interaction avec l'abonnement et la suspension, impersonation, traçabilité). Mutations détectées : masquage retiré, administration ouverte aux employés, état désactivé ignoré, permissions ignorées, confirmation sensible ignorée. Les 268 tests d'intégration existants passent sans modification : le comportement du PDG est inchangé.
+
+**Limites actuelles :**
+- **Pas encore d'interface** : un employé qui se connecte verrait l'interface du PDG avec des erreurs 403. L'interface (gestion des employés, navigation et pages adaptées aux permissions) est l'objet de la 6.2 ; **ne pas déployer la 6.1 seule** si des employés peuvent être créés.
+- Les notifications restent à l'état « lu » partagé : un employé les lit mais ne peut pas les modifier (à lever en 6.6).
+- Pas de limite du nombre d'employés par formule (les limites de formule ne sont pas appliquées).
+- Pas d'obligation de changer le mot de passe à la première connexion.
+- Le catalogue de permissions et les postes sont une proposition à valider avec des ateliers réels.

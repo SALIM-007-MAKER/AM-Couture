@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requirePermission } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { computeSolde } from "../lib/money.js";
@@ -299,7 +299,7 @@ router.get("/:paiementId/recu", async (req, res) => {
 // contexte nécessaire (verrou de la commande, calcul du solde disponible).
 // ───────────────────────────────────────────────────────────────────────
 export const paiementsGlobalRouter = Router();
-paiementsGlobalRouter.use(requireAuth, requireAtelier);
+paiementsGlobalRouter.use(requireAuth, requireMembreAtelier, requirePermission("paiements.lire"));
 
 const PAIEMENT_GLOBAL_INCLUDE = {
   commande: {

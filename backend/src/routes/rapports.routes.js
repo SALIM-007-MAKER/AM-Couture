@@ -2,7 +2,8 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
 import { formatZodError } from "../lib/validation.js";
 import {
   resolvePeriod,
@@ -25,7 +26,7 @@ import { CATEGORIES_VETEMENT } from "../schemas/modele.schema.js";
 
 // Module PUREMENT consultatif : aucune écriture en base dans ce fichier.
 const router = Router();
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission("rapports.lire"), masquerFinancesSiNonAutorise);
 
 const D0 = new Prisma.Decimal(0);
 const dec = (v) => (v == null ? D0 : new Prisma.Decimal(v));
@@ -73,7 +74,7 @@ async function agregatsFinances(atelierId, range) {
 // §6 : total commandes (valeur), total encaissé, total dépenses, solde,
 // nombre de paiements, nombre de dépenses.
 // ───────────────────────────────────────────────────────────────────────
-router.get("/finances", async (req, res) => {
+router.get("/finances", requirePermission("finances.voir"), async (req, res) => {
   const parsed = periodQuerySchema.safeParse(req.query);
   if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
   const { from, to } = resolvePeriod(parsed.data);
@@ -140,7 +141,7 @@ router.get("/finances", async (req, res) => {
 // Plafonné à MAX_EVOLUTION_MONTHS (60) mois quelle que soit la plage
 // demandée, pour éviter une réponse illimitée (§14).
 // ───────────────────────────────────────────────────────────────────────
-router.get("/evolution", async (req, res) => {
+router.get("/evolution", requirePermission("finances.voir"), async (req, res) => {
   const parsed = evolutionQuerySchema.safeParse(req.query);
   if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
 

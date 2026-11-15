@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { refuserDemandeSchema, accepterDemandeSchema, listDemandesQuerySchema } from "../schemas/demandeCommande.schema.js";
@@ -13,7 +14,9 @@ import { creerNotificationClient } from "../lib/notificationsClient.js";
 // ce module, seulement un lien vers une Commande créée par le flux normal
 // (voir accepterDemandeSchema, demandeCommande.schema.js).
 const router = Router();
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+// Membres de l'atelier (PDG ou employé) ; l'employé doit en plus avoir la permission « demandes.lire » (GET) ou
+// « demandes.ecrire » (autres méthodes), contrôlée avant toute route.
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule("demandes"), masquerFinancesSiNonAutorise);
 router.param("id", requireValidIdParam);
 
 const DEMANDE_SELECT = {

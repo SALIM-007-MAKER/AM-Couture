@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { verrouillerCle } from "../lib/verrous.js";
@@ -15,7 +16,9 @@ const router = Router();
 
 // Toutes les routes Modèles exigent une session valide et un compte ADMIN
 // rattaché à un atelier (Phase 8 — multi-tenant).
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+// Membres de l'atelier (PDG ou employé) ; l'employé doit en plus avoir la permission « modeles.lire » (GET) ou
+// « modeles.ecrire » (autres méthodes), contrôlée avant toute route.
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule("modeles"), masquerFinancesSiNonAutorise);
 
 // Rétro-portage du garde-fou anti-octet-nul/caractères de contrôle — voir
 // clientes.routes.js pour le contexte complet (point ouvert depuis le module 5).

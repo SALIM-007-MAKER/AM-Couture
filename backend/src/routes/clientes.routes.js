@@ -6,7 +6,8 @@ import { prisma } from "../lib/prisma.js";
 import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule, requirePermission } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import {
@@ -28,7 +29,9 @@ const router = Router();
 // Toutes les routes Clientes (et Mesures, montées ci-dessous) exigent une
 // session valide ET un compte ADMIN rattaché à un atelier (Phase 8 —
 // multi-tenant, voir auth.middleware.js).
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+// Membres de l'atelier (PDG ou employé) ; l'employé doit en plus avoir la permission « clientes.lire » (GET) ou
+// « clientes.ecrire » (autres méthodes), contrôlée avant toute route.
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule("clientes"), masquerFinancesSiNonAutorise);
 
 // Rétro-portage du garde-fou anti-octet-nul/caractères de contrôle, déjà en
 // place sur Commandes/Paiements/Livraisons/Dépenses/Reçus depuis le module 5
@@ -207,7 +210,7 @@ const dec = (v) => (v == null ? D0 : new Prisma.Decimal(v));
 // le solde d'une commande individuelle (computeSolde) ne le fait pas non
 // plus — un statut de commande et un total financier restent deux
 // informations distinctes ici, jamais mélangées.
-router.get("/:id/totaux", async (req, res) => {
+router.get("/:id/totaux", requirePermission("finances.voir"), async (req, res) => {
   const { id } = req.params;
   const cliente = await prisma.cliente.findFirst({
     where: { id, atelierId: req.user.atelierId },

@@ -91,6 +91,13 @@ router.post("/login", loginLimiter, async (req, res) => {
     throw new HttpError(401, "Identifiant ou mot de passe incorrect.");
   }
 
+  // Compte désactivé (employé retiré par le PDG) : refusé APRÈS la vérification du mot de passe, pour ne pas révéler
+  // l'existence ou l'état d'un compte à qui ne connaît pas son mot de passe.
+  if (!user.actif) {
+    await journaliserSecurite("LOGIN_COMPTE_DESACTIVE", { req, userId: user.id, atelierId: user.atelierId });
+    throw new HttpError(403, "Ce compte a été désactivé. Contactez le responsable de l'atelier.");
+  }
+
   // Fil d'activité SUPERADMIN (voir GET /api/ateliers/:id/activite) — un
   // échec de cet horodatage ne doit jamais faire échouer la connexion,
   // purement informatif (voir .catch() local ci-dessous). AWAIT tout de
@@ -410,6 +417,9 @@ router.get("/me", requireAuth, async (req, res) => {
     email: user.email,
     emailVerifieLe: user.emailVerifieLe,
     impersonation,
+    // Employés : poste et permissions (relues en base), pour adapter l'interface. Le serveur ne s'y fie JAMAIS :
+    // chaque route revérifie les permissions.
+    ...(user.role === "EMPLOYE" ? { poste: user.poste, permissions: user.permissions } : {}),
   });
 });
 

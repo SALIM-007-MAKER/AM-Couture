@@ -3,6 +3,7 @@ import { COOKIE_NAME } from "../lib/authCookie.js";
 import { HttpError } from "./error.middleware.js";
 import { prisma } from "../lib/prisma.js";
 import { essaiExpire } from "../lib/trial.js";
+import { aPermission, permissionPourMethode } from "../lib/permissions.js";
 import { etatAbonnementAtelier, modeAcces } from "../lib/abonnement.js";
 
 // Jours de grâce appliqués si la plateforme n'a rien configuré (ParametresPlateforme.joursGrace vaut 7 par défaut).
@@ -32,9 +33,18 @@ export async function requireAuth(req, res, next) {
   }
   try {
     const payload = verifyAuthToken(token);
-    const compte = await prisma.user.findUnique({ where: { id: payload.sub }, select: { sessionVersion: true } });
-    if (!compte || compte.sessionVersion !== payload.sessionVersion) {
+    // Une seule lecture : version de session, rôle, état actif et permissions. Un compte désactivé, un rôle qui ne
+    // correspond plus au jeton ou une version de session périmée coupent la session IMMÉDIATEMENT, quelle que soit la
+    // durée de vie restante du jeton.
+    const compte = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { sessionVersion: true, actif: true, role: true, permissions: true },
+    });
+    if (!compte || compte.sessionVersion !== payload.sessionVersion || compte.role !== payload.role) {
       return next(new HttpError(401, "Session expirée — reconnectez-vous."));
+    }
+    if (!compte.actif) {
+      return next(new HttpError(401, "Ce compte a été désactivé. Contactez le responsable de l'atelier."));
     }
     req.user = {
       id: payload.sub,
@@ -48,6 +58,8 @@ export async function requireAuth(req, res, next) {
       // Présent UNIQUEMENT pour un compte USER (§ plan rôle client, voir
       // requireClient ci-dessous) — jamais pour ADMIN/SUPERADMIN.
       clienteId: payload.clienteId ?? null,
+      // Employés : permissions accordées par le PDG, lues en base à CETTE requête (jamais dans le jeton).
+      permissions: compte.permissions ?? [],
     };
     next();
   } catch (err) {
@@ -81,15 +93,8 @@ export async function requireAuth(req, res, next) {
  * table minuscule (une ligne par atelier) — négligeable face aux requêtes
  * métier qui suivent de toute façon dans la même route.
  */
-export async function requireAtelier(req, res, next) {
-  if (req.user?.role !== "ADMIN" || !req.user?.atelierId) {
-    return next(
-      new HttpError(
-        403,
-        "Réservé aux comptes ADMIN d'un atelier.",
-      ),
-    );
-  }
+/** Vérifie que l'atelier du compte existe et n'est pas suspendu ; pose l'échéance d'essai pour requireAbonnementActif. */
+async function verifierAtelierActif(req, next) {
   try {
     const atelier = await prisma.atelier.findUnique({
       where: { id: req.user.atelierId },
@@ -97,9 +102,8 @@ export async function requireAtelier(req, res, next) {
       // lui évite une seconde lecture de la même ligne (un aller-retour de moins par requête authentifiée).
       select: { actif: true, trialEndsAt: true },
     });
-    // atelier introuvable : cas théorique (onDelete: Restrict empêche sa
-    // suppression tant qu'un compte y est rattaché) — traité comme suspendu
-    // plutôt que de laisser passer par défaut.
+    // atelier introuvable : cas théorique (onDelete: Restrict empêche sa suppression tant qu'un compte y est
+    // rattaché) — traité comme suspendu plutôt que de laisser passer par défaut.
     if (!atelier || !atelier.actif) {
       return next(new HttpError(403, "Cet atelier a été suspendu par la plateforme. Contactez le support."));
     }
@@ -108,6 +112,64 @@ export async function requireAtelier(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+/**
+ * ADMINISTRATION de l'atelier : réservé au PDG (compte ADMIN). Employés, paramètres, abonnement et ses paiements ne
+ * sont jamais délégables : un employé reçoit toujours 403 ici, quelles que soient ses permissions.
+ *
+ * Vérifie EXPLICITEMENT `role === "ADMIN"`, pas seulement la présence d'atelierId : un compte USER (cliente) ou
+ * EMPLOYE a LUI AUSSI un atelierId. Vérifie aussi que l'atelier n'est pas suspendu, EN BASE, à chaque requête : une
+ * suspension décidée par le SUPERADMIN prend effet immédiatement, même pour une session déjà ouverte.
+ */
+export async function requireAtelier(req, res, next) {
+  if (req.user?.role !== "ADMIN" || !req.user?.atelierId) {
+    return next(
+      new HttpError(
+        403,
+        req.user?.role === "EMPLOYE"
+          ? "Réservé au responsable de l'atelier (PDG)."
+          : "Réservé aux comptes ADMIN d'un atelier.",
+      ),
+    );
+  }
+  return verifierAtelierActif(req, next);
+}
+
+/**
+ * FONCTIONS MÉTIER de l'atelier : le PDG (ADMIN) ou un employé (EMPLOYE). Ne vérifie QUE l'appartenance à un atelier
+ * actif ; ce qu'un employé a le droit de faire est contrôlé ensuite, route par route, par requirePermission /
+ * droitsParModule. À lui seul, ce middleware ne donne aucun accès à un employé sans permission.
+ */
+export async function requireMembreAtelier(req, res, next) {
+  const role = req.user?.role;
+  if ((role !== "ADMIN" && role !== "EMPLOYE") || !req.user?.atelierId) {
+    return next(new HttpError(403, "Réservé aux comptes d'un atelier."));
+  }
+  return verifierAtelierActif(req, next);
+}
+
+/** Exige une permission précise (le PDG les a toutes). 403 sinon, sans révéler d'information sur la ressource. */
+export function requirePermission(permission) {
+  return function controlePermission(req, res, next) {
+    if (aPermission(req.user, permission)) return next();
+    return next(new HttpError(403, "Vous n'avez pas l'autorisation d'effectuer cette action.", { permission }));
+  };
+}
+
+/** Exige au moins UNE des permissions données. */
+export function requireUnePermission(...permissions) {
+  return function controlePermissions(req, res, next) {
+    if (permissions.some((p) => aPermission(req.user, p))) return next();
+    return next(new HttpError(403, "Vous n'avez pas l'autorisation d'effectuer cette action.", { permission: permissions[0] }));
+  };
+}
+
+/** Lecture (GET) ou écriture (autres méthodes) d'un module : `<module>.lire` ou `<module>.ecrire`. */
+export function droitsParModule(module) {
+  return function controleModule(req, res, next) {
+    return requirePermission(permissionPourMethode(module, req.method))(req, res, next);
+  };
 }
 
 /**

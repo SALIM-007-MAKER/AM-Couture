@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireAtelier, requireMembreAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { putParametresSchema, patchParametresSchema } from "../schemas/atelier.schema.js";
 import { essaiExpire } from "../lib/trial.js";
@@ -19,7 +19,9 @@ const router = Router();
 // la bloquer aurait fait échouer ce chargement en boucle sur la page même
 // censée permettre de sortir du blocage. Seules les écritures (PUT/PATCH),
 // une vraie fonctionnalité métier, restent gardées individuellement plus bas.
-router.use(requireAuth, requireAtelier);
+// Lecture : tout membre de l'atelier. Écriture : PDG uniquement (non déléguable).
+router.use(requireAuth, requireMembreAtelier);
+router.use((req, res, next) => (req.method === "GET" ? next() : requireAtelier(req, res, next)));
 
 // GET /api/parametres — configuration actuelle, ou 404 si jamais configurée
 // (cas résiduel : un atelier créé sans nom initial — ne devrait plus arriver

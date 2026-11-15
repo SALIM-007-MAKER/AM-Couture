@@ -135,6 +135,9 @@ enum RoleUtilisateur {
   SUPERADMIN
   ADMIN
   USER
+  // Employé d'un atelier : n'a accès qu'aux fonctions que le PDG lui a accordées (User.permissions). Ne peut jamais
+  // administrer l'atelier (employés, paramètres, abonnement).
+  EMPLOYE
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -168,6 +171,15 @@ model User {
   // uniquement à l'affichage (fiche atelier côté SUPERADMIN), jamais à une
   // décision d'autorisation.
   derniereConnexionAt DateTime?
+  // Compte actif ? Un compte désactivé ne peut plus ni se connecter ni utiliser une session ouverte ; il n'est jamais
+  // supprimé (ses actions passées restent attribuées). Tous les comptes existants sont actifs.
+  actif               Boolean         @default(true)
+  desactiveLe         DateTime?
+  // Employés uniquement : poste (modèle de permissions, voir backend/src/lib/permissions.js), permissions accordées
+  // par le PDG (relues en base à chaque requête : un retrait prend effet immédiatement) et téléphone professionnel.
+  poste               String?
+  permissions         String[]        @default([])
+  telephone           String?
   // null tant que le lien envoyé par email (voir POST /auth/inscription-atelier)
   // n'a pas été cliqué — jamais une condition bloquante pour se connecter ou
   // utiliser l'application (voir décision : accès immédiat après inscription),
