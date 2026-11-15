@@ -58,6 +58,20 @@ export function useChangeStatutMutation(id) {
   });
 }
 
+export function useProductionQuery({ enabled = true } = {}) {
+  return useQuery({ queryKey: ["commandes", "production"], queryFn: () => commandesApi.production(), enabled });
+}
+
+export function useAffecterMutation(id) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (employeId) => commandesApi.affecter(id, employeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["commandes"] });
+    },
+  });
+}
+
 export function usePaiementsQuery(commandeId, params) {
   return useQuery({
     queryKey: ["commandes", commandeId, "paiements", "list", params],

@@ -10,6 +10,8 @@ export const commandesApi = {
   create: (data) => api.post("/commandes", data),
   update: (id, data) => api.patch(`/commandes/${id}`, data),
   changeStatut: (id, statut) => api.post(`/commandes/${id}/statut`, { statut }),
+  production: () => api.get("/commandes/production"),
+  affecter: (id, employeId) => api.put(`/commandes/${id}/affectation`, { employeId }),
   paiements: {
     list: (commandeId, params) => api.get(`/commandes/${commandeId}/paiements${buildQuery(params)}`),
     create: (commandeId, data) => api.post(`/commandes/${commandeId}/paiements`, data),

@@ -10,6 +10,7 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/QueryStat
 import Pagination from "../../components/Pagination.jsx";
 import CommandeStatutBadge from "./components/CommandeStatutBadge.jsx";
 import PaiementStatutBadge from "./components/PaiementStatutBadge.jsx";
+import BadgeRetard from "../production/BadgeRetard.jsx";
 import { useCan } from "../../hooks/usePermissions.js";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
@@ -30,10 +31,12 @@ export default function CommandesListPage() {
   const page = Number(searchParams.get("page") ?? "1");
   const statut = searchParams.get("statut") ?? "";
   const priorite = searchParams.get("priorite") ?? "";
+  const assigneA = searchParams.get("assigneA") ?? "";
+  const enRetard = searchParams.get("enRetard") === "true";
   const [qInput, setQInput] = useState(searchParams.get("q") ?? "");
   const q = useDebouncedValue(qInput, 300);
 
-  const params = { q, statut: statut || undefined, priorite: priorite || undefined, page, pageSize: PAGE_SIZE };
+  const params = { q, statut: statut || undefined, priorite: priorite || undefined, assigneA: assigneA || undefined, enRetard: enRetard ? "true" : undefined, page, pageSize: PAGE_SIZE };
   const { data, isPending, isError, error, refetch, isFetching } = useCommandesQuery(params);
 
   function updateParams(patch) {
@@ -111,6 +114,27 @@ export default function CommandesListPage() {
             </option>
           ))}
         </select>
+        <select
+          value={assigneA}
+          onChange={(e) => updateParams({ assigneA: e.target.value, page: undefined })}
+          className={`${inputClass} w-auto`}
+          aria-label={t("prod.colAssigne")}
+          data-testid="filtre-assigne"
+        >
+          <option value="">{t("prod.filtreTous")}</option>
+          <option value="moi">{t("prod.filtreMoi")}</option>
+          <option value="aucun">{t("prod.filtreAucun")}</option>
+          {assigneA && !["moi", "aucun"].includes(assigneA) && <option value={assigneA}>{t("prod.colAssigne")}</option>}
+        </select>
+        <label className="inline-flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
+          <input
+            type="checkbox"
+            checked={enRetard}
+            onChange={(e) => updateParams({ enRetard: e.target.checked ? "true" : undefined, page: undefined })}
+            data-testid="filtre-retard"
+          />
+          {t("prod.filtreRetard")}
+        </label>
       </div>
 
       {isPending && <LoadingState label={t("common.loading")} />}
@@ -118,7 +142,7 @@ export default function CommandesListPage() {
 
       {data && data.data.length === 0 && (
         <EmptyState icon={ClipboardList}>
-          {q || statut || priorite ? t("commandes.emptyFiltered") : t("commandes.emptyAll")}
+          {q || statut || priorite || assigneA || enRetard ? t("commandes.emptyFiltered") : t("commandes.emptyAll")}
         </EmptyState>
       )}
 
@@ -134,6 +158,7 @@ export default function CommandesListPage() {
                   <th className="px-4 py-3 font-medium hidden lg:table-cell">{t("commandes.colModele")}</th>
                   <th className="px-4 py-3 font-medium hidden sm:table-cell">{t("commandes.colLivraisonPrevue")}</th>
                   <th className="px-4 py-3 font-medium hidden md:table-cell">{t("commandes.colPriorite")}</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell">{t("prod.colAssigne")}</th>
                   {voirFinances && <th className="px-4 py-3 font-medium text-right">{t("commandes.colSolde")}</th>}
                   {voirFinances && <th className="px-4 py-3 font-medium">{t("commandes.colPaiement")}</th>}
                   <th className="px-4 py-3 font-medium">{t("commandes.colStatut")}</th>
@@ -157,6 +182,9 @@ export default function CommandesListPage() {
                     <td className="px-4 py-3 text-neutral-500 hidden md:table-cell">
                       {prioriteLabel(commande.priorite)}
                     </td>
+                    <td className="px-4 py-3 text-neutral-500 hidden lg:table-cell">
+                      {commande.assigneA ? `${commande.assigneA.prenom ?? ""} ${commande.assigneA.nom ?? commande.assigneA.identifiant}`.trim() : "—"}
+                    </td>
                     {voirFinances && (
                       <td className="px-4 py-3 text-right tabular-nums text-neutral-900 dark:text-neutral-100">{commande.solde}</td>
                     )}
@@ -166,7 +194,10 @@ export default function CommandesListPage() {
                       </td>
                     )}
                     <td className="px-4 py-3">
-                      <CommandeStatutBadge statut={commande.statut} />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <CommandeStatutBadge statut={commande.statut} />
+                        {commande.enRetard && <BadgeRetard />}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button as={Link} to={`/commandes/${commande.id}`} variant="ghost" size="sm" icon={Eye}>
@@ -187,7 +218,10 @@ export default function CommandesListPage() {
                   <Card variant="outlined" className="space-y-1 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors">
                     <div className="flex items-center justify-between">
                       <span className="font-medium text-neutral-900 dark:text-neutral-100">{commande.numero}</span>
-                      <CommandeStatutBadge statut={commande.statut} />
+                      <span className="inline-flex items-center gap-2">
+                        {commande.enRetard && <BadgeRetard />}
+                        <CommandeStatutBadge statut={commande.statut} />
+                      </span>
                     </div>
                     <p className="text-neutral-600 dark:text-neutral-400 text-sm">
                       {commande.cliente.nom} {commande.cliente.prenom} — {formatDate(commande.dateLivraisonPrevue)}
