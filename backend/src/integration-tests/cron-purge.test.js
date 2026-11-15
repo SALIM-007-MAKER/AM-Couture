@@ -61,6 +61,23 @@ describe("Cron — rappels quotidiens et purge du journal de sécurité", () => 
     assert.ok(await prisma.journalSecurite.findUnique({ where: { id: ids.recent } }));
   });
 
+  it("purge aussi les clés d'idempotence expirées (et seulement elles)", async () => {
+    process.env.CRON_SECRET = "secret-de-test-cron-0123456789";
+    const portee = `atelier:cron-${process.pid}`;
+    const base = { portee, methode: "POST", chemin: "/x", empreinte: "e", statut: "TERMINEE", reponseStatut: 201, reponseCorps: {} };
+    await prisma.cleIdempotence.create({ data: { ...base, cle: "expiree-cron-0001", expireLe: new Date(Date.now() - 3_600_000) } });
+    await prisma.cleIdempotence.create({ data: { ...base, cle: "valide-cron-00001", expireLe: new Date(Date.now() + 3_600_000) } });
+    try {
+      const res = await appeler("Bearer secret-de-test-cron-0123456789");
+      assert.equal(res.status, 200);
+      assert.ok((await res.json()).clesIdempotencePurgees >= 1);
+      assert.equal(await prisma.cleIdempotence.count({ where: { portee, cle: "expiree-cron-0001" } }), 0);
+      assert.equal(await prisma.cleIdempotence.count({ where: { portee, cle: "valide-cron-00001" } }), 1);
+    } finally {
+      await prisma.cleIdempotence.deleteMany({ where: { portee } });
+    }
+  });
+
   it("idempotent : un second passage ne supprime plus rien de ces lignes", async () => {
     process.env.CRON_SECRET = "secret-de-test-cron-0123456789";
     const res = await appeler("Bearer secret-de-test-cron-0123456789");

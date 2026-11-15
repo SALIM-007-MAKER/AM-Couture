@@ -872,3 +872,31 @@ model JournalSecurite {
   @@index([atelierId, createdAt])
   @@index([userId, createdAt])
 }
+
+// Clé d'idempotence (sous-phase 3.3, docs/IDEMPOTENCE.md) : mémorise la réponse 2xx d'une requête
+// d'écriture envoyée avec l'en-tête `Idempotency-Key`, pour qu'un réessai (double clic, délai dépassé,
+// relance réseau) rejoue la réponse d'origine au lieu de ré-exécuter l'opération (double paiement,
+// commande en double…).
+//
+// - `portee` : « atelier:<id> » ou « superadmin:<id> » — une clé n'est valable que dans SA portée, jamais
+//   partagée entre ateliers. Pas de clé étrangère (même choix que JournalSecurite) : purge par durée de vie.
+// - `empreinte` : SHA-256 de (méthode, chemin, corps). Même clé + empreinte différente = requête différente → 422.
+// - `statut` : EN_COURS (réservée, en traitement) ou TERMINEE (réponse 2xx mémorisée). Seules les réponses
+//   2xx sont mémorisées : un 4xx ou 5xx supprime la réservation, le réessai est réévalué.
+// - `expireLe` : durée de vie 24 h ; purge quotidienne par le cron.
+model CleIdempotence {
+  id            String   @id @default(cuid())
+  portee        String
+  cle           String
+  methode       String
+  chemin        String
+  empreinte     String
+  statut        String
+  reponseStatut Int?
+  reponseCorps  Json?
+  createdAt     DateTime @default(now())
+  expireLe      DateTime
+
+  @@unique([portee, cle])
+  @@index([expireLe])
+}

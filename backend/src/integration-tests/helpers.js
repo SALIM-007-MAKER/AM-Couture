@@ -45,13 +45,14 @@ export function client(baseUrl) {
   // fixe faisait partager les mêmes IP à tous les fichiers (et à chaque relance locale), d'où des
   // 429 sur la connexion dès que le nombre de fichiers augmentait.
   const ip = `10.${(process.pid >> 8) & 255}.${process.pid & 255}.${(compteurIp++ % 254) + 1}`;
-  async function requete(path, { method = "GET", body } = {}) {
+  async function requete(path, { method = "GET", body, headers = {} } = {}) {
     const res = await fetch(`${baseUrl}${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
         "X-Forwarded-For": ip,
         ...(cookie ? { Cookie: cookie } : {}),
+        ...headers,
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
@@ -63,14 +64,14 @@ export function client(baseUrl) {
     } catch {
       // Pas de corps JSON (204) — laissé à null.
     }
-    return { status: res.status, body: json };
+    return { status: res.status, body: json, headers: res.headers };
   }
   return {
-    get: (path) => requete(path),
-    post: (path, body) => requete(path, { method: "POST", body }),
-    patch: (path, body) => requete(path, { method: "PATCH", body }),
-    put: (path, body) => requete(path, { method: "PUT", body }),
-    delete: (path) => requete(path, { method: "DELETE" }),
+    get: (path, headers) => requete(path, { headers }),
+    post: (path, body, headers) => requete(path, { method: "POST", body, headers }),
+    patch: (path, body, headers) => requete(path, { method: "PATCH", body, headers }),
+    put: (path, body, headers) => requete(path, { method: "PUT", body, headers }),
+    delete: (path, headers) => requete(path, { method: "DELETE", headers }),
   };
 }
 

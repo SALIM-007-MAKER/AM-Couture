@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
@@ -41,7 +42,7 @@ const CLIENTE_SUMMARY_SELECT = { id: true, nom: true, prenom: true, telephone: t
 const MODELE_SUMMARY_SELECT = { id: true, nom: true, categorie: true, archivedAt: true };
 
 // POST /api/commandes — création (+ paiement initial optionnel, atomique)
-router.post("/", async (req, res) => {
+router.post("/", idempotence, async (req, res) => {
   const parsed = createCommandeSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));

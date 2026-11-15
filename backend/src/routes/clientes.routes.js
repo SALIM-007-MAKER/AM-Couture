@@ -2,6 +2,7 @@ import { Router } from "express";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
+import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
@@ -64,7 +65,7 @@ async function assertPhoneAvailable(client, atelierId, telephone, excludeId) {
 }
 
 // POST /api/clientes — création
-router.post("/", async (req, res) => {
+router.post("/", idempotence, async (req, res) => {
   const parsed = createClienteSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));

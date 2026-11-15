@@ -94,9 +94,10 @@ describe("Concurrence — paiements", () => {
     assert.deepEqual(await toutesViolations(ctx.atelier.id), []);
   });
 
-  it("[caractérisation 3.3] sans clé d'idempotence, une même requête répétée crée deux paiements", async () => {
-    // COMPORTEMENT ACTUEL, connu (écart 2.2) : documenté ici pour qu'un changement soit visible.
-    // La sous-phase 3.3 introduira l'idempotence et inversera cette assertion.
+  it("sans en-tête Idempotency-Key, une même requête répétée crée deux paiements (comportement conservé ; protégé avec une clé)", async () => {
+    // Depuis la 3.3, l'idempotence est OPTIONNELLE : envoyée avec l'en-tête Idempotency-Key, la requête
+    // répétée est rejouée (voir idempotence.test.js). Sans en-tête, le comportement historique est inchangé.
+    // L'interface ne transmet pas encore de clé : câblage prévu en sous-phase 3.6.
     const c = await creerCommandeApi(ctx.api, ctx.cliente.id, { prixTotal: "10000" });
     const r1 = await payer(ctx.api, c.id, 3000);
     const r2 = await payer(ctx.api, c.id, 3000);
@@ -105,7 +106,6 @@ describe("Concurrence — paiements", () => {
     assert.notEqual(r1.body.id, r2.body.id);
     assert.equal(await totalPaye(c.id), 6000);
   });
-
   it("paiement refusé sur commande annulée, y compris quand l'annulation est simultanée", async () => {
     const c = await creerCommandeApi(ctx.api, ctx.cliente.id, { prixTotal: "10000" });
     const [statut, ...paiements] = await Promise.all([

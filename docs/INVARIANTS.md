@@ -42,7 +42,7 @@ Format : `PRÉFIXE-AAAA-NNNN`. Un compteur par couple (préfixe, année UTC), pa
 
 | Cas | Comportement actuel |
 |---|---|
-| Même paiement envoyé deux fois | **Deux paiements** sont créés si le solde le permet (aucune clé d'idempotence) — écart 2.2, sous-phase 3.3 |
+| Même paiement envoyé deux fois | **Avec** l'en-tête `Idempotency-Key` (3.3) : la réponse d'origine est rejouée, un seul paiement (voir `docs/IDEMPOTENCE.md`). **Sans** en-tête : deux paiements si le solde le permet (comportement historique conservé ; l'interface n'envoie pas encore de clé, câblage en 3.6) |
 | Même transition de statut envoyée N fois en parallèle | Un seul succès, les autres reçoivent 409 (`updateMany` conditionnel) |
 | Annulation du même paiement / de la même livraison N fois | Un seul succès, les autres reçoivent 409 |
 | Reçu du même paiement N fois | Un seul succès, les autres reçoivent 409 |
@@ -74,8 +74,9 @@ RÉSOLUE. Résultats **mesurés** (Postgres 16 et 17).
 Limite des tests pour 2 et 3 : un test extérieur ne peut pas prouver l'ABSENCE d'une vérification préalable (un message identique peut venir d'un contrôle ou de la contrainte). La preuve de la cause repose donc sur la **revue de code** des trois chemins de création de compte (consignée ci-dessus), complétée par des mutations : retirer la traduction par champ ou le repli sans email est détecté.
 
 Comportements **caractérisés** (le test affirme l'état actuel, à inverser dans la sous-phase
-indiquée) : absence d'idempotence des paiements (3.3), numérotation globale non continue par
-atelier (3.4).
+indiquée) : numérotation globale non continue par atelier (3.4). L'idempotence des écritures est
+implémentée en 3.3 mais **optionnelle** (en-tête `Idempotency-Key`) et pas encore utilisée par l'interface
+(3.6) : sans clé, une requête répétée reste exécutée deux fois.
 
 ## 5. Efficacité des tests : vérification par mutation
 
