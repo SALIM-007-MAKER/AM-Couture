@@ -69,7 +69,7 @@ RÉSOLUE. Résultats **mesurés** (Postgres 16 et 17).
 | 5 | Doublons de clientes sous concurrence : `assertPhoneAvailable` est une vérification applicative, `telephone` n'a qu'un index non unique | **mesuré** : 8 créations simultanées du même téléphone → 2 clientes créées | **OUVERTE** | 3.3 |
 | 6 | Doublons de modèles sous concurrence (même mécanisme sur nom + catégorie) | **mesuré** : 8 créations simultanées → 6 modèles créés | **OUVERTE** | 3.3 |
 | 7 | Aucune contrainte `CHECK` en base | **mesuré** : `INSERT` direct d'un paiement à -500 ou 0, `prixTotal` négatif, quantité de commande 0 acceptés | **OUVERTE** | 3.3 |
-| 8 | Événement client non atomique : le changement de statut et le refus d'une demande écrivent l'événement hors transaction | **code** (`commandes.routes.js`, `demandes.routes.js`) — **à confirmer par test** avant correction | **OUVERTE, à confirmer** | 3.3 |
+| 8 | Événement client non atomique : le changement de statut et le refus d'une demande écrivent l'événement hors transaction | **code** (`commandes.routes.js`, `demandes.routes.js`) — **à confirmer par test** avant correction | **RÉSOLUE en 3.3** : **confirmée** par test (un déclencheur SQL fait échouer l'événement : le statut changeait quand même, et la demande était refusée en silence), puis corrigée — le changement de statut et le refus de demande écrivent leur événement dans la même transaction. Trois routes déjà atomiques servent de contrôle. Test bloquant | 3.3 |
 
 Les tests des anomalies 2 et 3 sont **bloquants** (15 exécutions consécutives sans échec) : ils
 protègent le comportement HTTP atténué, pas la correction de la cause. Ils ne valent pas
