@@ -195,10 +195,10 @@ model User {
   // expiration, quoi qu'il arrive côté base).
   sessionVersion      Int             @default(0)
 
-  tokensAction TokenAction[]
+  tokensAction        TokenAction[]
   // Présent UNIQUEMENT pour un compte USER (voir Cliente.userId) — null pour
   // ADMIN/SUPERADMIN, qui ne sont jamais reliés à une Cliente.
-  cliente      Cliente?      @relation
+  cliente             Cliente?              @relation
   commandesAssignees  Commande[]            @relation("CommandesAssignees")
   affectationsRecues  AffectationCommande[] @relation("AffectationEmploye")
   affectationsFaites  AffectationCommande[] @relation("AffectationAuteur")
@@ -243,33 +243,41 @@ model TokenAction {
 /// logo, coordonnées, comptes ADMIN et données métier (Clientes, Commandes,
 /// Modèles, Dépenses, Abonnement) — jamais partagés entre ateliers.
 model Atelier {
-  id          String    @id @default(cuid())
-  nom         String
-  logoUrl     String?
-  telephone   String?
-  adresse     String?
+  id                 String    @id @default(cuid())
+  nom                String
+  logoUrl            String?
+  telephone          String?
+  adresse            String?
   // Distincts d'`adresse` (rue/complément, en texte libre) — ajoutés pour
   // l'inscription en libre-service (Phase 8), qui les demande séparément.
-  ville       String?
-  pays        String?
-  slogan      String?
-  devise      String    @default("FCFA")
-  recuConfig  Json?
+  ville              String?
+  pays               String?
+  slogan             String?
+  devise             String    @default("FCFA")
+  recuConfig         Json?
+  // Vitrine publique (7.2) : désactivée par défaut, rien n'est visible sans geste explicite du PDG. `slug` = identifiant
+  // dans l'adresse publique (/a/<slug>). `vitrineContact` : le téléphone, l'adresse et la ville ne sont montrés que si
+  // le PDG le choisit. `couleurPrincipale` : #RRGGBB, contraste vérifié (texte blanc lisible).
+  slug               String?   @unique
+  vitrineActive      Boolean   @default(false)
+  vitrineDescription String?
+  couleurPrincipale  String?
+  vitrineContact     Boolean   @default(false)
   // Suspension par le SUPERADMIN (ex: impayé, litige) — bloque IMMÉDIATEMENT
   // les nouvelles requêtes de tout compte de cet atelier (vérifié à chaque
   // requête via requireAtelier, pas seulement à la connexion : voir
   // auth.middleware.js), sans supprimer aucune donnée.
-  actif       Boolean   @default(true)
-  suspenduLe  DateTime?
+  actif              Boolean   @default(true)
+  suspenduLe         DateTime?
   // Essai gratuit de 7 jours — posé UNE SEULE FOIS à la création (voir
   // atelierProvisioning.js:creerAtelierEtAdmin), jamais recalculé ni
   // prolongé après coup, jamais accepté depuis le frontend. `null` pour
   // tout atelier créé AVANT l'introduction de cette fonctionnalité : ces
   // ateliers "légataires" ne sont jamais bloqués par le trial (voir
   // lib/trial.js) — seuls les ateliers créés après ont une échéance réelle.
-  trialEndsAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  trialEndsAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   users                User[]
   clientes             Cliente[]
@@ -723,8 +731,8 @@ model ArticleStock {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  mouvements  MouvementStock[]
-  lignesAchat LigneAchat[]
+  mouvements    MouvementStock[]
+  lignesAchat   LigneAchat[]
   notifications Notification[]
 
   @@index([atelierId])
@@ -732,18 +740,18 @@ model ArticleStock {
 }
 
 model MouvementStock {
-  id        String             @id @default(cuid())
-  articleId String
-  article   ArticleStock       @relation(fields: [articleId], references: [id], onDelete: Restrict)
-  type      TypeMouvementStock
+  id           String             @id @default(cuid())
+  articleId    String
+  article      ArticleStock       @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  type         TypeMouvementStock
   // Toujours positive : le signe est déterminé par `type`, jamais encodé
   // dans la valeur (évite un ENTREE négatif ou une SORTIE positive incohérents).
-  quantite  Decimal            @db.Decimal(10, 2)
-  motif     String?
+  quantite     Decimal            @db.Decimal(10, 2)
+  motif        String?
   // Renseigné quand l'entrée vient de la réception d'un achat (Phase 6.5) : trace et garde-fou contre le double comptage.
   ligneAchatId String?
   ligneAchat   LigneAchat?        @relation(fields: [ligneAchatId], references: [id], onDelete: Restrict)
-  createdAt DateTime           @default(now())
+  createdAt    DateTime           @default(now())
 
   @@index([articleId])
   @@index([ligneAchatId])

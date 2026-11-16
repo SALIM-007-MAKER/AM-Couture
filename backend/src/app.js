@@ -11,6 +11,8 @@ import authRouter from "./routes/auth.routes.js";
 import clientesRouter from "./routes/clientes.routes.js";
 import modelesRouter from "./routes/modeles.routes.js";
 import imagesRouter from "./routes/images.routes.js";
+import vitrineRouter from "./routes/vitrine.routes.js";
+import vitriniquePubliqueRouter from "./routes/vitrinePublique.routes.js";
 import fournisseursRouter from "./routes/fournisseurs.routes.js";
 import achatsRouter from "./routes/achats.routes.js";
 import commandesRouter from "./routes/commandes.routes.js";
@@ -81,6 +83,9 @@ app.use("/api/auth", authRouter);
 app.use("/api/clientes", clientesRouter);
 app.use("/api/modeles", modelesRouter);
 app.use("/api/images", imagesRouter);
+app.use("/api/vitrine", vitrineRouter);
+// Sans compte : lecture seule de la vitrine d'un atelier qui l'a activée (voir vitrinePublique.routes.js).
+app.use("/api/public", vitriniquePubliqueRouter);
 app.use("/api/fournisseurs", fournisseursRouter);
 app.use("/api/achats", achatsRouter);
 app.use("/api/commandes", commandesRouter);
