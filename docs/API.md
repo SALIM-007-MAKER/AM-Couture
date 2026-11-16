@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 192 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 195 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -125,13 +125,14 @@ Schéma : `cliente.schema.js`, `mesure.schema.js`.
 | Route | Accès | Corps / paramètres |
 |---|---|---|
 | `POST /api/clientes` | Atelier, idempotente | `{ nom, prenom, telephone }` + `telephone2?, email?, adresse?, sexe? ("FEMME" \| "HOMME" \| "AUTRE"), notes?`. 409 si le téléphone existe déjà dans l'atelier (la réponse contient l'identité de la cliente existante dans `details`). |
-| `GET /api/clientes` | Atelier | `?q=` (nom, prénom, téléphone), `archived=true\|false\|all` (défaut `false`), `page`, `pageSize`. |
+| `GET /api/clientes` | Atelier | `?q=` (nom, prénom, téléphone), `archived=true\|false\|all` (défaut `false`), `effacement=true` (cliente ayant demandé l'effacement, pas encore anonymisée), `page`, `pageSize`. |
 | `GET /api/clientes/export` | Atelier | CSV, mêmes filtres. |
 | `GET /api/clientes/:id` | Atelier | Fiche. |
 | `GET /api/clientes/:id/totaux` | Atelier | `{ totalCommandes, totalPaye, totalRestant }` de la cliente. |
 | `PATCH /api/clientes/:id` | Atelier | Mêmes champs que la création, tous optionnels (au moins un). |
 | `POST /api/clientes/:id/archiver` | Atelier | Archive (aucune suppression physique). |
 | `POST /api/clientes/:id/restaurer` | Atelier | Restaure une cliente archivée. |
+| `POST /api/clientes/:id/anonymiser` | PDG | Droit à l'effacement : remplace l'identité par des valeurs neutres, supprime mesures, fil d'activité et compte de connexion ; commandes et paiements restent. 409 si une commande est en cours ou si déjà anonymisée ; 403 pour un employé. Irréversible. |
 | `POST /api/clientes/:id/inviter` | Atelier | Crée le compte de connexion (identifiant = téléphone) et renvoie un lien d'activation ; 409 si un compte existe déjà. |
 | `POST /api/clientes/:id/mesures` | Atelier | Nouvelle prise de mesures (historique conservé) : champs en cm parmi `epaule, poitrine, taille, hanches, longueur, longueurRobe, longueurJupe, longueurPantalon, longueurManche, tourBras, tourCou, tourPoignet, tourCuisse, tourGenou` (0,1 à 300, 2 décimales), `autres?` (objet libre, 20 clés maximum), `notes?`. |
 | `GET /api/clientes/:id/mesures` | Atelier | Historique, paginé. |
@@ -336,6 +337,8 @@ Une cliente ne voit que ses propres données.
 | `POST /api/moi/commandes/:id/recus` | Cliente | Demande l'émission du reçu d'une de ses commandes. |
 | `GET /api/moi/recus` | Cliente | Ses reçus. |
 | `GET /api/moi/recus/:id/pdf` | Cliente | Un de ses reçus en PDF. |
+| `GET /api/moi/export` | Cliente | Télécharge SES données (profil, mesures, commandes avec paiements et livraisons, reçus, demandes, activité) en JSON. 10 par heure et par IP. |
+| `POST /api/moi/suppression` | Cliente | `{ motDePasse }` — ferme son compte (session comprise) et marque la fiche « effacement demandé » ; 400 si mot de passe incorrect. 5 par heure et par IP. |
 
 ## 14. Administration de la plateforme — SuperAdmin
 

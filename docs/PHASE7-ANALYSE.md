@@ -177,3 +177,30 @@ Les quatre options recommandées ont été retenues : **adaptateur de stockage d
 - Pas de réponse automatique au visiteur (pas de courriel collecté) : l'atelier le rappelle par téléphone ou WhatsApp.
 - Le visiteur n'a aucun accès à sa demande après l'envoi ; pas de suivi en ligne tant qu'il n'a pas de compte (espace client).
 - La demande de **suppression anticipée** par le visiteur passe par l'atelier (le refus ou la suppression de la fiche) : pas de procédure en libre-service.
+
+## 10. Réalisé en 7.4 — espace client : suivi d'étapes, export et effacement des données
+
+**Fonctionnement**
+- **Suivi d'étapes** : la fiche d'une commande, côté cliente, affiche les six étapes (nouvelle, en confection, essayage, retouches, terminée, livrée) avec les étapes passées cochées et l'étape en cours expliquée en une phrase ; une commande annulée l'indique sans progression. Rien d'interne n'apparaît (employé, coûts, notes) : seul le statut, déjà visible, est mis en forme.
+- **Télécharger mes données** (`GET /api/moi/export`) : un fichier JSON avec son profil, ses mesures, ses commandes (paiements et livraisons compris), ses reçus, ses demandes et son fil d'activité. Toujours filtré par l'identité du jeton, jamais par un paramètre ; ni identifiant technique interne, ni donnée d'une autre cliente ; `Cache-Control: no-store`.
+- **Supprimer mon compte** (`POST /api/moi/suppression`) : demande le mot de passe (une session volée ne suffit pas), puis supprime immédiatement le compte de connexion (la session s'arrête, la reconnexion échoue) et marque la fiche « effacement demandé ». Le cache du navigateur est vidé.
+- **Anonymisation par l'atelier** (`POST /api/clientes/:id/anonymiser`, PDG seulement) : nom, téléphone, email, adresse, notes et sexe sont remplacés par des valeurs neutres, les mesures et le fil d'activité sont supprimés, le texte libre de ses demandes est effacé, le compte de connexion est fermé. Le numéro d'origine est libéré. Les **commandes, paiements, livraisons et reçus restent** (obligation comptable de l'atelier) mais ne portent plus d'identité.
+
+**Garde-fous**
+- L'effacement n'est jamais forcé à l'insu de l'atelier : la cliente ferme son accès, l'atelier traite (filtre « Effacement demandé » et pastille dans la liste des clientes).
+- L'anonymisation est **refusée tant qu'une commande est en cours** (on ne confectionne pas pour une identité effacée) ; elle n'est pas rejouable (409) ; une fiche anonymisée ne peut être ni restaurée, ni modifiée, ni invitée. Deux anonymisations simultanées : une seule réussit (verrou de ligne).
+- Irréversible : l'identité d'origine n'est conservée nulle part. Le journal de sécurité note l'événement (identifiants techniques seulement, jamais le nom).
+- 5 suppressions et 10 exports par heure et par IP.
+
+**Base de données** (migration additive `20261129090000_droit_effacement`) : `Cliente.suppressionDemandeeLe` et `Cliente.anonymiseeLe`. Retour arrière : supprimer les deux colonnes (l'anonymisation déjà faite ne se défait pas, par conception).
+
+**API** : 3 routes ajoutées (195 documentées) + paramètre `effacement` sur `GET /api/clientes`.
+
+**Tests** : 12 d'intégration (export complet et isolé, refus aux non-clientes, mot de passe exigé, compte et session fermés, rien effacé sans l'atelier, filtre isolé par atelier, anonymisation complète sans trace de l'identité, numéro libéré, refus avec commande en cours puis acceptation, droits PDG/employé/autre atelier, non-rejouable et fiche verrouillée, cliente sans compte, anonymisations simultanées) ; **7 mutations détectées** (export sans filtre, commande ouverte ignorée, mesures conservées, notes conservées, mot de passe non vérifié, employé autorisé, atelier ignoré) ; 6 unitaires frontend (étapes) ; 5 E2E (suivi d'étapes, export, mauvais mot de passe puis fermeture, reconnexion impossible, anonymisation côté atelier).
+
+**Limites**
+- **La langue des messages n'est pas traitée ici** : les messages du fil d'activité sont figés en français au moment de l'événement (choix d'origine). Les rendre dans la langue de la cliente demande de stocker un code et des paramètres plutôt qu'un texte, ce qui touche aussi les PDF et les courriels : regroupé avec le **multilingue serveur (7.7)** pour ne le faire qu'une fois.
+- Le PDG n'est pas alerté à l'arrivée d'une demande d'effacement (filtre et pastille dans la liste, pas de notification) : à ajouter avec la cloche si l'usage le justifie.
+- Le texte libre d'une commande (description) peut citer la personne : il est conservé car c'est un document comptable ; l'atelier doit éviter d'y mettre des données personnelles.
+- Les anciennes sauvegardes de la base (Neon) peuvent contenir l'identité avant anonymisation, jusqu'à expiration de leur historique : à indiquer dans la politique de confidentialité.
+- Pas de motif de conservation légal vérifié pour le pays de l'atelier : à valider avec un juriste local avant de promettre un délai.
