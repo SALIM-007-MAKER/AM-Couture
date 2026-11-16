@@ -168,3 +168,30 @@ Plan ajusté : **6.1** employés et permissions (serveur) · **6.2** interface e
 - Les lignes et les prix ne se modifient pas après création : annuler et recréer (tant que rien n'est reçu ni payé). L'API permet de modifier la date attendue et les notes ; l'interface ne l'expose pas encore.
 - Recevoir ne modifie pas le prix unitaire de l'article de stock (comportement existant inchangé) ; pas de gestion de retours fournisseur.
 - Pas de rappel « achat attendu non reçu » avant la 6.6 ; pas de rapport par fournisseur avant la 6.7.
+
+## 13. Réalisé en 6.6 — notifications automatiques
+
+**Nouvelles alertes** (dans l'application, décision du 15/11 ; toujours **dérivées de l'état réel** et recalculées à la lecture, comme les alertes de la phase 4 : aucun texte stocké, elles disparaissent seules quand la cause disparaît) :
+
+| Alerte | Quand | Qui la voit |
+|---|---|---|
+| `TACHE_AFFECTEE` | une commande ouverte est confiée à un employé actif | cet employé seul (ni le PDG, ni un collègue) |
+| `RETARD` (existante) | commande en retard | le PDG ; l'employé à qui la commande est confiée ; qui gère les commandes (`commandes.ecrire` ou `commandes.affecter`) |
+| `PRET`, `LIVRAISON_PROCHE` (existantes) | commande prête / livraison proche | idem `RETARD` |
+| `STOCK_BAS` | quantité de l'article ≤ seuil d'alerte (seuil renseigné, article non archivé) | le PDG et qui gère le stock (`stock.ecrire`) ; la quantité actuelle est affichée |
+| `ACHAT_EN_RETARD` | achat non annulé, pas entièrement reçu, date attendue passée | le PDG et qui réceptionne (`achats.recevoir`) |
+| `IMPAYE` (existante) | commande sans paiement | le PDG et `finances.voir`, inchangé |
+
+Réaffecter une commande déplace l'alerte vers le nouvel employé (non lue) ; la retirer, annuler ou livrer la commande, désactiver le compte, réapprovisionner ou réceptionner la fait disparaître.
+
+**État de lecture individuel** (lève la limite notée en 6.1) : un employé marque lu **pour lui seul** (table `NotificationLue`) ; le drapeau historique `Notification.lu` reste celui du PDG (et de l'espace client pour `PRET` / `LIVRAISON_PROCHE`, comportement inchangé). Un employé ne modifie donc jamais l'état du PDG ni celui d'un collègue, ne peut pas atteindre une notification hors de sa vue (404) et ne peut pas supprimer (réservé au PDG). Changement de comportement par rapport à la 6.1 : un employé sans gestion des commandes ne voit plus les alertes des commandes qui ne lui sont pas confiées.
+
+**Résumé quotidien par email** : reste réservé au PDG, désormais **explicitement**. Il était envoyé à tout compte de l'atelier ayant une adresse email — donc aussi à un employé, avec le décompte des impayées. Corrigé (filtre `lib/rappelsQuotidiens.js`, testé par mutation) ; le résumé compte aussi stock bas et achats en retard et ignore les alertes individuelles.
+
+**Base de données** (migration `20261125090000_notifications_employes`, additive sauf `commandeId` rendu facultatif) : `Notification` reçoit `atelierId` (rempli depuis la commande pour les lignes existantes — vérifié sur une base contenant déjà une notification), `articleId`, `achatId`, `destinataireId` ; trois valeurs d'énumération ; table `NotificationLue` ; un `CHECK` impose exactement **une** référence (commande, article ou achat). Retour arrière : supprimer les alertes non liées à une commande, remettre `commandeId` obligatoire, supprimer les colonnes et la table.
+
+**Interface** : la page Notifications affiche les nouveaux types (icône, libellé, lien vers la commande, l'article ou l'achat) ; un employé peut marquer lu, la suppression n'est proposée qu'au PDG.
+
+**Tests** : 16 d'intégration (travail confié et réaffectation en une seule lecture, retards, droits par type, stock bas au seuil exact, achats en retard, lecture individuelle, isolation, résumé quotidien) avec 5 mutations détectées (vue limitée aux commandes confiées, drapeau partagé modifié par un employé, destinataires du résumé, ordre suppression/création, seuil strict) ; 3 E2E ; la suite d'intégration existante passe inchangée sauf un test de la 6.1 mis à jour (la limite « un employé ne peut pas marquer lu » est levée). Suites complètes : 333 unitaires backend, 364 intégration, 97 frontend, 55 E2E.
+
+**Limites** : alertes recalculées à la lecture (pastille actualisée toutes les 60 s), pas de notification poussée ni d'email individuel à l'employé ; pas de réglage par personne de ce qu'elle veut recevoir ; l'alerte de retard utilise la définition historique (statut non terminé et date dépassée), légèrement différente du filtre « en retard » de la page Production (qui garde `TERMINEE` en cours jusqu'à la livraison) — à harmoniser si besoin.

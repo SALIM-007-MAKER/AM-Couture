@@ -8,7 +8,8 @@ import {
   useMarquerLuMasseMutation,
   useSupprimerMasseMutation,
 } from "./hooks.js";
-import { NOTIFICATION_LABELS, NOTIFICATION_ICONS, NOTIFICATION_TONES, notificationMessage } from "./constants.js";
+import { NOTIFICATION_LABELS, NOTIFICATION_ICONS, NOTIFICATION_TONES, notificationMessage, notificationCible } from "./constants.js";
+import { useCan } from "../../hooks/usePermissions.js";
 import { LoadingState, ErrorState, EmptyState, GlobalFormError } from "../../components/QueryState.jsx";
 import Pagination from "../../components/Pagination.jsx";
 import Card from "../../components/Card.jsx";
@@ -37,6 +38,8 @@ function formatDateHeure(iso) {
 
 export default function NotificationsPage() {
   const { t } = useTranslation();
+  // Supprimer agit sur l'état de tout l'atelier : réservé au PDG. Marquer lu est individuel pour un employé.
+  const peutSupprimer = useCan()("@admin");
   const FILTRES = [
     { value: "", label: t("notif.filterAll") },
     { value: "false", label: t("notif.filterUnread") },
@@ -141,7 +144,7 @@ export default function NotificationsPage() {
             >
               {t("notif.markSelectedRead")}
             </Button>
-            {confirmingDelete ? (
+            {!peutSupprimer ? null : confirmingDelete ? (
               <>
                 <Button
                   variant="danger"
@@ -199,11 +202,9 @@ export default function NotificationsPage() {
                         <span className={`text-xs font-semibold ${tone}`}>{NOTIFICATION_LABELS[notif.type]}</span>
                         <span className="text-xs text-neutral-400">{formatDateHeure(notif.createdAt)}</span>
                       </div>
-                      <Link
-                        to={`/commandes/${notif.commande.id}`}
-                        className="text-sm text-neutral-900 dark:text-neutral-100 hover:underline"
-                      >
-                        {notif.commande.cliente.nom} {notif.commande.cliente.prenom} — {notificationMessage(notif)}
+                      <Link to={notificationCible(notif).to} className="text-sm text-neutral-900 dark:text-neutral-100 hover:underline" data-testid={`notif-${notif.type}`}>
+                        {notificationCible(notif).prefixe}
+                        {notificationMessage(notif)}
                       </Link>
                     </div>
                     <Button
