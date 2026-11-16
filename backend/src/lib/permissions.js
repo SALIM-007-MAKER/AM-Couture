@@ -36,6 +36,9 @@ export const CATALOGUE = {
   "stock.ecrire": { module: "stock", sensible: false },
   "dashboard.lire": { module: "dashboard", sensible: false },
   "rapports.lire": { module: "rapports", sensible: false },
+  // Rapports avancés (6.7) : performance par employé, retards, achats, dépenses, marges. Les rapports qui portent un montant
+  // exigent EN PLUS « finances.voir ».
+  "rapports.avances": { module: "rapports", sensible: false },
   "notifications.lire": { module: "notifications", sensible: false },
   // Argent : encaissements, dépenses, montants visibles partout.
   "paiements.lire": { module: "paiements", sensible: true },
@@ -50,7 +53,7 @@ export const PERMISSIONS_SENSIBLES = new Set(PERMISSIONS.filter((p) => CATALOGUE
 
 // Une permission d'écriture suppose la lecture du même module ; changer le statut d'une commande suppose de la lire ;
 // consulter ou enregistrer des paiements suppose de voir les montants des commandes (solde, prix).
-const IMPLICATIONS = { "commandes.statut": ["commandes.lire"], "commandes.affecter": ["commandes.lire"], "achats.recevoir": ["achats.lire"], "achats.ecrire": ["achats.recevoir", "finances.voir"], "paiements.lire": ["finances.voir"] };
+const IMPLICATIONS = { "commandes.statut": ["commandes.lire"], "commandes.affecter": ["commandes.lire"], "achats.recevoir": ["achats.lire"], "rapports.avances": ["rapports.lire"], "achats.ecrire": ["achats.recevoir", "finances.voir"], "paiements.lire": ["finances.voir"] };
 for (const p of PERMISSIONS) {
   if (p.endsWith(".ecrire")) IMPLICATIONS[p] = [...(IMPLICATIONS[p] ?? []), p.replace(".ecrire", ".lire")];
 }
