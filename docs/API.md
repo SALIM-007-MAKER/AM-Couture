@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 195 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 200 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -98,6 +98,7 @@ Le **PDG** (compte `ADMIN`) a tous les droits sur son atelier. Un **employé** (
 | `demandes.lire` / `demandes.ecrire` | demandes de commande des clientes |
 | `stock.lire` / `stock.ecrire` | stock et mouvements |
 | `dashboard.lire` / `rapports.lire` | tableau de bord et rapports non financiers |
+| `rapports.avances` | rapports avancés (production par employé, retards, achats, dépenses, marges) ; implique `rapports.lire`. Ceux qui portent un montant exigent en plus `finances.voir` |
 | `notifications.lire` | lecture des alertes (hors impayés) ; l'état « lu » reste réservé au PDG |
 | **`paiements.lire` / `paiements.ecrire`** *(sensible)* | paiements, reçus ; implique `finances.voir` |
 | **`depenses.lire` / `depenses.ecrire`** *(sensible)* | dépenses |
@@ -284,6 +285,11 @@ Périodes : `period=today\|week\|month\|quarter\|year`, ou `from` et `to` (dates
 | `GET /api/rapports/commandes/a-livrer` | Atelier | `?horizonJours=` (1–90, défaut 7), pagination. |
 | `GET /api/rapports/clientes` | Atelier | Période → clientes actives et archivées, nouvelles et ayant commandé, meilleures clientes par nombre de commandes. |
 | `GET /api/rapports/modeles` | Atelier | Catalogue par catégorie (hors période), modèles les plus utilisés dans les commandes de la période. |
+| `GET /api/rapports/avances/production` | Atelier (`rapports.avances`) | `?period=|from=&to=`. Par employé : commandes ouvertes qui lui sont confiées, dont en retard (instantané du jour), livraisons de la période et part livrée à l'heure ; commandes ouvertes non affectées. Aucun montant. |
+| `GET /api/rapports/avances/retards` | Atelier (`rapports.avances`) | `?period=|from=&to=`. Commandes ouvertes en retard (par statut, par priorité, 20 plus anciennes) et ponctualité des livraisons de la période (taux à l'heure, retard moyen en jours). Même définition du retard que la production (jour UTC). |
+| `GET /api/rapports/avances/achats-fournisseurs` | Atelier (`rapports.avances` + `finances.voir`) | `?period=|from=&to=`. Par fournisseur : achats (hors annulés), annulés, valeur commandée, reçue, payée, reste à payer. |
+| `GET /api/rapports/avances/depenses-categories` | Atelier (`rapports.avances` + `finances.voir`) | `?period=|from=&to=`. Dépenses non annulées par catégorie : nombre, total, part en %, dont achats fournisseurs. |
+| `GET /api/rapports/avances/marges` | Atelier (`rapports.avances` + `finances.voir`) | `?period=|from=&to=`. Marge simple = valeur des commandes (hors annulées) − dépenses ; taux ; solde de caisse ; valeur par type de vêtement. Ordre de grandeur, pas une marge comptable. |
 | `GET /api/notifications` | Atelier (`notifications.lire`) | `?lu=true\|false`, pagination. Réconcilie les alertes avant de répondre : `RETARD`, `PRET`, `LIVRAISON_PROCHE`, `IMPAYE`, `TACHE_AFFECTEE` (travail confié, vue par l'employé concerné seul), `STOCK_BAS` (avec la quantité actuelle), `ACHAT_EN_RETARD`. Chaque personne ne reçoit que ce que ses droits permettent (voir docs/PHASE6-ANALYSE.md §13). `lu` est celui de la personne : drapeau partagé pour le PDG, individuel pour un employé. |
 | `GET /api/notifications/nombre-non-lues` | Atelier | `{ count, notifications, demandes }` (alertes non lues + demandes en attente) — sondée toutes les 60 s par l'interface. |
 | `PATCH /api/notifications/:id` | Atelier | `{ lu: boolean }` — pour la personne connectée seulement (un employé ne modifie jamais l'état du PDG). 404 si la notification n'est pas dans sa vue. |

@@ -44,3 +44,10 @@ export function useClientesStatsQuery(params) {
 export function useModelesStatsQuery(params) {
   return useQuery(opts({ queryKey: ["rapports", "modeles", params], queryFn: () => rapportsApi.modeles(params) }));
 }
+
+// Rapports avancés (6.7) : permission « rapports.avances » ; achats, dépenses et marges exigent aussi « finances.voir ».
+export const useProductionRapportQuery = (params) => useQuery(opts({ queryKey: ["rapports", "avances", "production", params], queryFn: () => rapportsApi.production(params) }));
+export const useRetardsRapportQuery = (params) => useQuery(opts({ queryKey: ["rapports", "avances", "retards", params], queryFn: () => rapportsApi.retards(params) }));
+export const useAchatsFournisseursQuery = (params) => useQuery(opts({ queryKey: ["rapports", "avances", "achats", params], queryFn: () => rapportsApi.achatsFournisseurs(params) }));
+export const useDepensesCategoriesQuery = (params) => useQuery(opts({ queryKey: ["rapports", "avances", "depenses", params], queryFn: () => rapportsApi.depensesCategories(params) }));
+export const useMargesQuery = (params) => useQuery(opts({ queryKey: ["rapports", "avances", "marges", params], queryFn: () => rapportsApi.marges(params) }));

@@ -95,6 +95,7 @@ export default {
       "stock.ecrire": "Manage stock (in, out)",
       "dashboard.lire": "See the dashboard",
       "rapports.lire": "See reports (non-financial)",
+      "rapports.avances": "See advanced reports (employee performance, delays; purchases, expenses and margins with “see all amounts”)",
       "notifications.lire": "See notifications",
       "paiements.lire": "View payments and receipts",
       "paiements.ecrire": "Record and cancel payments",

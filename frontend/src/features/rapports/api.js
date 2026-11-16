@@ -10,5 +10,10 @@ export const rapportsApi = {
   commandesEnRetard: (params) => api.get(`/rapports/commandes/en-retard${buildQuery(params)}`),
   commandesALivrer: (params) => api.get(`/rapports/commandes/a-livrer${buildQuery(params)}`),
   clientes: (params) => api.get(`/rapports/clientes${buildQuery(params)}`),
+  production: (params) => api.get(`/rapports/avances/production${buildQuery(params)}`),
+  retards: (params) => api.get(`/rapports/avances/retards${buildQuery(params)}`),
+  achatsFournisseurs: (params) => api.get(`/rapports/avances/achats-fournisseurs${buildQuery(params)}`),
+  depensesCategories: (params) => api.get(`/rapports/avances/depenses-categories${buildQuery(params)}`),
+  marges: (params) => api.get(`/rapports/avances/marges${buildQuery(params)}`),
   modeles: (params) => api.get(`/rapports/modeles${buildQuery(params)}`),
 };

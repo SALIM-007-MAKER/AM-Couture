@@ -16,6 +16,7 @@ import lookbook from "./parts/lookbook.en.js";
 import vitrine from "./parts/vitrine.en.js";
 import demandesVitrine from "./parts/demandesVitrine.en.js";
 import donnees from "./parts/donnees.en.js";
+import rapportsAvances from "./parts/rapportsAvances.en.js";
 
 export default {
   ...shared,
@@ -33,6 +34,7 @@ export default {
   ...vitrine,
   ...demandesVitrine,
   ...donnees,
+  ...rapportsAvances,
   common: {
     save: "Save",
     cancel: "Cancel",

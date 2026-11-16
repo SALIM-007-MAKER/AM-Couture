@@ -23,10 +23,14 @@ import {
 } from "../schemas/dashboard.schema.js";
 import { STATUTS_COMMANDE, PRIORITES } from "../schemas/commande.schema.js";
 import { CATEGORIES_VETEMENT } from "../schemas/modele.schema.js";
+import rapportsAvancesRouter from "./rapportsAvances.routes.js";
 
 // Module PUREMENT consultatif : aucune écriture en base dans ce fichier.
 const router = Router();
 router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission("rapports.lire"), masquerFinancesSiNonAutorise);
+
+// Rapports avancés (6.7) : permission distincte « rapports.avances », voir rapportsAvances.routes.js.
+router.use("/avances", rapportsAvancesRouter);
 
 const D0 = new Prisma.Decimal(0);
 const dec = (v) => (v == null ? D0 : new Prisma.Decimal(v));

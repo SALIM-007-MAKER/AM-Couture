@@ -12,6 +12,7 @@ const lire = (f) => readFileSync(resolve(src, f), "utf8");
 // Routeurs montés par un autre routeur (pas dans app.js) : variable → préfixe complet.
 const IMBRIQUES = {
   "routes/mesures.routes.js": { router: "/api/clientes/:id/mesures" },
+  "routes/rapportsAvances.routes.js": { router: "/api/rapports/avances" },
   "routes/paiements.routes.js": { router: "/api/commandes/:commandeId/paiements", paiementsGlobalRouter: "/api/paiements" },
   "routes/livraisons.routes.js": { router: "/api/commandes/:commandeId/livraisons", livraisonsGlobalRouter: "/api/livraisons" },
   "routes/recus.routes.js": { recusCommandeRouter: "/api/commandes/:commandeId/recus", router: "/api/recus" },
@@ -41,7 +42,7 @@ export function inventaireRoutes() {
     }
     // Un routeur monté dans un fichier non prévu ferait disparaître ses routes de l'inventaire.
     for (const m of code.matchAll(/^\w+\.use\("(\/[^"]+)",\s*(\w+)\)/gm)) {
-      const connu = ["/:commandeId/paiements", "/:commandeId/livraisons", "/:commandeId/recus", "/:id/mesures"];
+      const connu = ["/avances", "/:commandeId/paiements", "/:commandeId/livraisons", "/:commandeId/recus", "/:id/mesures"];
       if (!connu.includes(m[1])) throw new Error(`${fichier} : montage imbriqué ${m[1]} inconnu (compléter IMBRIQUES).`);
     }
   }

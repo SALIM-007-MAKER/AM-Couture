@@ -96,6 +96,7 @@ export default {
       "stock.ecrire": "Gérer le stock (entrées, sorties)",
       "dashboard.lire": "Voir le tableau de bord",
       "rapports.lire": "Voir les rapports (hors finances)",
+      "rapports.avances": "Voir les rapports avancés (performance des employés, retards ; achats, dépenses et marges avec « voir tous les montants »)",
       "notifications.lire": "Voir les notifications",
       "paiements.lire": "Consulter les paiements et reçus",
       "paiements.ecrire": "Enregistrer et annuler des paiements",
