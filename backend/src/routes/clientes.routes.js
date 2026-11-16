@@ -23,6 +23,8 @@ import { verrouillerCle } from "../lib/verrous.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { emailInvitationClientTemplate } from "../lib/emailTemplates.js";
+import { anonymiserCliente } from "../lib/donneesCliente.js";
+import { journaliserSecurite } from "../lib/securityLog.js";
 
 const router = Router();
 
@@ -93,8 +95,13 @@ router.post("/", idempotence, async (req, res) => {
 // Filtre partagé entre GET / (paginé) et GET /export (tout en un CSV) — une
 // seule définition, jamais deux logiques de recherche qui pourraient dériver
 // l'une de l'autre au fil du temps.
-function buildClientesWhere(atelierId, { q, archived }) {
+function buildClientesWhere(atelierId, { q, archived, effacement }) {
   const where = { atelierId };
+  // « effacement=true » : fiches dont la cliente a demandé l'effacement de ses données et qui ne sont pas encore anonymisées.
+  if (effacement === "true") {
+    where.suppressionDemandeeLe = { not: null };
+    where.anonymiseeLe = null;
+  }
   // Par défaut : uniquement les clientes actives. "archived=true" isole les
   // archivées, "archived=all" retire le filtre pour tout voir.
   if (archived === "false") where.archivedAt = null;
@@ -124,8 +131,8 @@ router.get("/", async (req, res) => {
   if (!parsed.success) {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
   }
-  const { q, archived, page, pageSize } = parsed.data;
-  const where = buildClientesWhere(req.user.atelierId, { q, archived });
+  const { q, archived, effacement, page, pageSize } = parsed.data;
+  const where = buildClientesWhere(req.user.atelierId, { q, archived, effacement });
 
   const [rows, total] = await Promise.all([
     prisma.cliente.findMany({
@@ -300,11 +307,23 @@ router.post("/:id/archiver", async (req, res) => {
   res.json(cliente);
 });
 
+// POST /api/clientes/:id/anonymiser — droit à l'effacement (7.4). PDG uniquement (irréversible, non délégable). Remplace
+// l'identité par des valeurs neutres, supprime mesures et fil d'activité, ferme le compte de connexion ; commandes et
+// paiements restent (obligation comptable). Refusé tant qu'une commande est en cours.
+router.post("/:id/anonymiser", async (req, res) => {
+  if (req.user.role !== "ADMIN") throw new HttpError(403, "Réservé au responsable de l'atelier.");
+  const conflit = (message) => new HttpError(409, message);
+  const cliente = await anonymiserCliente(prisma, { clienteId: req.params.id, atelierId: req.user.atelierId }, conflit);
+  if (!cliente) throw new HttpError(404, "Client introuvable.");
+  await journaliserSecurite("CLIENTE_ANONYMISEE", { req, userId: req.user.id, atelierId: req.user.atelierId, details: { clienteId: cliente.id } });
+  res.json(cliente);
+});
+
 // POST /api/clientes/:id/restaurer — réactivation d'une fiche archivée
 router.post("/:id/restaurer", async (req, res) => {
   const { id } = req.params;
   const result = await prisma.cliente.updateMany({
-    where: { id, atelierId: req.user.atelierId, archivedAt: { not: null } },
+    where: { id, atelierId: req.user.atelierId, archivedAt: { not: null }, anonymiseeLe: null },
     data: { archivedAt: null },
   });
 
@@ -314,6 +333,8 @@ router.post("/:id/restaurer", async (req, res) => {
       select: { archivedAt: true },
     });
     if (!existing) throw new HttpError(404, "Client introuvable.");
+    const anonyme = await prisma.cliente.findFirst({ where: { id, anonymiseeLe: { not: null } }, select: { id: true } });
+    if (anonyme) throw new HttpError(409, "Cette fiche a été anonymisée : elle ne peut pas être restaurée.");
     throw new HttpError(409, "Client déjà actif.");
   }
 
@@ -338,6 +359,7 @@ router.post("/:id/restaurer", async (req, res) => {
 router.post("/:id/inviter", async (req, res) => {
   const cliente = await prisma.cliente.findFirst({ where: { id: req.params.id, atelierId: req.user.atelierId } });
   if (!cliente) throw new HttpError(404, "Client introuvable.");
+  if (cliente.anonymiseeLe) throw new HttpError(409, "Cette fiche a été anonymisée : elle ne peut pas être invitée.");
 
   // Cette lecture ne sert qu'à charger les données de l'invitation. Les gardes « déjà invitée » et
   // « identifiant déjà pris » sont appliquées DANS la transaction ci-dessous (verrou de ligne sur la
