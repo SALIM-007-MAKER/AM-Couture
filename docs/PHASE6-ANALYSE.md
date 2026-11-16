@@ -196,7 +196,7 @@ Réaffecter une commande déplace l'alerte vers le nouvel employé (non lue) ; l
 
 **Limites** : alertes recalculées à la lecture (pastille actualisée toutes les 60 s), pas de notification poussée ni d'email individuel à l'employé ; pas de réglage par personne de ce qu'elle veut recevoir ; l'alerte de retard utilise la définition historique (statut non terminé et date dépassée), légèrement différente du filtre « en retard » de la page Production (qui garde `TERMINEE` en cours jusqu'à la livraison) — à harmoniser si besoin.
 
-## 15. Réalisé en 6.7 — rapports avancés
+## 14. Réalisé en 6.7 — rapports avancés
 
 **Permission distincte** : `rapports.avances` (non sensible, implique `rapports.lire`). Voir la performance des employés n'est pas anodin : le PDG l'accorde employé par employé. Les rapports qui portent un **montant** exigent **en plus** `finances.voir`, comme les rapports financiers existants. Aucun poste ne la reçoit par défaut.
 
@@ -228,3 +228,7 @@ Réaffecter une commande déplace l'alerte vers le nouvel employé (non lue) ; l
 - Pas de comparaison avec la période précédente (existe pour les finances, pas ici).
 - Le garde-fou de l'interface (page, lien) n'est pas ce qui protège : seul le serveur l'est (403 testé). Le test E2E de la page vérifie l'affichage, pas la sécurité.
 - Les montants s'affichent comme dans les rapports existants (sans symbole de devise).
+
+## 15. Réalisé en 6.8 — documentation et bilan
+
+Le bilan complet de la phase est dans **BILAN-PHASE6.md** (état des 10 points, consignes, changements de comportement, risques, travaux restants). Remarque sur le plan : la table du §5 est celle de l'analyse initiale ; le plan **ajusté** réellement suivi est : 6.1 employés (serveur), 6.2 interface employés, 6.3 affectation et production, 6.4 fournisseurs, 6.5 achats, 6.6 notifications, 6.7 rapports avancés, 6.8 documentation et bilan. `DOCUMENTATION.md` (écrit avant les phases 4 à 7) porte maintenant un avertissement renvoyant aux bilans.

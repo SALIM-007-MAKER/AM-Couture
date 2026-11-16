@@ -7,6 +7,8 @@
 
 > **Note** : ce document décrit l'état du projet avant la phase 2 de sécurisation. Plusieurs points de la section 10.1 (alertes de dépendances, politique de mot de passe, journalisation, sauvegarde) ont depuis été traités : voir `docs/SECURITE.md` pour l'état actuel.
 
+> **Mise à jour du 16 novembre 2026 (fin des phases 6 et 7)** : ce document a été écrit avant les phases 4 à 7. Il reste valable pour l'architecture, mais plusieurs sections sont dépassées : **employés et permissions, production, fournisseurs, achats, notifications individuelles, rapports avancés** (phase 6 : [docs/BILAN-PHASE6.md](docs/BILAN-PHASE6.md)) ; **lookbook, vitrine publique, demandes en ligne, espace client avancé, hors connexion, textes serveur en français/anglais** (phase 7 : [docs/BILAN-PHASE7.md](docs/BILAN-PHASE7.md)) ; **abonnement** (phase 5 : [docs/BILAN-PHASE5.md](docs/BILAN-PHASE5.md)). Les routes à jour sont dans [docs/API.md](docs/API.md) (200 routes, vérifiées par test), les tests dans [docs/TESTS.md](docs/TESTS.md). En cas de divergence, **les bilans et API.md font foi**.
+
 ## Sommaire
 
 1. [Vue d'ensemble](#1-vue-densemble)
@@ -98,6 +100,7 @@ AM_Couture/
 |---|---|---|
 | `SUPERADMIN` | Aucun atelier | Console plateforme : ateliers, abonnements, tarifs, impersonation |
 | `ADMIN` | Exactement 1 atelier | Toutes les données de son atelier (soumis à l'abonnement actif) |
+| `EMPLOYE` *(phase 6)* | Exactement 1 atelier | Uniquement les permissions que le PDG lui accorde (28 permissions possibles, relues en base à chaque requête) ; jamais l'administration (employés, paramètres, abonnement) ; aucun montant sans `finances.voir`. Voir [docs/PHASE6-ANALYSE.md](docs/PHASE6-ANALYSE.md) §8 |
 | `USER` | 1 atelier **et** 1 cliente | Uniquement ses propres données (filtrage par `clienteId`, pas seulement `atelierId`) |
 
 Middlewares : `requireAuth`, `requireAtelier` (vérifie aussi que l'atelier n'est pas suspendu, à **chaque** requête), `requireAbonnementActif` (renvoie **402** si l'essai est terminé sans abonnement), `requireSuperadmin`, `requireClient`.
@@ -141,6 +144,12 @@ Middlewares : `requireAuth`, `requireAtelier` (vérifie aussi que l'atelier n'es
 | **Rapports** | Finances avec comparaison à la période précédente (variation en %), évolution sur 12 mois, répartition par statut/priorité/catégorie, commandes en retard / à livrer, top clients et modèles. |
 | **Notifications** | Retard, prête à récupérer, livraison sous 3 jours, impayée — recalculées en continu, marquage lu/supprimé. |
 | **Calendrier** | Vue mensuelle des livraisons prévues. |
+| **Employés** *(phase 6)* | Comptes employés, postes-modèles, permissions par employé, désactivation immédiate. |
+| **Production** *(phase 6)* | Commande confiée à une personne (historique), « Mes travaux », retards, charge par personne. |
+| **Fournisseurs et achats** *(phase 6)* | Annuaire, bons d'achat, réception partielle ou totale en stock, paiement = une dépense. |
+| **Rapports avancés** *(phase 6)* | Production par employé, retards, achats par fournisseur, dépenses par catégorie, marge simple (permission distincte). |
+| **Lookbook et vitrine** *(phase 7)* | Plusieurs photos par modèle, publication explicite, page publique `/a/<slug>`, demandes sans compte avec consentement. |
+| **Hors connexion** *(phase 7)* | Consultation de ce qui a été vu en ligne ; trois écritures sûres mises en file (jamais d'argent). |
 | **Paramètres** | Nom, logo, devise, coordonnées, slogan, thème, mentions des reçus. |
 | **Mon compte** | Changement de mot de passe (révoque les autres sessions), langue. |
 | **Abonnement** | Affichage de l'état (essai, actif, expiré), formules et contact WhatsApp de la plateforme pour souscrire. |
@@ -224,13 +233,14 @@ Profil, mesures, liste et détail des commandes, paiements, reçus (PDF), fil de
 | # | Fonctionnalité | Pourquoi |
 |---|---|---|
 | 1 | **Paiement en ligne de l'abonnement** (Wave/Orange Money) | Aujourd'hui tout passe par le SuperAdmin : goulot d'étranglement et friction à la conversion. La couche existe mais est dormante. |
-| 2 | **Gestion des employés / couturiers** | Un seul compte ADMIN par atelier utile ; pas d'affectation des commandes à un couturier, ni de suivi de charge ou de commission. |
-| 3 | **Droits fins par compte** (caissier, couturier, lecture seule) | Aujourd'hui tout ADMIN voit les finances. |
+| 2 | ~~Gestion des employés / couturiers~~ | **Fait (phase 6)** : employés, affectation, charge. Reste : commissions. |
+| 3 | ~~Droits fins par compte~~ | **Fait (phase 6)** : 28 permissions, aucun montant sans `finances.voir`. |
 | 4 | **Notifications sortantes automatiques au client** (WhatsApp/SMS) | Le rappel WhatsApp est un lien manuel ; pas d'envoi automatique « commande prête ». |
 | 5 | **Sauvegarde / export global des données** d'un atelier | Seuls des exports CSV par module existent. |
 
 ### 9.2 Priorité moyenne
 
+- *(Partiellement traité en phases 6 et 7 : fournisseurs et achats faits ; galerie/lookbook et vitrine publique faits ; mode hors connexion partiel — voir les bilans.)*
 - Traduction **haoussa** (listé mais absent) et complétude de l'anglais sur tous les écrans.
 - **Devis / factures** distincts des reçus ; numérotation fiscale.
 - **Gestion des retouches et essayages** planifiés (rendez-vous, rappel).
