@@ -111,7 +111,7 @@ router.post("/:id/accepter", async (req, res) => {
       clienteId: demande.clienteId,
       commandeId: commande.id,
       type: "DEMANDE_ACCEPTEE",
-      message: `Votre demande a été acceptée et liée à la commande ${commande.numero}.`,
+      params: { numero: commande.numero },
     });
     return demandeMiseAJour;
   });
@@ -184,7 +184,7 @@ router.post("/:id/refuser", async (req, res) => {
         clienteId: refusee.cliente.id,
         commandeId: null,
         type: "DEMANDE_REFUSEE",
-        message: refusee.motifRefus ? `Votre demande a été refusée : ${refusee.motifRefus}` : "Votre demande a été refusée.",
+        params: refusee.motifRefus ? { motif: refusee.motifRefus } : {},
       });
       return refusee;
     },

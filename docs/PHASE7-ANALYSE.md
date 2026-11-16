@@ -259,3 +259,24 @@ Les quatre options recommandées ont été retenues : **adaptateur de stockage d
 - **Libellés de la file en français** (mémorisés tels quels) ; les messages de conflit sont ceux du serveur.
 - **Fermer l'application avant le retour du réseau** : la file est conservée sur l'appareil et reprise à la prochaine ouverture ; il n'y a pas d'envoi en arrière-plan (Background Sync) quand l'application est fermée. Non vérifié sur de vrais appareils (iOS en particulier : le stockage peut être purgé par le système après une longue inactivité).
 - **Heure de l'appareil** : l'ancienneté d'une écriture se mesure avec l'horloge de l'appareil ; une horloge très décalée peut la déclarer « à vérifier » à tort (sans risque de doublon).
+
+## 13. Réalisé en 7.7 — textes du serveur dans la langue de la personne
+
+**Langues** : français et anglais. La préférence `User.langue` accepte aussi « ha », mais **aucune traduction haoussa n'existe** : cette valeur retombe sur le français (jamais de clé brute affichée). Catalogue unique : `backend/src/lib/messagesServeur.js` (une clé absente d'une langue retombe sur le français).
+
+**Ce qui est traduit**
+- **Fil d'activité des clientes** (point reporté de la 7.4) : chaque événement enregistre désormais un **code et des paramètres** (`NotificationClient.code`, `params`) ; le message est **composé à la lecture** dans la langue de la cliente. Un changement de langue s'applique donc aussi aux événements passés. Le texte français reste enregistré dans `message` (secours, export de données). Libellés de statut traduits.
+- **PDF** : reçu et fiche commande. Langue = préférence du compte connecté, ou `?langue=fr|en` sur l'URL (valeur invalide ignorée). Dates et heures au format de la langue.
+- **Courriels** : vérification d'adresse, réinitialisation de mot de passe (langue du compte destinataire) et invitation d'une cliente (langue de la **personne qui invite**, la cliente n'ayant pas encore de compte). Sujets compris ; toute valeur saisie reste échappée.
+
+**Migration** (`20261130090000_messages_multilingues`) : deux colonnes nullables sur `NotificationClient`. **Additive et sans reprise de données** : les lignes existantes gardent leur texte (code NULL) et s'affichent telles quelles, dans toutes les langues. Retour arrière : le code précédent ignore simplement ces colonnes.
+
+**Tests** : 8 unitaires (repli de langue, parité fr/en des textes ET des paramètres, composition, lignes antérieures, choix de la langue d'un document, texte réel du reçu et de la fiche en français et en anglais, échappement des courriels) ; 6 d'intégration (code et paramètres enregistrés, la **même ligne** lue en français, anglais, « ha » ; statut traduit ; ligne antérieure ; PDF selon le compte, le paramètre et une valeur invalide ; courriel de réinitialisation ; invitation). **6 mutations détectées** : lecture sans langue, PDF ignorant la langue du compte, sujet de courriel figé en français, langue inconnue non repliée, échappement retiré, paramètres non enregistrés.
+
+**Limites — à lire**
+- **Non traduits** : courriels de rappels quotidiens et d'abonnement (leurs libellés sont composés ailleurs), factures d'abonnement PDF de la plateforme, messages d'erreur de l'API (restent en français), noms de modèles et notes saisis par les ateliers (jamais traduits automatiquement), page publique de la vitrine.
+- **Qualité de l'anglais** : rédigé sans relecture par une personne de langue anglaise ; à faire relire avant mise en production.
+- **Pas de langue propre à la cliente avant son compte** : une invitation part dans la langue de l'invitant ; la cliente choisit ensuite sa langue dans son espace.
+- **Le reçu garde la langue de celui qui l'ouvre** : un reçu imprimé par l'atelier pour une cliente anglophone demande d'ajouter `?langue=en` à l'adresse ; l'interface n'a pas (encore) de sélecteur. Les noms de modes de paiement (ESPECES…) ne sont pas traduits dans le PDF.
+- **iCal** (flux des livraisons) : **non fait**, volontairement : c'était « si retenu » et il expose des données de clientes dans un lien d'abonnement durable ; à décider avec un modèle de jeton révocable.
+- **Texte du fil d'activité figé dans `message`** en français pour les exports ; l'export de données (7.4) ne le recompose pas dans la langue.

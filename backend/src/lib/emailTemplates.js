@@ -16,19 +16,24 @@ export function esc(valeur) {
     .replace(/'/g, "&#39;");
 }
 
+import { traduire } from "./messagesServeur.js";
+
 const STYLE_BOUTON =
   "display:inline-block;background:#276386;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px;";
 const STYLE_CORPS = "font-family:Arial,sans-serif;color:#1a1a1a;line-height:1.6;max-width:480px;margin:0 auto;padding:24px;";
 const STYLE_PIED = "color:#737373;font-size:12px;margin-top:32px;";
 
-export function emailVerificationTemplate({ prenom, lienVerification }) {
+// 7.7 : `langue` ("fr" par défaut, "en") — la langue de la personne qui reçoit le courriel. Les textes viennent de
+// lib/messagesServeur.js ; les valeurs saisies restent échappées par esc().
+export function emailVerificationTemplate({ prenom, lienVerification, langue }) {
+  const t = (cle, p) => esc(traduire(langue, `email.verification.${cle}`, p));
   return `
     <div style="${STYLE_CORPS}">
-      <h2>Bienvenue${prenom ? ` ${esc(prenom)}` : ""} !</h2>
-      <p>Merci d'avoir créé votre atelier sur Gestion d'Atelier. Confirmez votre adresse email en cliquant sur le lien ci-dessous :</p>
-      <a href="${esc(lienVerification)}" style="${STYLE_BOUTON}">Confirmer mon email</a>
+      <h2>${t("titre", { prenom: prenom ? ` ${prenom}` : "" })}</h2>
+      <p>${t("corps")}</p>
+      <a href="${esc(lienVerification)}" style="${STYLE_BOUTON}">${t("bouton")}</a>
       <p style="${STYLE_PIED}">
-        Ce lien expire dans 24 heures. Si vous n'êtes pas à l'origine de cette inscription, ignorez cet email.
+        ${t("pied")}
       </p>
     </div>
   `;
@@ -38,28 +43,29 @@ export function emailVerificationTemplate({ prenom, lienVerification }) {
 // /clientes/:id/inviter (routes/clientes.routes.js). `identifiant` rappelle
 // le numéro de téléphone (identifiant de connexion réel, jamais cet email)
 // pour éviter toute confusion au moment de se connecter.
-export function emailInvitationClientTemplate({ prenom, identifiant, lienActivation }) {
+export function emailInvitationClientTemplate({ prenom, identifiant, lienActivation, langue }) {
+  const t = (cle, p) => esc(traduire(langue, `email.invitation.${cle}`, p));
   return `
     <div style="${STYLE_CORPS}">
-      <h2>Bonjour${prenom ? ` ${esc(prenom)}` : ""} !</h2>
-      <p>Votre atelier vous invite à créer votre espace client, où vous pourrez suivre vos commandes, vos mesures et vos paiements.</p>
-      <a href="${esc(lienActivation)}" style="${STYLE_BOUTON}">Créer mon compte</a>
+      <h2>${t("titre", { prenom: prenom ? ` ${prenom}` : "" })}</h2>
+      <p>${t("corps")}</p>
+      <a href="${esc(lienActivation)}" style="${STYLE_BOUTON}">${t("bouton")}</a>
       <p style="${STYLE_PIED}">
-        Ce lien expire dans 7 jours. Votre identifiant de connexion sera votre numéro de téléphone (${esc(identifiant)}).
-        Si vous ne vous attendiez pas à cette invitation, ignorez cet email.
+        ${t("pied", { identifiant })}
       </p>
     </div>
   `;
 }
 
-export function emailReinitialisationTemplate({ lienReinitialisation }) {
+export function emailReinitialisationTemplate({ lienReinitialisation, langue }) {
+  const t = (cle) => esc(traduire(langue, `email.reinitialisation.${cle}`));
   return `
     <div style="${STYLE_CORPS}">
-      <h2>Réinitialisation de mot de passe</h2>
-      <p>Vous avez demandé à réinitialiser votre mot de passe sur Gestion d'Atelier. Cliquez sur le lien ci-dessous pour en choisir un nouveau :</p>
-      <a href="${esc(lienReinitialisation)}" style="${STYLE_BOUTON}">Réinitialiser mon mot de passe</a>
+      <h2>${t("titre")}</h2>
+      <p>${t("corps")}</p>
+      <a href="${esc(lienReinitialisation)}" style="${STYLE_BOUTON}">${t("bouton")}</a>
       <p style="${STYLE_PIED}">
-        Ce lien expire dans 1 heure. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — votre mot de passe reste inchangé.
+        ${t("pied")}
       </p>
     </div>
   `;

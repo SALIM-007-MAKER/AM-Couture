@@ -99,7 +99,7 @@ router.post("/", idempotence, async (req, res) => {
         clienteId: req.commande.clienteId,
         commandeId,
         type: "PAIEMENT_ENREGISTRE",
-        message: `Paiement de ${nouveauPaiement.montant} enregistré sur votre commande ${req.commande.numero}.`,
+        params: { montant: nouveauPaiement.montant, numero: req.commande.numero },
       });
       return nouveauPaiement;
     },
@@ -262,7 +262,7 @@ router.post("/:paiementId/recu", async (req, res) => {
         clienteId: req.commande.clienteId,
         commandeId,
         type: "RECU_EMIS",
-        message: `Un reçu est disponible pour votre commande ${req.commande.numero}.`,
+        params: { numero: req.commande.numero },
       });
       return nouveauRecu;
     }, { maxWait: 10_000, timeout: 15_000 });

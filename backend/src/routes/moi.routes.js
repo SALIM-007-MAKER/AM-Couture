@@ -17,6 +17,7 @@ import { exporterDonnees } from "../lib/donneesCliente.js";
 import { rateLimitPersistant } from "../lib/rateLimiter.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
 import { clearAuthCookie } from "../lib/authCookie.js";
+import { rendreNotification, langueDemandee } from "../lib/messagesServeur.js";
 
 // Espace client final (§ plan rôle USER, Phase 3) — un USER voit UNIQUEMENT
 // ses propres données. RÈGLE ABSOLUE, répétée sur chaque route ci-dessous :
@@ -183,7 +184,7 @@ router.get("/notifications", async (req, res) => {
       createdAt: n.createdAt,
       lu: n.lu,
       source: "evenement",
-      message: n.message,
+      message: rendreNotification(n, req.user.langue),
       commande: n.commande,
       canMarkLu: true,
     })),
@@ -330,7 +331,7 @@ router.get("/recus/:id/pdf", async (req, res) => {
   const cliente = await prisma.cliente.findUnique({ where: { id: req.user.clienteId }, select: { atelierId: true } });
   const atelier = await prisma.atelier.findUnique({ where: { id: cliente.atelierId } });
 
-  streamRecuPdf(res, { recu, atelier });
+  streamRecuPdf(res, { recu, atelier, langue: langueDemandee(req) });
 });
 
 // GET /api/moi/export — « télécharger mes données » : tout ce que l'atelier détient sur ELLE (profil, mesures, commandes avec

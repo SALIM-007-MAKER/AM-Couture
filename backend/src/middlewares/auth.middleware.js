@@ -38,7 +38,7 @@ export async function requireAuth(req, res, next) {
     // durée de vie restante du jeton.
     const compte = await prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { sessionVersion: true, actif: true, role: true, permissions: true },
+      select: { sessionVersion: true, actif: true, role: true, permissions: true, langue: true },
     });
     if (!compte || compte.sessionVersion !== payload.sessionVersion || compte.role !== payload.role) {
       return next(new HttpError(401, "Session expirée — reconnectez-vous."));
@@ -55,6 +55,8 @@ export async function requireAuth(req, res, next) {
       // lib/jwt.js) — permet à /auth/quitter-impersonation de retrouver le
       // compte SUPERADMIN d'origine.
       impersonatedBy: payload.impersonatedBy ?? null,
+      // Langue des textes produits par le serveur pour cette personne (fil d'activité, PDF…) — voir lib/messagesServeur.js.
+      langue: compte.langue,
       // Présent UNIQUEMENT pour un compte USER (§ plan rôle client, voir
       // requireClient ci-dessous) — jamais pour ADMIN/SUPERADMIN.
       clienteId: payload.clienteId ?? null,
