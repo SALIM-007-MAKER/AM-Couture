@@ -4,6 +4,7 @@ import { SEXE_OPTIONS } from "../clientes/constants.js";
 import { LoadingState, ErrorState } from "../../components/QueryState.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
+import MesDonneesSection from "./MesDonneesSection.jsx";
 import { useTranslation } from "../../i18n/index.js";
 import { useLocaleStore } from "../../stores/localeStore.js";
 
@@ -41,6 +42,7 @@ export default function ClientProfilPage() {
         <InfoRow label={t("client.fieldClientDepuis")} value={formatDate(cliente.createdAt)} />
       </Card>
       <p className="text-xs text-neutral-500">{t("client.profilEditNote")}</p>
+      <MesDonneesSection />
     </div>
   );
 }

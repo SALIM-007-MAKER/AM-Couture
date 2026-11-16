@@ -20,6 +20,7 @@ import MesuresHistory from "./components/MesuresHistory.jsx";
 import ClienteCommandesHistory from "./components/ClienteCommandesHistory.jsx";
 import RappelButton from "./components/RappelButton.jsx";
 import InviterClientButton from "./components/InviterClientButton.jsx";
+import AnonymiserControl from "./components/AnonymiserControl.jsx";
 
 export default function ClienteDetailPage() {
   const { t } = useTranslation();
@@ -52,6 +53,8 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
   // vérité même si ce bloc n'a pas encore chargé.
   const can = useCan();
   const totauxQuery = useClienteTotauxQuery(id, { actif: can("finances.voir") });
+  // Droit à l'effacement : réservé au PDG (irréversible, non délégable).
+  const peutAnonymiser = can("@admin");
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -149,6 +152,8 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
         )}
         <ClienteCommandesHistory clienteId={id} />
       </div>
+
+      {peutAnonymiser && <AnonymiserControl cliente={cliente} />}
 
       <div className="space-y-2">
         <SectionTitle

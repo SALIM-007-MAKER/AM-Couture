@@ -35,3 +35,12 @@ test("la fiche d'une commande d'un autre atelier n'est pas accessible", async ({
   await expect(page.getByText("Secrète")).toHaveCount(0);
   await expect(page.getByText("99999")).toHaveCount(0);
 });
+
+test("voit le suivi d'étapes de sa commande, avec l'étape en cours marquée", async ({ page }) => {
+  await page.goto("/client/commandes");
+  await page.getByText("E2E-ALPHA-001").click();
+  const etapes = page.getByTestId("etapes-commande");
+  await expect(etapes).toBeVisible();
+  await expect(etapes.locator('li[aria-current="step"]')).toHaveCount(1);
+  await expect(etapes.locator("li")).toHaveCount(6);
+});

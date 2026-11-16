@@ -25,6 +25,18 @@ export function useMesPaiementsQuery() {
   return useQuery({ queryKey: ["moi", "paiements"], queryFn: moiApi.paiements });
 }
 
+// Fermeture du compte par la cliente (7.4) : le serveur supprime le compte de connexion et ferme la session. On vide tout le
+// cache local pour qu'aucune donnée personnelle ne reste en mémoire dans le navigateur.
+export function useSupprimerMonCompteMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => moiApi.supprimerCompte(data),
+    onSuccess: () => {
+      queryClient.clear();
+    },
+  });
+}
+
 // Le client génère lui-même un reçu récapitulatif de SA commande (voir
 // POST /moi/commandes/:id/recus) — invalide sa propre liste de reçus pour
 // que ClientRecusPage.jsx le voie apparaître sans recharger la page.

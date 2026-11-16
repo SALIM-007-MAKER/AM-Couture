@@ -302,23 +302,28 @@ model Atelier {
 // ─────────────────────────────────────────────────────────────────────────
 
 model Cliente {
-  id         String    @id @default(cuid())
-  atelierId  String
-  atelier    Atelier   @relation(fields: [atelierId], references: [id], onDelete: Restrict)
-  nom        String
-  prenom     String
-  telephone  String
-  telephone2 String?
+  id                    String    @id @default(cuid())
+  atelierId             String
+  atelier               Atelier   @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  nom                   String
+  prenom                String
+  telephone             String
+  telephone2            String?
   // Optionnel — sert UNIQUEMENT à l'envoi automatique du lien d'invitation
   // (voir POST /clientes/:id/inviter) : l'identifiant de connexion du compte
   // USER reste le téléphone, jamais cet email (pas d'unicité imposée ici).
-  email      String?
-  adresse    String?
-  sexe       Sexe?
-  notes      String?
-  archivedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  email                 String?
+  adresse               String?
+  sexe                  Sexe?
+  notes                 String?
+  archivedAt            DateTime?
+  // Droit à l'effacement (7.4) : la cliente a fermé son compte et demande l'effacement de ses données personnelles
+  // (suppressionDemandeeLe), puis l'atelier les a anonymisées (anonymiseeLe). Les commandes et paiements restent
+  // (obligation comptable) mais ne portent plus d'identité.
+  suppressionDemandeeLe DateTime?
+  anonymiseeLe          DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   // Lien OPTIONNEL vers un compte de connexion (§ plan rôle USER, Phase 3) —
   // Cliente reste l'unique source de vérité métier, User n'est qu'un MOYEN

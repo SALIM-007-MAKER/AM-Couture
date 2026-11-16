@@ -31,10 +31,11 @@ export default function ClientesListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page") ?? "1");
   const archived = searchParams.get("archived") ?? "false";
+  const effacement = searchParams.get("effacement") === "true";
   const [qInput, setQInput] = useState(searchParams.get("q") ?? "");
   const q = useDebouncedValue(qInput, 300);
 
-  const params = { q, archived, page, pageSize: PAGE_SIZE };
+  const params = { q, archived, page, pageSize: PAGE_SIZE, ...(effacement ? { effacement: "true" } : {}) };
   // isPending (pas isLoading, voir ClienteDetailPage.jsx) : ici aucun
   // risque de crash (tout est déjà gardé par `data &&`), mais isPending
   // reflète correctement "aucune donnée encore reçue" pour cet affichage.
@@ -108,6 +109,10 @@ export default function ClientesListPage() {
             </option>
           ))}
         </select>
+        <label className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+          <input type="checkbox" checked={effacement} onChange={(e) => updateParams({ effacement: e.target.checked ? "true" : undefined, page: undefined })} data-testid="filtre-effacement" />
+          {t("anon.filtre")}
+        </label>
       </div>
 
       {isPending && <LoadingState label={t("common.loading")} />}
@@ -150,6 +155,9 @@ export default function ClientesListPage() {
                     <td className="px-4 py-3 text-neutral-500">{formatDate(cliente.derniereActivite)}</td>
                     <td className="px-4 py-3">
                       <StatutBadge archivedAt={cliente.archivedAt} activeLabel={t("common.active")} archivedLabel={t("common.archived")} />
+                      {cliente.suppressionDemandeeLe && !cliente.anonymiseeLe && (
+                        <span className="ml-2 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 text-xs px-2 py-0.5">{t("anon.badge")}</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Button as={Link} to={`/clientes/${cliente.id}`} variant="ghost" size="sm" icon={Eye}>

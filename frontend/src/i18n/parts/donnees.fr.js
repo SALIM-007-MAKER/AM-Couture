@@ -1,0 +1,35 @@
+// Traductions FR — espace client avancé (7.4) : suivi d'étapes (« etapes »), droits sur les données (« mesdonnees »,
+// côté cliente) et anonymisation par l'atelier (« anon »).
+export default {
+  etapes: {
+    titre: "Avancement de la commande",
+    annulee: "Cette commande a été annulée.",
+    aide: {
+      NOUVELLE: "L'atelier a enregistré votre commande.",
+      EN_CONFECTION: "Votre vêtement est en cours de confection.",
+      ESSAYAGE: "Un essayage est prévu ou en cours.",
+      RETOUCHES: "Des retouches sont en cours.",
+      TERMINEE: "Votre commande est prête à être récupérée.",
+      LIVREE: "Commande remise.",
+    },
+  },
+  mesdonnees: {
+    titre: "Mes données",
+    exportTexte: "Téléchargez un fichier avec tout ce que l'atelier détient sur vous : votre profil, vos mesures, vos commandes, paiements, reçus et demandes.",
+    exporter: "Télécharger mes données",
+    supprimerTitre: "Supprimer mon compte",
+    supprimerTexte: "Votre accès est fermé immédiatement et l'atelier est chargé d'effacer vos données personnelles (nom, téléphone, adresse, mesures). Vos commandes et paiements passés sont conservés par l'atelier pour sa comptabilité, sans votre identité. Pour retrouver un accès, l'atelier devra vous réinviter.",
+    supprimer: "Supprimer mon compte",
+    motDePasse: "Confirmez avec votre mot de passe",
+    confirmer: "Oui, supprimer définitivement",
+  },
+  anon: {
+    bouton: "Anonymiser cette cliente",
+    demandee: "Cette cliente a fermé son compte et demandé l'effacement de ses données.",
+    confirmation: "Son nom, téléphone, email, adresse, notes, mesures et compte seront effacés définitivement. Ses commandes et paiements restent dans votre comptabilité, sans son identité. Cette action est irréversible.",
+    confirmer: "Anonymiser définitivement",
+    faite: "Cette fiche a été anonymisée : l'identité de la cliente n'est plus conservée.",
+    filtre: "Effacement demandé",
+    badge: "Effacement demandé",
+  },
+};
