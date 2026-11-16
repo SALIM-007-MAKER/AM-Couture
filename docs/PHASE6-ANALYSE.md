@@ -195,3 +195,36 @@ Réaffecter une commande déplace l'alerte vers le nouvel employé (non lue) ; l
 **Tests** : 16 d'intégration (travail confié et réaffectation en une seule lecture, retards, droits par type, stock bas au seuil exact, achats en retard, lecture individuelle, isolation, résumé quotidien) avec 5 mutations détectées (vue limitée aux commandes confiées, drapeau partagé modifié par un employé, destinataires du résumé, ordre suppression/création, seuil strict) ; 3 E2E ; la suite d'intégration existante passe inchangée sauf un test de la 6.1 mis à jour (la limite « un employé ne peut pas marquer lu » est levée). Suites complètes : 333 unitaires backend, 364 intégration, 97 frontend, 55 E2E.
 
 **Limites** : alertes recalculées à la lecture (pastille actualisée toutes les 60 s), pas de notification poussée ni d'email individuel à l'employé ; pas de réglage par personne de ce qu'elle veut recevoir ; l'alerte de retard utilise la définition historique (statut non terminé et date dépassée), légèrement différente du filtre « en retard » de la page Production (qui garde `TERMINEE` en cours jusqu'à la livraison) — à harmoniser si besoin.
+
+## 15. Réalisé en 6.7 — rapports avancés
+
+**Permission distincte** : `rapports.avances` (non sensible, implique `rapports.lire`). Voir la performance des employés n'est pas anodin : le PDG l'accorde employé par employé. Les rapports qui portent un **montant** exigent **en plus** `finances.voir`, comme les rapports financiers existants. Aucun poste ne la reçoit par défaut.
+
+**Cinq rapports** (`GET /api/rapports/avances/…`, consultatifs, bornés à l'atelier, période `?period=|from=&to=`) :
+| Rapport | Contenu | Droit |
+|---|---|---|
+| `production` | par employé : commandes ouvertes, en retard, livraisons de la période, part livrée à l'heure ; commandes ouvertes non affectées | `rapports.avances` |
+| `retards` | retards du jour (par statut, par priorité, 20 plus anciens) ; ponctualité des livraisons de la période (taux, retard moyen) | `rapports.avances` |
+| `achats-fournisseurs` | par fournisseur : achats, annulés, valeur commandée / reçue / payée, reste à payer | + `finances.voir` |
+| `depenses-categories` | dépenses non annulées par catégorie : nombre, total, part, dont achats fournisseurs | + `finances.voir` |
+| `marges` | marge simple = valeur des commandes (hors annulées) − dépenses ; taux ; solde de caisse ; valeur par type de vêtement | + `finances.voir` |
+
+**Définitions (à lire avant d'interpréter un chiffre)**
+- **Retard** : la définition de la production (6.3) : ouverte et date de livraison prévue **avant le début du jour UTC**. Le rapport « en retard » plus ancien (`/rapports/commandes/en-retard`) compare à l'instant exact : il peut afficher une commande de plus le jour même ; non modifié pour ne pas changer un comportement existant.
+- **À l'heure** : livrée au plus tard le jour prévu (comparaison de dates, pas d'heures). Livraisons annulées exclues.
+- **Attribution à l'employé** : l'employé **actuellement** chargé de la commande ; l'historique des affectations n'est pas rejoué. Une commande réaffectée après livraison est comptée pour le nouvel employé.
+- **Période** : sans effet sur les commandes ouvertes (instantané du jour) ; elle borne les livraisons, achats (date de commande), dépenses et commandes (date de commande).
+- **Marge simple** : un **ordre de grandeur**, pas une marge comptable. Aucune dépense n'est rattachée à une commande (loyer, salaires, tissu acheté d'avance) et une commande peut être encaissée sur une autre période. Aucun coût de revient par commande n'existe dans le modèle de données : une marge par commande ou par modèle n'est **pas calculable honnêtement** et n'est pas proposée.
+- Les dépenses d'un achat payé figurent dans les dépenses par catégorie (colonne « dont achats ») : décomposition, jamais un double comptage.
+
+**Interface** : page `/rapports/avances` (lien depuis « Rapports » pour qui a la permission) ; les trois sections chiffrées n'apparaissent et ne sont demandées qu'avec `finances.voir`. Libellés FR/EN, libellé de permission dans la fiche employé.
+
+**Tests** : 19 d'intégration avec des chiffres exacts sur un jeu connu (employés, commandes annulées/non affectées/livrées à l'heure et en retard, 2 fournisseurs et un achat annulé, dépenses annulées, un autre atelier avec ses propres données) ; permissions (`rapports.lire` seul → 403 sur les cinq ; sans `finances.voir` → 403 sur les trois chiffrés ; production et retards sans aucun montant) ; périodes vides (pas de division par zéro) ; 3 E2E (PDG, employé sans la permission, employé avec la permission sans les montants) ; garde de dérive des permissions frontend/serveur. **8 mutations**, 6 détectées d'emblée, 2 non détectables de l'extérieur (filtres d'atelier redondants : le rapport est déjà isolé par la jointure sur l'employé / le fournisseur, ces filtres sont une seconde barrière).
+
+**Performance** (gros volume, base locale) : production 9 ms, retards 30 ms, marges 35 ms, dépenses 8 ms, achats 7 ms (le jeu de volume ne contient pas d'achats : à relever sur de vraies données).
+
+**Limites**
+- Pas d'export CSV de ces rapports, ni de graphique : tableaux et chiffres seulement.
+- Pas de comparaison avec la période précédente (existe pour les finances, pas ici).
+- Le garde-fou de l'interface (page, lien) n'est pas ce qui protège : seul le serveur l'est (403 testé). Le test E2E de la page vérifie l'affichage, pas la sécurité.
+- Les montants s'affichent comme dans les rapports existants (sans symbole de devise).

@@ -165,6 +165,11 @@ const ROUTES = [
   ["Vitrine — image", "/api/public/vitrines/perf-vitrine/images/perf-img-1"],
   ["Lookbook — liste modèles", "/api/modeles?page=1&pageSize=20"],
   ["Demandes — liste", "/api/demandes?page=1&pageSize=20"],
+  ["Avancés — production", "/api/rapports/avances/production"],
+  ["Avancés — retards", "/api/rapports/avances/retards"],
+  ["Avancés — achats/fournisseurs", "/api/rapports/avances/achats-fournisseurs"],
+  ["Avancés — dépenses/catégories", "/api/rapports/avances/depenses-categories"],
+  ["Avancés — marges", "/api/rapports/avances/marges"],
 ];
 
 const resultats = [];
