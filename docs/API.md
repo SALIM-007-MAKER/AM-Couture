@@ -134,7 +134,7 @@ Schéma : `cliente.schema.js`, `mesure.schema.js`.
 | `POST /api/clientes/:id/restaurer` | Atelier | Restaure une cliente archivée. |
 | `POST /api/clientes/:id/anonymiser` | PDG | Droit à l'effacement : remplace l'identité par des valeurs neutres, supprime mesures, fil d'activité et compte de connexion ; commandes et paiements restent. 409 si une commande est en cours ou si déjà anonymisée ; 403 pour un employé. Irréversible. |
 | `POST /api/clientes/:id/inviter` | Atelier | Crée le compte de connexion (identifiant = téléphone) et renvoie un lien d'activation ; 409 si un compte existe déjà. |
-| `POST /api/clientes/:id/mesures` | Atelier | Nouvelle prise de mesures (historique conservé) : champs en cm parmi `epaule, poitrine, taille, hanches, longueur, longueurRobe, longueurJupe, longueurPantalon, longueurManche, tourBras, tourCou, tourPoignet, tourCuisse, tourGenou` (0,1 à 300, 2 décimales), `autres?` (objet libre, 20 clés maximum), `notes?`. |
+| `POST /api/clientes/:id/mesures` | Atelier | Nouvelle prise de mesures (historique conservé ; accepte `Idempotency-Key`) : champs en cm parmi `epaule, poitrine, taille, hanches, longueur, longueurRobe, longueurJupe, longueurPantalon, longueurManche, tourBras, tourCou, tourPoignet, tourCuisse, tourGenou` (0,1 à 300, 2 décimales), `autres?` (objet libre, 20 clés maximum), `notes?`. |
 | `GET /api/clientes/:id/mesures` | Atelier | Historique, paginé. |
 | `GET /api/clientes/:id/mesures/derniere` | Atelier | Dernière prise de mesures. |
 | `GET /api/clientes/:id/mesures/:mesureId` | Atelier | Une prise de mesures. |
@@ -174,7 +174,7 @@ Schémas : `commande.schema.js`, `paiement.schema.js`, `livraison.schema.js`, `a
 | `GET /api/commandes/:id/fiche-pdf` | Atelier | Fiche de commande en PDF. |
 | `PATCH /api/commandes/:id` | Atelier | Champs modifiables : `modeleId, typeVetement, description, couleur, tissu, quantite, priorite, dateLivraisonPrevue, observations, photoTissuUrl, photoModeleUrl`. Le prix et la cliente ne se modifient pas. |
 | `PUT /api/commandes/:id/affectation` | Permission `commandes.affecter` | `{ employeId }` (employé actif ou PDG de l'atelier, ou `null` pour retirer) — commandes ouvertes seulement (409 sinon) ; historisé ; répéter la même affectation renvoie `dejaTraite: true`. |
-| `POST /api/commandes/:id/statut` | Atelier | `{ statut }` — transition contrôlée. |
+| `POST /api/commandes/:id/statut` | Atelier | `{ statut, statutAttendu? }` — transition contrôlée. `statutAttendu` (facultatif, utilisé par les écritures rejouées hors ligne) : si le statut actuel est différent, **409** `details.code = "STATUT_CHANGE"` et rien n'est modifié. Accepte `Idempotency-Key`. |
 | `POST /api/commandes/:commandeId/paiements` | Atelier, idempotente | `{ montant, mode ("ESPECES" \| "MOBILE_MONEY" \| "VIREMENT" \| "AUTRE") }` + `reference?, commentaire?`. 409 si le montant dépasse le solde. |
 | `GET /api/commandes/:commandeId/paiements` | Atelier | Paiements de la commande, annulés compris (avec motif), paginés. |
 | `GET /api/commandes/:commandeId/paiements/:paiementId` | Atelier | Un paiement. |

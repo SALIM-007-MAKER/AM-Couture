@@ -50,7 +50,7 @@ clé utilisée par deux ateliers est indépendante : la réponse d'un atelier n'
 
 `POST /api/commandes` · `POST /api/commandes/:id/paiements` · `POST /api/commandes/:id/livraisons`
 (avec paiement final éventuel) · `POST /api/stock/:id/mouvements` · `POST /api/depenses` ·
-`POST /api/clientes` · `POST /api/ateliers/:id/abonnement/activer` (SuperAdmin) · `POST /api/abonnements/souscrire` (déclaration de paiement d'abonnement).
+`POST /api/clientes` · `POST /api/clientes/:id/mesures` · `POST /api/commandes/:id/statut` (ces deux dernières : rejeu des écritures hors ligne, 7.6) · `POST /api/ateliers/:id/abonnement/activer` (SuperAdmin) · `POST /api/abonnements/souscrire` (déclaration de paiement d'abonnement).
 
 ## Limites connues
 

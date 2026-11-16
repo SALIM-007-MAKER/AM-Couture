@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
+import { idempotence } from "../lib/idempotence.js";
 import { createMesureSchema, listMesuresQuerySchema } from "../schemas/mesure.schema.js";
 
 // mergeParams: true — monté sous /api/clientes/:id/mesures, a besoin de
@@ -29,7 +30,7 @@ router.use(async (req, res, next) => {
 // POST /api/clientes/:id/mesures — nouvelle prise de mesures.
 // Principe non négociable : on crée TOUJOURS une nouvelle ligne, jamais de
 // mise à jour d'une mesure existante (historique complet préservé).
-router.post("/", async (req, res) => {
+router.post("/", idempotence, async (req, res) => {
   if (req.cliente.archivedAt) {
     throw new HttpError(
       409,
