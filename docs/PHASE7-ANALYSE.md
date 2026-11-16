@@ -204,3 +204,30 @@ Les quatre options recommandées ont été retenues : **adaptateur de stockage d
 - Le texte libre d'une commande (description) peut citer la personne : il est conservé car c'est un document comptable ; l'atelier doit éviter d'y mettre des données personnelles.
 - Les anciennes sauvegardes de la base (Neon) peuvent contenir l'identité avant anonymisation, jusqu'à expiration de leur historique : à indiquer dans la politique de confidentialité.
 - Pas de motif de conservation légal vérifié pour le pays de l'atelier : à valider avec un juriste local avant de promettre un délai.
+
+## 11. Réalisé en 7.5 — consultation hors connexion (lecture)
+
+**Fonctionnement** : ce que le PDG ou l'employé a **déjà consulté en ligne** (clientes et leurs mesures, commandes, modèles, réglages de l'atelier) est recopié sur l'appareil. Sans réseau, ou si le serveur est injoignable, l'application s'ouvre avec ces données en **lecture**, sous un bandeau « Hors connexion » qui indique la date de la dernière connexion au serveur. Une page jamais consultée en ligne sur cet appareil le dit (« n'a pas encore été consultée ») au lieu de tourner indéfiniment. Au retour du serveur, le bandeau disparaît et les données se rafraîchissent seules.
+
+**Fonctionnement technique**
+- `lib/instantane.js` (logique pure, testée) : construction, expiration, restauration, sauvegarde regroupée (une écriture au plus toutes les 2 s) ; `lib/instantaneStockage.js` : IndexedDB, une seule entrée, toute erreur absorbée ; `lib/connexion.js` : état hors ligne partagé avec TanStack Query (les requêtes sont mises **en pause avec leurs données**, jamais en erreur).
+- **Serveur injoignable ≠ absence de réseau** : le navigateur ne signale « hors ligne » que sans aucun réseau. Un wifi sans internet reste « en ligne » ; l'application bascule donc aussi en mode hors ligne dès qu'une requête échoue faute de réponse, puis sonde `/api/health` toutes les 8 s (et immédiatement quand le navigateur annonce le retour du réseau).
+- L'instantané est rechargé **avant** l'affichage (borné à 1,5 s) : l'application s'ouvre directement avec les données.
+
+**Données personnelles sur l'appareil — garde-fous**
+- Un seul instantané par appareil, au nom du dernier utilisateur ; un autre compte qui se connecte le remplace.
+- **Effacé à la déconnexion** et dès que le serveur répond 401 (session terminée) ; **expire 7 jours** après la dernière confirmation de la session par le serveur (durée de vie de la session) ; un instantané expiré, illisible ou d'une autre version est supprimé au lancement.
+- Réservé au **PDG et aux employés** : jamais pour une cliente ni pour la plateforme.
+- **Liste blanche** : clientes, commandes, modèles, réglages, et l'identité du compte. **Jamais** paiements, dépenses, rapports, abonnement, achats, stock. Les montants des commandes suivent le masquage déjà appliqué par le serveur à ce compte.
+- Tailles bornées : 500 Ko par requête, 4 Mo au total (les plus récentes d'abord).
+- Les **écritures échouent tout de suite** avec un message (`mutations.networkMode = "always"`) : par défaut TanStack les aurait mises en attente et rejouées au retour du réseau, ce qui aurait envoyé un paiement ou un changement de statut à l'insu de l'utilisateur. Les écritures hors ligne sûres sont l'objet de la 7.6.
+- À la déconnexion, la mémoire de l'application est aussi vidée (auparavant, le cache restait en mémoire jusqu'au rechargement).
+
+**Tests** : 10 unitaires (liste blanche, éligibilité, tailles, expiration, restauration, suppression d'un instantané périmé, clé hors liste blanche refusée même injectée, écriture regroupée, effacement à la déconnexion, stockage défaillant) ; **7 mutations détectées** (finances conservées, pas d'expiration, cliente éligible, pas d'effacement, restauration hors liste, deux bornes de taille) + 1 mutation E2E (écritures mises en attente) ; 3 E2E (enregistrement sans les finances, serveur injoignable avec réouverture, page non consultée, écriture refusée sans rejeu, bandeau levé au retour, effacement à la déconnexion). Un défaut réel a été trouvé et corrigé par ces tests : vider le cache avant le démontage des écrans provoquait une page blanche à la déconnexion.
+
+**Limites — à lire**
+- **Seul ce qui a été consulté en ligne est disponible** : il n'y a pas de téléchargement préalable de tout l'atelier. Une employée qui n'a jamais ouvert « Commandes » sur son téléphone ne les verra pas hors ligne. Un préchargement des écrans principaux à la connexion est possible mais coûte du stockage et des données mobiles ; non fait.
+- **Vérifié avec un serveur injoignable simulé** (appels `/api` coupés dans Chromium), pas sur de vrais appareils : le comportement du stockage et du service worker sur iOS et Android (quotas, purge par le système, mode économie de données) n'est **pas vérifié**. Le chargement de la coquille de l'application sans réseau repose sur le service worker déjà en place (vite-plugin-pwa), non testé ici car absent du serveur de développement.
+- Les **droits ne se mettent pas à jour hors ligne** : si le PDG retire une permission à un employé, celui-ci garde l'accès en lecture aux données déjà enregistrées jusqu'à son prochain contact avec le serveur (au plus 7 jours).
+- Une personne qui a l'appareil déverrouillé peut ouvrir l'application hors ligne sans ressaisir de mot de passe tant que l'instantané existe (comme la session en ligne). Les données ne sont **pas chiffrées** dans IndexedDB : le chiffrement navigateur sans secret saisi par l'utilisateur n'apporterait qu'une fausse sécurité ; la protection est l'effacement à la déconnexion et le verrouillage de l'appareil.
+- Aucune synchronisation, aucune file d'écriture : c'est la 7.6.
