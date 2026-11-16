@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { emptyToUndefined, optionalTrimmed } from "../lib/zodHelpers.js";
+import { emptyToUndefined, optionalTrimmed, normalizeText } from "../lib/zodHelpers.js";
+import { normalizePhone } from "../lib/phone.js";
 
 const idRefField = z.string().trim().min(1, "Identifiant requis.");
 
@@ -36,3 +37,26 @@ export const listDemandesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
   pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
+
+const nomVisiteur = z.string().trim().min(1, "Champ requis.").max(60, "60 caractères maximum.").transform(normalizeText);
+const telephoneVisiteur = z
+  .string()
+  .trim()
+  .min(1, "Numéro de téléphone requis.")
+  .transform(normalizePhone)
+  .refine((v) => /^\+?\d{8,15}$/.test(v), "Numéro de téléphone invalide (8 à 15 chiffres attendus).");
+
+// Envoyée par un VISITEUR sans compte depuis la vitrine (7.3). Jamais de prix, de date ni de statut : ce n'est qu'une
+// proposition. `consentement` doit être EXACTEMENT true (case cochée par la personne). `siteWeb` est un piège à robots :
+// invisible pour une personne, toujours vide ; rempli, la demande est ignorée sans le dire.
+export const creerDemandePubliqueSchema = z
+  .object({
+    prenom: nomVisiteur,
+    nom: nomVisiteur,
+    telephone: telephoneVisiteur,
+    modeleId: z.preprocess(emptyToUndefined, idRefField.optional()),
+    description: optionalTrimmed(1000),
+    consentement: z.literal(true, { errorMap: () => ({ message: "Votre accord est nécessaire pour transmettre votre demande à l'atelier." }) }),
+    siteWeb: z.string().max(200).optional(),
+  })
+  .strict();

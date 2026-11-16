@@ -263,6 +263,8 @@ model Atelier {
   vitrineDescription String?
   couleurPrincipale  String?
   vitrineContact     Boolean   @default(false)
+  // 7.3 : la vitrine accepte les demandes de commande des visiteurs sans compte (désactivé par défaut).
+  demandesEnLigne    Boolean   @default(false)
   // Suspension par le SUPERADMIN (ex: impayé, litige) — bloque IMMÉDIATEMENT
   // les nouvelles requêtes de tout compte de cet atelier (vérifié à chaque
   // requête via requireAtelier, pas seulement à la connexion : voir
@@ -480,14 +482,29 @@ enum StatutDemandeCommande {
   REFUSEE
 }
 
+enum OrigineDemande {
+  CLIENT // envoyée par une cliente connectée (espace client)
+  VITRINE // envoyée par un visiteur sans compte depuis la vitrine publique (7.3)
+}
+
 model DemandeCommande {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   atelierId String
-  atelier   Atelier @relation(fields: [atelierId], references: [id], onDelete: Restrict)
-  clienteId String
-  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
-  modeleId  String?
-  modele    Modele? @relation(fields: [modeleId], references: [id], onDelete: SetNull)
+  atelier   Atelier  @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  // Nul tant qu'une demande de la vitrine n'a pas été rattachée à une fiche cliente par l'atelier.
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+
+  origine          OrigineDemande @default(CLIENT)
+  // Données personnelles d'un VISITEUR (sans fiche cliente) : minimales, avec consentement horodaté. Effacées dès que la
+  // demande est rattachée à une fiche cliente (les données vivent alors sur la fiche) ou purgées après un délai
+  // (voir lib/demandesPubliques.js).
+  contactPrenom    String?
+  contactNom       String?
+  contactTelephone String?
+  consentementLe   DateTime?
+  modeleId         String?
+  modele           Modele?        @relation(fields: [modeleId], references: [id], onDelete: SetNull)
 
   description String?
 
@@ -506,6 +523,7 @@ model DemandeCommande {
   @@index([atelierId])
   @@index([clienteId])
   @@index([statut])
+  @@index([origine, createdAt])
 }
 
 model Paiement {

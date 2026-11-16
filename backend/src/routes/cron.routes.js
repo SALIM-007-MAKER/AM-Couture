@@ -8,6 +8,7 @@ import { rappelsQuotidiensTemplate } from "../lib/emailTemplates.js";
 import { UTILISATEURS_RESUME_QUOTIDIEN } from "../lib/rappelsQuotidiens.js";
 import { purgerJournalSecurite } from "../lib/securityLog.js";
 import { purgerClesIdempotence } from "../lib/idempotence.js";
+import { purgerDemandesPubliques } from "../lib/demandesPubliques.js";
 import { envoyerRappelsAbonnement } from "../lib/rappelsAbonnement.js";
 import { rattraperTransactionsWave } from "../lib/paiementEnLigne.js";
 import { paiementWaveActif } from "../lib/wave.js";
@@ -52,6 +53,12 @@ router.get("/rappels-quotidiens", async (req, res) => {
   // Clés d'idempotence expirées (durée de vie 24 h) : même principe, un échec ne bloque pas les rappels.
   const clesPurgees = await purgerClesIdempotence().catch((err) => {
     log.error("erreur", { categorie: "cron", operation: "purge_cles_idempotence", message: messageErreur(err) });
+    return null;
+  });
+
+  // Demandes de la vitrine sans suite : données personnelles de visiteurs, conservation limitée (voir lib/demandesPubliques.js).
+  const demandesPurgees = await purgerDemandesPubliques(prisma).catch((err) => {
+    log.error("erreur", { categorie: "cron", operation: "purge_demandes_publiques", message: messageErreur(err) });
     return null;
   });
 
@@ -120,6 +127,7 @@ router.get("/rappels-quotidiens", async (req, res) => {
     erreurs,
     journalSecuritePurge: journalPurge,
     clesIdempotencePurgees: clesPurgees,
+    demandesPubliquesPurgees: demandesPurgees,
     rappelsAbonnement,
     rattrapageWave,
   });

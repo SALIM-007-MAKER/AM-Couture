@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule, requirePermission } from "../middlewares/auth.middleware.js";
+import { verrouillerCle } from "../lib/verrous.js";
 import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
@@ -26,6 +27,11 @@ const DEMANDE_SELECT = {
   motifRefus: true,
   commandeId: true,
   createdAt: true,
+  origine: true,
+  // Visiteur de la vitrine pas encore rattaché à une fiche cliente (effacés au rattachement).
+  contactPrenom: true,
+  contactNom: true,
+  contactTelephone: true,
   cliente: { select: { id: true, nom: true, prenom: true, telephone: true } },
   modele: { select: { id: true, nom: true, categorie: true } },
   commande: { select: { id: true, numero: true } },
@@ -78,6 +84,9 @@ router.post("/:id/accepter", async (req, res) => {
   if (demande.statut !== "EN_ATTENTE") {
     throw new HttpError(409, "Cette demande a déjà été traitée.");
   }
+  if (!demande.clienteId) {
+    throw new HttpError(409, "Créez d'abord la fiche cliente de cette personne (demande venue de la vitrine).", { clienteRequise: true });
+  }
 
   const commande = await prisma.commande.findFirst({
     where: { id: parsed.data.commandeId, atelierId: req.user.atelierId, clienteId: demande.clienteId },
@@ -109,6 +118,42 @@ router.post("/:id/accepter", async (req, res) => {
   res.json(misAJour);
 });
 
+// POST /api/demandes/:id/cliente — rattache une demande de la vitrine à une fiche cliente : crée la fiche à partir des
+// coordonnées du visiteur, ou réutilise la fiche existante portant le même téléphone. Les coordonnées de la demande
+// sont alors EFFACÉES (elles vivent sur la fiche). Répétable : une demande déjà rattachée est renvoyée telle quelle.
+router.post("/:id/cliente", requirePermission("clientes.ecrire"), async (req, res) => {
+  const { id } = req.params;
+  const { atelierId } = req.user;
+  const resultat = await prisma.$transaction(
+    async (tx) => {
+      const demande = await tx.demandeCommande.findFirst({ where: { id, atelierId } });
+      if (!demande) throw new HttpError(404, "Demande introuvable.");
+      if (demande.clienteId) return { demandeId: id, deja: true };
+      if (demande.statut !== "EN_ATTENTE") throw new HttpError(409, "Cette demande a déjà été traitée.");
+
+      // Même verrou que la création d'une cliente (clientes.routes.js) : pas de doublon de téléphone en concurrence.
+      await verrouillerCle(tx, `cliente:${atelierId}:${demande.contactTelephone}`);
+      let cliente = await tx.cliente.findFirst({ where: { atelierId, telephone: demande.contactTelephone }, select: { id: true, archivedAt: true } });
+      let existante = Boolean(cliente);
+      if (cliente?.archivedAt) {
+        throw new HttpError(409, "Une cliente archivée porte déjà ce numéro : restaurez-la, puis rattachez la demande.", { clienteId: cliente.id });
+      }
+      cliente ??= await tx.cliente.create({
+        data: { atelierId, prenom: demande.contactPrenom, nom: demande.contactNom, telephone: demande.contactTelephone },
+        select: { id: true },
+      });
+      await tx.demandeCommande.update({
+        where: { id },
+        data: { clienteId: cliente.id, contactPrenom: null, contactNom: null, contactTelephone: null, consentementLe: null },
+      });
+      return { demandeId: id, deja: false, existante };
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
+  const demande = await prisma.demandeCommande.findUnique({ where: { id }, select: DEMANDE_SELECT });
+  res.json({ ...demande, clienteExistante: resultat.existante ?? false, dejaTraite: resultat.deja });
+});
+
 // POST /api/demandes/:id/refuser { motifRefus? } — refuse définitivement,
 // jamais de suppression (même discipline que le reste de l'app).
 router.post("/:id/refuser", async (req, res) => {
@@ -133,6 +178,8 @@ router.post("/:id/refuser", async (req, res) => {
       }
 
       const refusee = await tx.demandeCommande.findUnique({ where: { id: req.params.id }, select: DEMANDE_SELECT });
+      // Visiteur sans compte ni fiche : personne à prévenir dans l'application (l'atelier le recontacte lui-même).
+      if (!refusee.cliente) return refusee;
       await creerNotificationClient(tx, {
         clienteId: refusee.cliente.id,
         commandeId: null,

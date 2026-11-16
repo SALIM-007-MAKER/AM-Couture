@@ -6,6 +6,8 @@ import { requireValidIdParam } from "../lib/idParam.js";
 import { formatZodError } from "../lib/validation.js";
 import { stockage, decoderImage } from "../lib/stockageImages.js";
 import { listVitrineQuerySchema } from "../schemas/vitrine.schema.js";
+import { creerDemandePubliqueSchema } from "../schemas/demandeCommande.schema.js";
+import { verrouillerCle } from "../lib/verrous.js";
 
 // ═══ Vitrine PUBLIQUE d'un atelier : lecture seule, sans compte ═══════════════════════════════════════════════════════
 //
@@ -34,6 +36,7 @@ const lectureAtelier = (slug) =>
       vitrineDescription: true,
       couleurPrincipale: true,
       vitrineContact: true,
+      demandesEnLigne: true,
       telephone: true,
       adresse: true,
       ville: true,
@@ -80,6 +83,8 @@ router.get("/vitrines/:slug", limite, async (req, res) => {
       description: atelier.vitrineDescription ?? null,
       couleur: atelier.couleurPrincipale ?? null,
       logo: atelier.logoUrl ? `/api/public/vitrines/${slug}/logo` : null,
+      // L'atelier accepte-t-il les demandes de commande en ligne ? (affiche le formulaire)
+      demandes: atelier.demandesEnLigne,
       // Coordonnées : seulement si le PDG a choisi de les montrer.
       contact: atelier.vitrineContact
         ? { telephone: atelier.telephone ?? null, adresse: atelier.adresse ?? null, ville: atelier.ville ?? null, pays: atelier.pays ?? null }
@@ -116,6 +121,65 @@ router.get("/vitrines/:slug/images/:imageId", async (req, res) => {
   const image = photo ? await stockage.lire(prisma, { id: req.params.imageId, atelierId: atelier.id }) : null;
   if (!image) throw new HttpError(404, "Image introuvable.");
   envoyerImage(res, image);
+});
+
+// ── Demande de commande d'un visiteur SANS compte ──────────────────────────────────────────────────────────────────
+// Ne crée jamais de commande ni de fiche cliente : une proposition que l'atelier traite dans « Demandes ». Données
+// personnelles minimales (prénom, nom, téléphone) avec consentement horodaté, conservation limitée (30 / 90 jours si
+// rien n'en est fait, voir lib/demandesPubliques.js). La réponse ne révèle rien (ni identifiant, ni doublon détecté).
+const limiteDemande = rateLimitPersistant({ prefixe: "vitrine-demande", limite: 5, fenetreMs: 60 * 60_000, message: "Trop de demandes envoyées. Réessayez plus tard." });
+const MAX_EN_ATTENTE_VITRINE = 50;
+const JOUR = 86_400_000;
+
+router.post("/vitrines/:slug/demandes", limiteDemande, async (req, res) => {
+  const parsed = creerDemandePubliqueSchema.safeParse(req.body);
+  if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
+  const { siteWeb, consentement: _consentement, ...donnees } = parsed.data;
+  const reponse = { ok: true };
+
+  // Piège à robots : champ invisible rempli → on fait semblant de réussir, sans rien enregistrer.
+  if (siteWeb) return res.status(201).json(reponse);
+
+  const atelier = await prisma.atelier.findFirst({
+    where: { slug: req.params.slug, vitrineActive: true, demandesEnLigne: true, actif: true },
+    select: { id: true },
+  });
+  if (!atelier) throw new HttpError(404, "Vitrine introuvable.");
+
+  if (donnees.modeleId) {
+    const modele = await prisma.modele.findFirst({ where: { id: donnees.modeleId, atelierId: atelier.id, publie: true, archivedAt: null }, select: { id: true } });
+    if (!modele) throw new HttpError(400, "Champs invalides.", { modeleId: ["Ce modèle n'est plus disponible."] });
+  }
+
+  await prisma.$transaction(
+    async (tx) => {
+      await verrouillerCle(tx, `demande-vitrine:${atelier.id}:${donnees.telephone}`);
+      const depuisUnJour = new Date(Date.now() - JOUR);
+      const recentes = await tx.demandeCommande.findMany({
+        where: { atelierId: atelier.id, origine: "VITRINE", contactTelephone: donnees.telephone, createdAt: { gte: depuisUnJour } },
+        select: { modeleId: true, statut: true },
+      });
+      // Même personne, même modèle, déjà en attente : le double envoi (ou le rejeu) ne crée pas de doublon.
+      if (recentes.some((d) => d.statut === "EN_ATTENTE" && (d.modeleId ?? null) === (donnees.modeleId ?? null))) return;
+      if (recentes.length >= 3) throw new HttpError(429, "Trop de demandes pour ce numéro aujourd'hui. L'atelier vous répondra.");
+      const enAttente = await tx.demandeCommande.count({ where: { atelierId: atelier.id, origine: "VITRINE", statut: "EN_ATTENTE" } });
+      if (enAttente >= MAX_EN_ATTENTE_VITRINE) throw new HttpError(429, "L'atelier ne peut pas recevoir de nouvelles demandes pour le moment.");
+      await tx.demandeCommande.create({
+        data: {
+          atelierId: atelier.id,
+          origine: "VITRINE",
+          contactPrenom: donnees.prenom,
+          contactNom: donnees.nom,
+          contactTelephone: donnees.telephone,
+          modeleId: donnees.modeleId,
+          description: donnees.description,
+          consentementLe: new Date(),
+        },
+      });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
+  res.status(201).json(reponse);
 });
 
 function envoyerImage(res, image) {

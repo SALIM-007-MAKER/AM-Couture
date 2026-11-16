@@ -35,6 +35,7 @@ export const patchVitrineSchema = z
     vitrineDescription: nullable(z.string().trim().max(1500)),
     couleurPrincipale: nullable(couleurField),
     vitrineContact: z.boolean().optional(),
+    demandesEnLigne: z.boolean().optional(),
   })
   .strict()
   .refine((d) => Object.keys(d).length > 0, { message: "Aucune donnée à modifier." });
