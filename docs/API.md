@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 185 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 190 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -254,6 +254,18 @@ Droits d'un employé : `achats.lire` (consulter), `achats.recevoir` (réceptionn
 | `POST /api/achats/:id/receptions` | `achats.recevoir` ou `achats.ecrire`, idempotente | `{ lignes: [{ ligneId, quantite }] }` — réception totale ou partielle ; crée une entrée de stock par ligne dans la même transaction. 409 si la quantité dépasse le reste à recevoir, si l'achat est annulé ou l'article archivé. |
 | `POST /api/achats/:id/paiement` | `achats.ecrire` + `depenses.ecrire`, idempotente | `{ date? }` — crée la dépense « Achats fournisseurs » du montant total. 409 si déjà payé ou annulé. Si la dépense est annulée ensuite (module Dépenses), l'achat redevient non payé. |
 | `POST /api/achats/:id/annuler` | `achats.ecrire` | `{ motif }`. 409 si de la marchandise a été reçue ou si l'achat est payé (annuler d'abord la dépense). |
+
+## 9 quater. Vitrine publique
+
+Réglages réservés au PDG ; lecture publique **sans compte**, limitée à 120 requêtes par minute et par IP (429 au-delà) sur la page du catalogue. Les réponses publiques sont construites champ par champ (liste blanche) : jamais d'identifiant d'atelier, de prix, de client, de stock, ni de modèle non publié ou archivé. Vitrine désactivée, atelier suspendu et adresse inconnue donnent le **même** 404.
+
+| Route | Accès | Corps / paramètres |
+|---|---|---|
+| `GET /api/vitrine` | PDG | `{ slug, vitrineActive, vitrineDescription, couleurPrincipale, vitrineContact, modelesPublies }`. |
+| `PATCH /api/vitrine` | PDG | `slug?` (3–40, minuscules, chiffres, tirets ; mots réservés refusés ; unique sur la plateforme, 409 sinon), `vitrineActive?` (exige un identifiant), `vitrineDescription?` (1 500 caractères, `null` pour effacer), `couleurPrincipale?` (`#RRGGBB`, refusée si un texte blanc n'y est pas lisible : contraste WCAG ≥ 4,5), `vitrineContact?` (montrer téléphone, adresse, ville). |
+| `GET /api/public/vitrines/:slug` | Public | `?q=`, `categorie=`, `tag=`, `page`, `pageSize` (≤ 50). `{ atelier: { nom, slogan, description, couleur, logo, contact }, modeles: [{ id, nom, categorie, description, tags, photos: [{ url, legende }] }], meta }`. `contact` vaut `null` tant que le PDG ne l'a pas choisi. Cache public 60 s. |
+| `GET /api/public/vitrines/:slug/logo` | Public | Logo de l'atelier comme image. |
+| `GET /api/public/vitrines/:slug/images/:imageId` | Public | Photo d'un modèle **publié** de cette vitrine seulement ; 404 sinon (brouillon, archivé, autre atelier). Cache public 5 min. |
 
 ## 10. Tableau de bord, rapports et notifications
 
