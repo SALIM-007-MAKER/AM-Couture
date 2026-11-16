@@ -56,7 +56,7 @@ export default function DemandesListPage() {
               <Card variant="outlined" className="space-y-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors">
                 <div className="flex items-center justify-between gap-3">
                   <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                    {demande.cliente.nom} {demande.cliente.prenom}
+                    {demande.cliente ? `${demande.cliente.nom} ${demande.cliente.prenom}` : `${demande.contactNom ?? ""} ${demande.contactPrenom ?? ""}`.trim()}
                   </p>
                   <div className="flex items-center gap-1.5">
                     <StatutDemandeBadge statut={demande.statut} />

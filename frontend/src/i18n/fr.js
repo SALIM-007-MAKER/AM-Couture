@@ -15,6 +15,7 @@ import fournisseurs from "./parts/fournisseurs.fr.js";
 import achats from "./parts/achats.fr.js";
 import lookbook from "./parts/lookbook.fr.js";
 import vitrine from "./parts/vitrine.fr.js";
+import demandesVitrine from "./parts/demandesVitrine.fr.js";
 
 export default {
   ...shared,
@@ -30,6 +31,7 @@ export default {
   ...achats,
   ...lookbook,
   ...vitrine,
+  ...demandesVitrine,
   common: {
     save: "Enregistrer",
     cancel: "Annuler",

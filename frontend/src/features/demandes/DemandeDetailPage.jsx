@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Inbox, User, ClipboardList, Check, X, Plus } from "lucide-react";
-import { useDemandeQuery, useAccepterDemandeMutation, useRefuserDemandeMutation } from "./hooks.js";
+import { Inbox, User, ClipboardList, Check, X, Plus, UserPlus, Globe } from "lucide-react";
+import { useDemandeQuery, useAccepterDemandeMutation, useRefuserDemandeMutation, useRattacherClienteMutation } from "./hooks.js";
+import { useCan } from "../../hooks/usePermissions.js";
 import { useCommandesQuery } from "../commandes/hooks.js";
 import StatutDemandeBadge from "./components/StatutDemandeBadge.jsx";
 import { LoadingState, ErrorState, GlobalFormError } from "../../components/QueryState.jsx";
@@ -33,12 +34,24 @@ function DemandeDetailContent({ id, demande }) {
     <div className="max-w-2xl space-y-6">
       <PageHeader
         icon={Inbox}
-        title={`${demande.cliente.nom} ${demande.cliente.prenom}`}
-        subtitle={<StatutDemandeBadge statut={demande.statut} />}
+        title={demande.cliente ? `${demande.cliente.nom} ${demande.cliente.prenom}` : `${demande.contactNom ?? ""} ${demande.contactPrenom ?? ""}`.trim()}
+        subtitle={
+          <span className="flex items-center gap-2">
+            <StatutDemandeBadge statut={demande.statut} />
+            {demande.origine === "VITRINE" && (
+              <span className="inline-flex items-center gap-1 text-xs text-neutral-500">
+                <Globe className="size-3" aria-hidden="true" />
+                {t("dvitadm.badge")}
+              </span>
+            )}
+          </span>
+        }
         actions={
-          <Button as={Link} to={`/clientes/${demande.cliente.id}`} variant="secondary" size="sm" icon={User}>
-            {t("demandesAdmin.voirFicheClient")}
-          </Button>
+          demande.cliente && (
+            <Button as={Link} to={`/clientes/${demande.cliente.id}`} variant="secondary" size="sm" icon={User}>
+              {t("demandesAdmin.voirFicheClient")}
+            </Button>
+          )
         }
       />
 
@@ -59,12 +72,13 @@ function DemandeDetailContent({ id, demande }) {
           </p>
           <p className="text-neutral-500">
             {t("demandesAdmin.telephoneLabel")}
-            <span className="text-neutral-900 dark:text-neutral-100">{demande.cliente.telephone}</span>
+            <span className="text-neutral-900 dark:text-neutral-100" data-testid="demande-telephone">{demande.cliente?.telephone ?? demande.contactTelephone}</span>
           </p>
         </Card>
       </div>
 
-      {demande.statut === "EN_ATTENTE" && <TraiterDemande id={id} clienteId={demande.cliente.id} />}
+      {demande.statut === "EN_ATTENTE" && !demande.cliente && <RattacherCliente id={id} />}
+      {demande.statut === "EN_ATTENTE" && <TraiterDemande id={id} clienteId={demande.cliente?.id} />}
 
       {demande.statut === "ACCEPTEE" && demande.commande && (
         <Card variant="outlined" className="text-sm">
@@ -95,7 +109,7 @@ function TraiterDemande({ id, clienteId }) {
   const [commandeId, setCommandeId] = useState("");
   const [motifRefus, setMotifRefus] = useState("");
   const [refusing, setRefusing] = useState(false);
-  const commandesQuery = useCommandesQuery({ clienteId, pageSize: 100 });
+  const commandesQuery = useCommandesQuery({ clienteId, pageSize: 100 }, { enabled: Boolean(clienteId) });
   const accepterMutation = useAccepterDemandeMutation(id);
   const refuserMutation = useRefuserDemandeMutation(id);
 
@@ -116,6 +130,7 @@ function TraiterDemande({ id, clienteId }) {
       <SectionTitle icon={Check}>{t("demandesAdmin.sectionTraiter")}</SectionTitle>
       <Card className="space-y-4">
         <GlobalFormError error={accepterMutation.error} />
+        {clienteId && (
         <form onSubmit={handleAccepter} className="space-y-3">
           <Field label={t("demandesAdmin.lierCommandeLabel")} hint={t("demandesAdmin.lierCommandeHint")}>
             <div className="flex gap-2">
@@ -138,8 +153,9 @@ function TraiterDemande({ id, clienteId }) {
             {t("demandesAdmin.accepterEtLier")}
           </Button>
         </form>
+        )}
 
-        <div className="border-t border-neutral-200 dark:border-neutral-800 pt-4">
+        <div className={clienteId ? "border-t border-neutral-200 dark:border-neutral-800 pt-4" : ""}>
           <GlobalFormError error={refuserMutation.error} />
           {refusing ? (
             <form onSubmit={handleRefuser} className="space-y-3">
@@ -163,5 +179,28 @@ function TraiterDemande({ id, clienteId }) {
         </div>
       </Card>
     </div>
+  );
+}
+
+// Demande venue de la vitrine : le visiteur n'a pas encore de fiche cliente. L'atelier la crée (ou retrouve celle qui porte
+// le même numéro) ; les coordonnées passent alors sur la fiche et sont effacées de la demande.
+function RattacherCliente({ id }) {
+  const { t } = useTranslation();
+  const can = useCan();
+  const mutation = useRattacherClienteMutation(id);
+  return (
+    <Card variant="outlined" className="space-y-3 text-sm" data-testid="rattacher-cliente">
+      <p className="font-medium">{t("dvitadm.visitor")}</p>
+      <p className="text-neutral-600 dark:text-neutral-400">{t("dvitadm.visitorHelp")}</p>
+      <p className="text-xs text-neutral-500">{t("dvitadm.retention")}</p>
+      <GlobalFormError error={mutation.error} />
+      {can("clientes.ecrire") ? (
+        <Button variant="primary" icon={UserPlus} loading={mutation.isPending} onClick={() => mutation.mutate()} data-testid="creer-fiche">
+          {t("dvitadm.createCard")}
+        </Button>
+      ) : (
+        <p className="text-neutral-500">{t("dvitadm.needRight")}</p>
+      )}
+    </Card>
   );
 }

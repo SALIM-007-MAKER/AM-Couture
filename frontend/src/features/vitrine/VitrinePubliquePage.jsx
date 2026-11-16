@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { MapPin, MessageCircle, Phone, Search, X, Scissors } from "lucide-react";
 import { useVitrinePubliqueQuery } from "./hooks.js";
+import DemandeForm from "./DemandeForm.jsx";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { CATEGORIES_VETEMENT, categorieLabel } from "../modeles/constants.js";
 import { ApiError } from "../../lib/apiClient.js";
@@ -23,6 +24,7 @@ export default function VitrinePubliquePage() {
   const [tag, setTag] = useState("");
   const [page, setPage] = useState(1);
   const [ouvert, setOuvert] = useState(null);
+  const [demande, setDemande] = useState(null); // { modele } quand le formulaire de demande est ouvert
   const recherche = useDebouncedValue(q, 300);
   const { data, isPending, isError, error } = useVitrinePubliqueQuery(slug, { q: recherche, categorie, tag, page, pageSize: 24 });
 
@@ -93,6 +95,12 @@ export default function VitrinePubliquePage() {
               </div>
             )}
           </section>
+        )}
+
+        {atelier.demandes && (
+          <button type="button" onClick={() => setDemande({ modele: null })} className="rounded-xl px-4 py-2 text-sm font-medium text-white" style={{ backgroundColor: couleur }} data-testid="demande-generale">
+            {t("dvit.askGeneral")}
+          </button>
         )}
 
         <section className="space-y-3">
@@ -166,6 +174,11 @@ export default function VitrinePubliquePage() {
             ))}
             {ouvert.description && <p className="text-sm whitespace-pre-wrap">{ouvert.description}</p>}
             {ouvert.tags.length > 0 && <p className="text-xs text-neutral-500">{ouvert.tags.join(" · ")}</p>}
+            {atelier.demandes && (
+              <button type="button" onClick={() => { setDemande({ modele: ouvert }); setOuvert(null); }} className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white mr-2" style={{ backgroundColor: couleur }} data-testid="demander-modele">
+                {t("dvit.askModel")}
+              </button>
+            )}
             {whatsapp && (
               <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(t("vit.whatsappAsk", { modele: ouvert.nom }))}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white" style={{ backgroundColor: couleur }}>
                 <MessageCircle className="size-4" aria-hidden="true" />
@@ -175,6 +188,7 @@ export default function VitrinePubliquePage() {
           </div>
         </div>
       )}
+      {demande && <DemandeForm slug={slug} modele={demande.modele} couleur={couleur} onClose={() => setDemande(null)} />}
     </main>
   );
 }
