@@ -27,3 +27,20 @@ test("production sans DIRECT_URL : erreur explicite, pas de repli silencieux", (
   assert.equal(d.migrer, false);
   assert.ok(d.erreur);
 });
+
+import { envPourGeneration, URL_FACTICE_GENERATION } from "../lib/deployPolicy.mjs";
+
+test("génération : sans DIRECT_URL (prévisualisation), une valeur factice est fournie", () => {
+  const env = { VERCEL_ENV: "preview" };
+  assert.equal(envPourGeneration(env, decideMigration(env)).DIRECT_URL, URL_FACTICE_GENERATION);
+});
+test("génération : une vraie DIRECT_URL n'est jamais remplacée", () => {
+  const env = { VERCEL_ENV: "preview", DIRECT_URL: "postgresql://reelle" };
+  assert.equal(envPourGeneration(env, decideMigration(env)).DIRECT_URL, "postgresql://reelle");
+});
+test("génération : un build de production qui migre garde l'exigence stricte (jamais de valeur factice)", () => {
+  const env = { VERCEL_ENV: "production", DIRECT_URL: "postgresql://reelle" };
+  assert.equal(envPourGeneration(env, decideMigration(env)).DIRECT_URL, "postgresql://reelle");
+  // Production sans DIRECT_URL : decideMigration renvoie une erreur ; le script s'arrête avant la génération (voir vercel-build.mjs).
+  assert.ok(decideMigration({ VERCEL_ENV: "production" }).erreur);
+});
