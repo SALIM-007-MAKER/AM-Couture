@@ -1,6 +1,7 @@
-import { Loader2, AlertCircle, Inbox, RotateCcw } from "lucide-react";
+import { Loader2, AlertCircle, Inbox, RotateCcw, WifiOff } from "lucide-react";
 import { ApiError } from "../lib/apiClient.js";
 import { useTranslation } from "../i18n/index.js";
+import { useConnexionStore } from "../lib/connexion.js";
 import { messageUtilisateur, aDesErreursDeChamps } from "../lib/errorMessage.js";
 
 /** Référence à communiquer au support (erreurs serveur uniquement) : retrouve la ligne de journal. */
@@ -12,6 +13,16 @@ function Reference({ reference }) {
 
 export function LoadingState({ label }) {
   const { t } = useTranslation();
+  const horsLigne = useConnexionStore((s) => s.horsLigne);
+  // Hors connexion, une page jamais consultée en ligne n'a rien à afficher : on le dit au lieu de tourner indéfiniment.
+  if (horsLigne) {
+    return (
+      <p className="flex items-center justify-center gap-2 text-sm text-neutral-500 py-8" data-testid="hors-ligne-vide">
+        <WifiOff className="size-4" aria-hidden="true" />
+        {t("horsLigne.nonDisponible")}
+      </p>
+    );
+  }
   return (
     <p className="flex items-center justify-center gap-2 text-sm text-neutral-500 py-8">
       <Loader2 className="size-4 animate-spin text-brand-500 dark:text-brand-400" aria-hidden="true" />

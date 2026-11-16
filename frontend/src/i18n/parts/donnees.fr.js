@@ -1,6 +1,12 @@
 // Traductions FR — espace client avancé (7.4) : suivi d'étapes (« etapes »), droits sur les données (« mesdonnees »,
 // côté cliente) et anonymisation par l'atelier (« anon »).
 export default {
+  horsLigne: {
+    banniere: "Hors connexion : vous consultez les données enregistrées sur cet appareil.",
+    verifie: "Dernière connexion au serveur : {{date}}.",
+    ecritures: "Les modifications ne sont pas possibles tant que la connexion n'est pas rétablie.",
+    nonDisponible: "Hors connexion : cette page n'a pas encore été consultée en ligne sur cet appareil.",
+  },
   etapes: {
     titre: "Avancement de la commande",
     annulee: "Cette commande a été annulée.",
