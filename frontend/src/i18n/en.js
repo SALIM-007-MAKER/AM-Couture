@@ -15,6 +15,7 @@ import achats from "./parts/achats.en.js";
 import lookbook from "./parts/lookbook.en.js";
 import vitrine from "./parts/vitrine.en.js";
 import demandesVitrine from "./parts/demandesVitrine.en.js";
+import donnees from "./parts/donnees.en.js";
 
 export default {
   ...shared,
@@ -31,6 +32,7 @@ export default {
   ...lookbook,
   ...vitrine,
   ...demandesVitrine,
+  ...donnees,
   common: {
     save: "Save",
     cancel: "Cancel",

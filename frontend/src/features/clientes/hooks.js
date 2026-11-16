@@ -51,6 +51,19 @@ export function useArchiveClienteMutation(id) {
   });
 }
 
+// Droit à l'effacement (PDG) : anonymise la fiche ; les mesures, le fil d'activité et le compte disparaissent, donc on
+// rafraîchit aussi leurs listes.
+export function useAnonymiserClienteMutation(id) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => clientesApi.anonymiser(id),
+    onSuccess: (cliente) => {
+      queryClient.setQueryData(["clientes", "detail", id], cliente);
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+    },
+  });
+}
+
 export function useRestoreClienteMutation(id) {
   const queryClient = useQueryClient();
   return useMutation({
