@@ -103,3 +103,7 @@ Existe (logo, coordonnées, reçu). Ajouts raisonnables : **couleur principale**
 - Lecture du code seulement ; pas de retour d'ateliers réels sur l'usage de la vitrine ni du hors ligne.
 - Coûts de stockage et services tiers estimés par ordre de grandeur, à confirmer au choix du fournisseur.
 - Hors ligne : comportement iOS/Android à vérifier sur appareils réels (non testable ici avec certitude).
+
+## 6. Décisions du 16/11/2026
+
+Les quatre options recommandées ont été retenues : **adaptateur de stockage d'images** (adaptateur base de données pour le développement et les tests, adaptateur objet à brancher et vérifier avec le fournisseur choisi) ; **hors ligne** = lecture + écritures sûres (jamais de paiement) ; **demandes publiques sans compte** avec consentement ; la phase 6 est mise en pause (6.6 fusionnée, **6.7 rapports et 6.8 bilan restent à faire**) pour avancer sur la phase 7.
