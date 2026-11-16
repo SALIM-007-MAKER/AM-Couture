@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useFileStore } from "../../../lib/fileSynchro.js";
 import { useChangeStatutMutation } from "../hooks.js";
 import { STATUT_TRANSITIONS, statutLabel, STATUT_ICONS } from "../constants.js";
 import { GlobalFormError } from "../../../components/QueryState.jsx";
@@ -19,6 +20,9 @@ export default function StatutTransitions({ commandeId, statutActuel }) {
   const [target, setTarget] = useState(null);
   const mutation = useChangeStatutMutation(commandeId);
   const transitions = (STATUT_TRANSITIONS[statutActuel] ?? []).filter((s) => s !== "LIVREE");
+  // Une avance déjà en attente pour cette commande : on n'en empile pas une deuxième sur un statut que personne n'a encore vu.
+  const enAttente = useFileStore((s) => s.elements.some((e) => e.type === "commande.statut" && e.chemin === `/commandes/${commandeId}/statut` && e.etat === "attente"));
+  if (enAttente) return <p data-testid="statut-en-attente" className="text-sm text-amber-700 dark:text-amber-300">{t("file.statutEnAttente")}</p>;
 
   if (transitions.length === 0) return null;
 
@@ -37,7 +41,7 @@ export default function StatutTransitions({ commandeId, statutActuel }) {
               disabled={mutation.isPending}
               onClick={() => {
                 setTarget(statut);
-                mutation.mutate(statut);
+                mutation.mutate({ statut, statutAttendu: statutActuel });
               }}
             >
               {t("cmd.passerA", { statut: statutLabel(statut) })}

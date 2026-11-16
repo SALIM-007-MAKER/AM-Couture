@@ -458,12 +458,12 @@ router.put("/:id/affectation", requirePermission("commandes.affecter"), async (r
 
 // POST /api/commandes/:id/statut — changement de statut via la machine à états dédiée
 // Faire avancer une commande : « commandes.statut » (couturier) ou « commandes.ecrire ».
-router.post("/:id/statut", requireUnePermission("commandes.statut", "commandes.ecrire"), async (req, res) => {
+router.post("/:id/statut", requireUnePermission("commandes.statut", "commandes.ecrire"), idempotence, async (req, res) => {
   const parsed = changeStatutSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
-  const { statut: nextStatut } = parsed.data;
+  const { statut: nextStatut, statutAttendu } = parsed.data;
   const { id } = req.params;
 
   // LIVREE est un cas à part : cette route ne fait QUE changer le champ
@@ -487,6 +487,15 @@ router.post("/:id/statut", requireUnePermission("commandes.statut", "commandes.e
     select: { statut: true, numero: true, clienteId: true },
   });
   if (!current) throw new HttpError(404, "Commande introuvable.");
+
+  // Écriture rejouée après un passage hors ligne : on n'applique que sur l'état que l'utilisateur voyait.
+  if (statutAttendu !== undefined && statutAttendu !== current.statut) {
+    throw new HttpError(409, `Le statut de la commande a changé entre-temps (${current.statut}).`, {
+      code: "STATUT_CHANGE",
+      statutActuel: current.statut,
+      statutAttendu,
+    });
+  }
 
   const allowed = STATUT_TRANSITIONS[current.statut] ?? [];
   if (!allowed.includes(nextStatut)) {

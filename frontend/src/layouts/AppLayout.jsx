@@ -37,6 +37,7 @@ import EmailVerificationBanner from "../components/EmailVerificationBanner.jsx";
 import ImpersonationBanner from "../components/ImpersonationBanner.jsx";
 import PaywallBanner from "../components/PaywallBanner.jsx";
 import HorsLigneBanner from "../components/HorsLigneBanner.jsx";
+import FileEcrituresBanner from "../components/FileEcrituresBanner.jsx";
 import AccesBanner from "../features/abonnement/components/AccesBanner.jsx";
 import LanguageSwitcher from "../components/LanguageSwitcher.jsx";
 import LocaleSync from "../components/LocaleSync.jsx";
@@ -364,6 +365,7 @@ export default function AppLayout() {
 
       <div className="flex-1 flex flex-col min-w-0">
         <HorsLigneBanner />
+        <FileEcrituresBanner />
         <PaywallBanner />
         <AccesBanner />
         <ImpersonationBanner />

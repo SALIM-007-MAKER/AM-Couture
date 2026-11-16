@@ -3,6 +3,7 @@ import { ApiError, erreurDepuisReponse } from "./apiError.js";
 import { useAbonnementStore } from "../stores/abonnementStore.js";
 import { signalerReseauIndisponible } from "./connexion.js";
 import { effacerInstantane } from "./instantaneStockage.js";
+import { effacerFile } from "./fileStockage.js";
 
 // Ré-exportée pour compatibilité : tout le code existant importe `ApiError`
 // depuis ce fichier. La classe elle-même vit dans apiError.js pour éviter un
@@ -58,6 +59,7 @@ async function request(path, { method = "GET", body, signal, headers } = {}) {
       queryClient.setQueryData(["auth", "me"], null);
       // Session terminée : plus aucune donnée personnelle ne doit rester sur l'appareil.
       effacerInstantane();
+      effacerFile();
     }
     // 402 = essai gratuit terminé sans abonnement actif (voir
     // requireAbonnementActif, auth.middleware.js) — signale l'état via

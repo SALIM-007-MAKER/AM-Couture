@@ -117,7 +117,9 @@ export const updateCommandeSchema = z
   .strict()
   .refine((data) => Object.keys(data).length > 0, { message: "Aucune donnée à modifier." });
 
-export const changeStatutSchema = z.object({ statut: z.enum(STATUTS_COMMANDE) }).strict();
+// `statutAttendu` : garde facultative des écritures rejouées hors ligne (7.6) — le statut que l utilisateur VOYAIT en décidant.
+// S il a changé entre-temps, la transition est refusée (409) au lieu d être appliquée sur un état que personne n a vu.
+export const changeStatutSchema = z.object({ statut: z.enum(STATUTS_COMMANDE), statutAttendu: z.enum(STATUTS_COMMANDE).optional() }).strict();
 
 export const listCommandesQuerySchema = z.object({
   q: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(120).optional()),

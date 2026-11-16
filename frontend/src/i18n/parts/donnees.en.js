@@ -4,8 +4,19 @@ export default {
   horsLigne: {
     banniere: "Offline: you are viewing the data saved on this device.",
     verifie: "Last connection to the server: {{date}}.",
-    ecritures: "Changes are not possible until the connection is back.",
+    ecritures: "New clients, measurements and order progress are kept and sent when the connection is back; everything else (payments, deliveries…) is only possible online.",
     nonDisponible: "Offline: this page has not been viewed online on this device yet.",
+  },
+  file: {
+    titre: "{{count}} change(s) waiting to be sent",
+    attente: "Waiting for connection",
+    conflit: "Rejected by the server",
+    aVerifier: "To check",
+    envoyer: "Send now",
+    abandonner: "Discard",
+    envoi: "Sending…",
+    avertissement: "Logging out deletes the changes that have not been sent.",
+    statutEnAttente: "A status change is already waiting to be sent for this order.",
   },
   etapes: {
     titre: "Order progress",

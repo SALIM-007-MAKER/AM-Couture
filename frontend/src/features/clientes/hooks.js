@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clientesApi } from "./api.js";
+import { ecrireOuMettreEnFile } from "../../lib/fileSynchro.js";
 
 export function useClientesQuery(params) {
   return useQuery({
@@ -22,7 +23,9 @@ export function useClienteQuery(id) {
 export function useCreateClienteMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data) => clientesApi.create(data),
+    // Hors connexion, la création est gardée sur l'appareil puis envoyée au retour du serveur (7.6) : la réponse vaut alors { enAttente: true }.
+    mutationFn: (data) =>
+      ecrireOuMettreEnFile({ type: "cliente.creer", chemin: "/clientes", corps: data, libelle: `Nouvelle cliente : ${data.prenom} ${data.nom}` }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes", "list"] });
     },
@@ -126,7 +129,8 @@ export function useInviterClienteMutation(id) {
 export function useCreateMesureMutation(clienteId) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data) => clientesApi.mesures.create(clienteId, data),
+    mutationFn: (data) =>
+      ecrireOuMettreEnFile({ type: "mesure.creer", chemin: `/clientes/${clienteId}/mesures`, corps: data, libelle: "Nouvelle prise de mesures" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes", clienteId, "mesures"] });
     },

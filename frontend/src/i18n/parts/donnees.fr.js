@@ -4,8 +4,19 @@ export default {
   horsLigne: {
     banniere: "Hors connexion : vous consultez les données enregistrées sur cet appareil.",
     verifie: "Dernière connexion au serveur : {{date}}.",
-    ecritures: "Les modifications ne sont pas possibles tant que la connexion n'est pas rétablie.",
+    ecritures: "Les nouvelles clientes, les prises de mesures et l'avancement des commandes sont gardés puis envoyés au retour de la connexion ; tout le reste (paiements, livraisons…) n'est possible qu'en ligne.",
     nonDisponible: "Hors connexion : cette page n'a pas encore été consultée en ligne sur cet appareil.",
+  },
+  file: {
+    titre: "{{count}} modification(s) en attente d'envoi",
+    attente: "En attente de connexion",
+    conflit: "Refusée par le serveur",
+    aVerifier: "À vérifier",
+    envoyer: "Envoyer maintenant",
+    abandonner: "Abandonner",
+    envoi: "Envoi en cours…",
+    avertissement: "Se déconnecter supprime les modifications qui n'ont pas été envoyées.",
+    statutEnAttente: "Un changement de statut est déjà en attente d'envoi pour cette commande.",
   },
   etapes: {
     titre: "Avancement de la commande",

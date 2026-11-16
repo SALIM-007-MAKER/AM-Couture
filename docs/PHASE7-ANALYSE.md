@@ -231,3 +231,31 @@ Les quatre options recommandées ont été retenues : **adaptateur de stockage d
 - Les **droits ne se mettent pas à jour hors ligne** : si le PDG retire une permission à un employé, celui-ci garde l'accès en lecture aux données déjà enregistrées jusqu'à son prochain contact avec le serveur (au plus 7 jours).
 - Une personne qui a l'appareil déverrouillé peut ouvrir l'application hors ligne sans ressaisir de mot de passe tant que l'instantané existe (comme la session en ligne). Les données ne sont **pas chiffrées** dans IndexedDB : le chiffrement navigateur sans secret saisi par l'utilisateur n'apporterait qu'une fausse sécurité ; la protection est l'effacement à la déconnexion et le verrouillage de l'appareil.
 - Aucune synchronisation, aucune file d'écriture : c'est la 7.6.
+
+## 12. Réalisé en 7.6 — écritures hors connexion (file sûre, rejeu, conflits)
+
+**Fonctionnement** : quand le serveur est injoignable, **trois** écritures seulement sont gardées sur l'appareil, puis envoyées automatiquement au retour du serveur, **dans l'ordre** : créer une cliente, ajouter une prise de mesures à une cliente existante, faire avancer le statut d'une commande. Un bandeau bleu liste ce qui attend (« N modification(s) en attente d'envoi »), avec « Envoyer maintenant » ; ce que le serveur refuse reste visible avec son message, et l'utilisateur peut l'abandonner.
+
+**Jamais hors connexion** : paiements, livraisons, annulations, dépenses, achats, stock, abonnement, comptes, suppressions. Une opération d'argent doit être confirmée par le serveur en direct : elle échoue tout de suite avec un message, rien n'est mis en attente ni rejoué (testé en E2E). Le passage à « Livrée » est exclu aussi (il crée la livraison et un paiement éventuel).
+
+**Pas de doublon, même si la réponse s'est perdue** : chaque écriture porte une clé d'idempotence (`Idempotency-Key`) générée à l'envoi. Si la requête atteint le serveur mais que la réponse n'arrive pas (cas fréquent en réseau mobile), la même clé est utilisée au rejeu : le serveur renvoie la réponse d'origine au lieu de recréer. Pour cela, `POST /clientes/:id/mesures` et `POST /commandes/:id/statut` acceptent désormais l'en-tête (sans en-tête : comportement inchangé).
+
+**Règles de conflit — le serveur reste l'arbitre, rien n'est forcé**
+- *Avance de statut* : l'écriture porte `statutAttendu` (le statut que la personne voyait). Si la commande a changé entre-temps (annulée, avancée par quelqu'un d'autre), le serveur refuse (409 `STATUT_CHANGE`) et **n'écrase pas** ; l'élément passe en « Refusée par le serveur » avec le message. Une seule avance en attente par commande (le bouton est remplacé par une mention), pour ne jamais empiler une décision sur un état que personne n'a vu.
+- *Création de cliente* : si le téléphone existe déjà au rejeu (créée entre-temps par quelqu'un d'autre), 409 → conflit affiché, pas de doublon.
+- *Mesures* : ajout seul, jamais de modification ; refusé si la cliente a été archivée entre-temps.
+- *Droit retiré / cliente supprimée* (403/404) : conflit affiché.
+- *Pas de réponse, 5xx, 429, « opération en cours »* : on s'arrête et on réessaiera ; **l'ordre est conservé** (une écriture n'est jamais sautée pour passer à la suivante).
+- *Plus de 23 h d'attente* : « À vérifier », pas de rejeu automatique (les clés d'idempotence ne sont gardées que 24 h côté serveur : au-delà, on ne saurait plus détecter qu'elle est déjà passée).
+
+**Données personnelles sur l'appareil** : la file contient des données de clientes (nom, téléphone, mesures). Elle est propre à l'utilisateur (rechargée seulement pour le même compte), **supprimée à la déconnexion** et dès que le serveur répond 401, revérifiée à chaque chargement (forme, propriétaire, liste blanche : un élément falsifié est écarté), bornée à 100 éléments. Si le stockage de l'appareil refuse l'écriture, l'application **le dit** au lieu de prétendre avoir gardé la modification. Le bandeau prévient que se déconnecter supprime ce qui n'a pas été envoyé.
+
+**Tests** : 11 unitaires (liste blanche, chemins détournés refusés, garde obligatoire, LIVREE refusé, rechargement d'une file falsifiée ou d'un autre compte, classement des erreurs, ordre et clé de chaque rejeu, conflit conservé, arrêt net sans saut, élément trop ancien, jamais sous un autre compte) ; 8 d'intégration serveur (rejeu sans doublon pour cliente, mesures, statut ; isolation de la clé entre ateliers ; garde de statut ; compatibilité sans garde) ; 5 E2E (avance puis envoi au retour, conflit non écrasé, **réponse perdue sans doublon**, paiement jamais mis en attente, déconnexion qui supprime la file) + le test 7.5 adapté. **Mutations détectées** : garde de statut retirée, idempotence retirée sur le statut et sur les mesures (3 côté serveur), rejeu sans clé d'idempotence (E2E).
+
+**Limites — à lire**
+- **Pas de création liée hors ligne** : une prise de mesures ne peut se faire que pour une cliente déjà enregistrée sur le serveur (et une commande n'est pas créable hors ligne). Créer une cliente puis ses mesures hors ligne demande d'attendre l'envoi de la cliente. La création de commande hors ligne n'est volontairement pas incluse (prix, mesure requise, numérotation attribuée par le serveur).
+- **Pas de fusion automatique** : en cas de conflit, la décision est humaine (abandonner puis refaire si besoin) ; aucune règle « le plus récent gagne ».
+- **Rejeu par plusieurs onglets** : deux onglets ouverts peuvent rejouer la même file ; l'idempotence l'absorbe (même clé), mais le second peut voir brièvement « en cours ». Non testé avec deux onglets.
+- **Libellés de la file en français** (mémorisés tels quels) ; les messages de conflit sont ceux du serveur.
+- **Fermer l'application avant le retour du réseau** : la file est conservée sur l'appareil et reprise à la prochaine ouverture ; il n'y a pas d'envoi en arrière-plan (Background Sync) quand l'application est fermée. Non vérifié sur de vrais appareils (iOS en particulier : le stockage peut être purgé par le système après une longue inactivité).
+- **Heure de l'appareil** : l'ancienneté d'une écriture se mesure avec l'horloge de l'appareil ; une horloge très décalée peut la déclarer « à vérifier » à tort (sans risque de doublon).
