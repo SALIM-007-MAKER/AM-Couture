@@ -16,6 +16,8 @@ base Neon). Un échec de migration fait échouer le build : Vercel garde alors *
 en ligne**. `DIRECT_URL` absente en production fait échouer le build (pas de repli sur la connexion poolée).
 La règle est testée : `scripts/__tests__/deployPolicy.test.mjs` (exécutée par `npm test` et la CI).
 
+**Prévisualisations sans `DIRECT_URL`** : la configuration Prisma exige que `DIRECT_URL` soit définie, même pour `prisma generate` (qui n'ouvre aucune connexion). Elle n'existe que pour Production sur Vercel : avant correction, tout build de prévisualisation s'arrêtait donc à la génération (« Cannot resolve environment variable: DIRECT_URL »). Le script fournit maintenant une valeur factice pour la seule génération, uniquement quand aucune migration ne sera appliquée ; un build de production sans `DIRECT_URL` échoue toujours explicitement. Cela ne donne pas de base à la prévisualisation : pour qu'elle serve des pages qui lisent des données, `DATABASE_URL` doit être définie pour Preview (idéalement une branche Neon distincte).
+
 Interrupteur de secours : variable `SKIP_MIGRATIONS=1` → le build ne migre pas, même en production.
 
 ## Avant de fusionner dans `main` (= déploiement de production)
