@@ -74,36 +74,42 @@ router.get("/rappels-quotidiens", async (req, res) => {
   let emailsEnvoyes = 0;
   const erreurs = [];
 
+  // Un atelier en erreur (supprimé pendant la tâche, donnée incohérente…) ne doit pas empêcher le résumé des autres : l'erreur est
+  // consignée dans le compte rendu et la tâche continue.
   for (const atelier of ateliers) {
     if (atelier.users.length === 0) continue;
+    try {
+      await reconcilierNotifications(prisma, atelier.id);
 
-    await reconcilierNotifications(prisma, atelier.id);
+      const comptes = await prisma.notification.groupBy({
+        by: ["type"],
+        // Hors travail confié à un employé (TACHE_AFFECTEE, destinataireId renseigné) : il ne concerne pas le PDG.
+        where: { lu: false, atelierId: atelier.id, destinataireId: null },
+        _count: true,
+      });
+      const total = comptes.reduce((acc, c) => acc + c._count, 0);
+      if (total === 0) continue;
 
-    const comptes = await prisma.notification.groupBy({
-      by: ["type"],
-      // Hors travail confié à un employé (TACHE_AFFECTEE, destinataireId renseigné) : il ne concerne pas le PDG.
-      where: { lu: false, atelierId: atelier.id, destinataireId: null },
-      _count: true,
-    });
-    const total = comptes.reduce((acc, c) => acc + c._count, 0);
-    if (total === 0) continue;
+      const lignes = Object.entries(LIBELLES).map(([type, label]) => ({
+        label,
+        nombre: comptes.find((c) => c.type === type)?._count ?? 0,
+      }));
 
-    const lignes = Object.entries(LIBELLES).map(([type, label]) => ({
-      label,
-      nombre: comptes.find((c) => c.type === type)?._count ?? 0,
-    }));
-
-    for (const user of atelier.users) {
-      try {
-        await envoyerEmail({
-          to: user.email,
-          subject: "Gestion d'Atelier — vos rappels du jour",
-          html: rappelsQuotidiensTemplate({ prenom: user.prenom, lignes, lienNotifications: `${origin}/notifications` }),
-        });
-        emailsEnvoyes += 1;
-      } catch (err) {
-        erreurs.push({ atelierId: atelier.id, email: user.email, message: err.message });
+      for (const user of atelier.users) {
+        try {
+          await envoyerEmail({
+            to: user.email,
+            subject: "Gestion d'Atelier — vos rappels du jour",
+            html: rappelsQuotidiensTemplate({ prenom: user.prenom, lignes, lienNotifications: `${origin}/notifications` }),
+          });
+          emailsEnvoyes += 1;
+        } catch (err) {
+          erreurs.push({ atelierId: atelier.id, email: user.email, message: err.message });
+        }
       }
+    } catch (err) {
+      log.error("erreur", { categorie: "cron", operation: "resume_quotidien", atelierId: atelier.id, message: messageErreur(err) });
+      erreurs.push({ atelierId: atelier.id, email: null, message: "Traitement de l'atelier en échec." });
     }
   }
 
