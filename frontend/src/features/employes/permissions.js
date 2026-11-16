@@ -28,6 +28,7 @@ export const PERMISSION_PAR_CHEMIN = {
   "/depenses": "depenses.lire",
   "/recus": "paiements.lire",
   "/rapports": "rapports.lire",
+  "/rapports/avances": "rapports.avances",
   "/calendrier": "commandes.lire",
   "/production": "commandes.affecter",
   "/finances": "finances.voir",
@@ -71,6 +72,7 @@ const IMPLICATIONS_EXPLICITES = {
   "commandes.affecter": ["commandes.lire"],
   "paiements.lire": ["finances.voir"],
   "achats.recevoir": ["achats.lire"],
+  "rapports.avances": ["rapports.lire"],
   "achats.ecrire": ["achats.recevoir", "finances.voir"],
 };
 const impliquees = (p) => [...(IMPLICATIONS_EXPLICITES[p] ?? []), ...(p.endsWith(".ecrire") ? [p.replace(".ecrire", ".lire")] : [])];

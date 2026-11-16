@@ -55,6 +55,7 @@ const LivraisonsListPage = lazy(() => import("./features/livraisons/LivraisonsLi
 const PaiementsListPage = lazy(() => import("./features/paiements/PaiementsListPage.jsx"));
 const RecusListPage = lazy(() => import("./features/recus/RecusListPage.jsx"));
 const RapportsPage = lazy(() => import("./features/rapports/RapportsPage.jsx"));
+const RapportsAvancesPage = lazy(() => import("./features/rapports/RapportsAvancesPage.jsx"));
 const ParametresPage = lazy(() => import("./features/parametres/ParametresPage.jsx"));
 const NotificationsPage = lazy(() => import("./features/notifications/NotificationsPage.jsx"));
 const CalendrierPage = lazy(() => import("./features/calendrier/CalendrierPage.jsx"));
@@ -205,6 +206,9 @@ export default function App() {
             </Route>
             <Route element={<RequirePermission permission="rapports.lire" />}>
               <Route path="/rapports" element={<RapportsPage />} />
+            </Route>
+            <Route element={<RequirePermission permission="rapports.avances" />}>
+              <Route path="/rapports/avances" element={<RapportsAvancesPage />} />
             </Route>
             <Route element={<RequirePermission permission="commandes.lire" />}>
               <Route path="/calendrier" element={<CalendrierPage />} />

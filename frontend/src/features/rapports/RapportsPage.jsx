@@ -368,7 +368,9 @@ function ModelesStatsSection({ period }) {
 }
 
 export default function RapportsPage() {
-  const voirFinances = useCan()("finances.voir");
+  const can = useCan();
+  const voirFinances = can("finances.voir");
+  const peutAvances = can("rapports.avances");
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const period = {
@@ -393,6 +395,13 @@ export default function RapportsPage() {
         subtitle={t("rapports.subtitle")}
         actions={<PeriodSelector value={period} onChange={handlePeriodChange} />}
       />
+
+      {peutAvances && (
+        <Link to="/rapports/avances" data-testid="lien-rapports-avances" className="inline-flex items-center gap-1 text-sm underline">
+          <BarChart3 className="size-4" aria-hidden="true" />
+          {t("ra.lien")}
+        </Link>
+      )}
 
       {voirFinances && (
         <div className="space-y-3">
