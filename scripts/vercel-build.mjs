@@ -24,7 +24,10 @@ if (decision.erreur) {
 run("npx", ["prisma", "generate"], envPourGeneration(process.env, decision));
 if (decision.migrer) {
   console.log(`[build] Migrations : appliquées (${decision.raison}).`);
-  run("npx", ["prisma", "migrate", "status"]); // journalise l'état avant application
+  // Purement informatif : `migrate status` renvoie le code 1 dès que des migrations sont EN ATTENTE, ce qui est justement le cas
+  // normal avant `migrate deploy` (il a fait échouer le premier build de production qui avait des migrations à appliquer).
+  console.log("\n[build] > npx prisma migrate status (informatif)");
+  spawnSync("npx", ["prisma", "migrate", "status"], { stdio: "inherit", shell: process.platform === "win32" });
   run("npx", ["prisma", "migrate", "deploy"]);
 } else {
   console.log(`[build] Migrations : ignorées — ${decision.raison}.`);
