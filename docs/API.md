@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 181 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 185 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -147,9 +147,13 @@ Schéma : `modele.schema.js`. Catégories : `ROBE, BOUBOU, ENSEMBLE, PANTALON, C
 | `POST /api/modeles` | Atelier | `{ nom, categorie }` + `description?, prixIndicatif?, photoUrl?` |
 | `GET /api/modeles` | Atelier | `?q=`, `categorie=`, `archived=true\|false\|all`, pagination. |
 | `GET /api/modeles/:id` | Atelier | Fiche. |
-| `PATCH /api/modeles/:id` | Atelier | Mêmes champs, optionnels. |
+| `PATCH /api/modeles/:id` | Atelier | Mêmes champs, optionnels, plus `publie` (booléen ; 409 sans aucune photo, ou si le modèle est archivé) et `tags` (12 au plus, 30 caractères, doublons ignorés sans tenir compte de la casse). Archiver un modèle le dépublie. |
 | `POST /api/modeles/:id/archiver` | Atelier | Archive. |
 | `POST /api/modeles/:id/restaurer` | Atelier | Restaure. |
+| `POST /api/modeles/:id/photos` | Atelier (`modeles.ecrire`) | Lookbook : `{ image, legende? }` — `image` est un fichier (data URL png/jpeg/webp/gif, signature vérifiée, 2 Mo au plus), jamais une URL externe. 8 photos au plus par modèle (409), ajoutée en dernière position. 409 si le modèle est archivé. |
+| `DELETE /api/modeles/:id/photos/:photoId` | Atelier (`modeles.ecrire`) | Retire la photo et son image (204). Retirer la dernière photo d'un modèle publié le dépublie. |
+| `PUT /api/modeles/:id/photos/ordre` | Atelier (`modeles.ecrire`) | `{ ids: [...] }` — nouvel ordre ; doit contenir exactement les photos du modèle. La première est la couverture. |
+| `GET /api/images/:id` | Atelier (`modeles.lire`) | Octets d'une image du lookbook (type d'origine, `nosniff`, cache privé). 404 si l'image n'est pas de l'atelier du compte. Aucune diffusion publique avant la vitrine (7.2). |
 
 ## 7. Commandes, paiements, livraisons et reçus
 
