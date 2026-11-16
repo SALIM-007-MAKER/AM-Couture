@@ -1,6 +1,12 @@
 // English translations — advanced client area (7.4): order progress ("etapes"), data rights ("mesdonnees", client side)
 // and anonymisation by the workshop ("anon").
 export default {
+  horsLigne: {
+    banniere: "Offline: you are viewing the data saved on this device.",
+    verifie: "Last connection to the server: {{date}}.",
+    ecritures: "Changes are not possible until the connection is back.",
+    nonDisponible: "Offline: this page has not been viewed online on this device yet.",
+  },
   etapes: {
     titre: "Order progress",
     annulee: "This order was cancelled.",

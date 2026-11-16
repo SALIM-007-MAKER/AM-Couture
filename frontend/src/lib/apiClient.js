@@ -1,6 +1,8 @@
 import { queryClient } from "./queryClient.js";
 import { ApiError, erreurDepuisReponse } from "./apiError.js";
 import { useAbonnementStore } from "../stores/abonnementStore.js";
+import { signalerReseauIndisponible } from "./connexion.js";
+import { effacerInstantane } from "./instantaneStockage.js";
 
 // Ré-exportée pour compatibilité : tout le code existant importe `ApiError`
 // depuis ce fichier. La classe elle-même vit dans apiError.js pour éviter un
@@ -30,7 +32,9 @@ async function request(path, { method = "GET", body, signal, headers } = {}) {
   } catch (err) {
     // Annulation voulue par l'appelant (changement de page, TanStack Query) : ce n'est pas une panne.
     if (signal?.aborted) throw err;
-    // Aucune réponse : coupure réseau / hors ligne, ou délai dépassé.
+    // Aucune réponse : coupure réseau / hors ligne, ou délai dépassé. L'application bascule en consultation hors ligne
+    // (requêtes en pause avec leurs données, jamais en erreur) et sonde le retour du serveur (voir connexion.js).
+    signalerReseauIndisponible();
     throw new ApiError(0, "Le serveur n'a pas répondu.", undefined, { kind: delai.aborted ? "timeout" : "network" });
   }
 
@@ -52,6 +56,8 @@ async function request(path, { method = "GET", body, signal, headers } = {}) {
     // (ex : mauvais mot de passe sur /auth/login, déjà "non authentifié").
     if (res.status === 401) {
       queryClient.setQueryData(["auth", "me"], null);
+      // Session terminée : plus aucune donnée personnelle ne doit rester sur l'appareil.
+      effacerInstantane();
     }
     // 402 = essai gratuit terminé sans abonnement actif (voir
     // requireAbonnementActif, auth.middleware.js) — signale l'état via

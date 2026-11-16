@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/apiClient.js";
 import { cheminAccueilEmploye } from "../features/employes/permissions.js";
+import { effacerInstantane } from "../lib/instantaneStockage.js";
 
 const ME_KEY = ["auth", "me"];
 
@@ -143,7 +144,12 @@ export function useLogoutMutation() {
       // onSettled (pas seulement onSuccess) : même si l'appel réseau échoue,
       // on efface l'état "connecté" côté client — l'utilisateur a demandé à
       // se déconnecter, on ne le laisse pas bloqué sur un écran protégé.
+      // Plus aucune donnée de l'utilisateur ne doit rester ni en mémoire, ni sur l'appareil (instantané hors ligne).
+      effacerInstantane();
+      // D'abord « non connecté » (les écrans protégés se démontent), puis on retire les données de la mémoire. Vider le
+      // cache avant laissait des écrans encore affichés relire des données disparues (page blanche).
       queryClient.setQueryData(ME_KEY, null);
+      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "auth" });
     },
   });
 }
