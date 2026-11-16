@@ -280,3 +280,7 @@ Les quatre options recommandées ont été retenues : **adaptateur de stockage d
 - **Le reçu garde la langue de celui qui l'ouvre** : un reçu imprimé par l'atelier pour une cliente anglophone demande d'ajouter `?langue=en` à l'adresse ; l'interface n'a pas (encore) de sélecteur. Les noms de modes de paiement (ESPECES…) ne sont pas traduits dans le PDF.
 - **iCal** (flux des livraisons) : **non fait**, volontairement : c'était « si retenu » et il expose des données de clientes dans un lien d'abonnement durable ; à décider avec un modèle de jeton révocable.
 - **Texte du fil d'activité figé dans `message`** en français pour les exports ; l'export de données (7.4) ne le recompose pas dans la langue.
+
+## 14. Réalisé en 7.8 — évolutivité, documentation et bilan
+
+Mesures des routes de la phase 7 sur un gros volume, vérification du cache HTTP (test dédié, 2 mutations détectées) : voir **PERFORMANCES.md §6**. Aucun correctif de performance n'a été nécessaire. Le bilan complet de la phase est dans **BILAN-PHASE7.md**.
