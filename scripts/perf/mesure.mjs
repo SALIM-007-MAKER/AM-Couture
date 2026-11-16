@@ -71,6 +71,14 @@ await prisma.user.create({
   data: { identifiant: "perf-pdg", passwordHash: await bcrypt.hash(MOT_DE_PASSE, 4), role: "ADMIN", atelierId: "perf-gros" },
 });
 
+// Phase 7 : vitrine publique, lookbook et demandes en ligne sur le gros atelier (volume volontairement élevé : 3 000
+// modèles dont 2 000 publiés, 4 000 photos, 2 000 demandes). Données de test créées en SQL, base jetable uniquement.
+await prisma.$executeRawUnsafe(`UPDATE "Atelier" SET slug = 'perf-vitrine', "vitrineActive" = true, "demandesEnLigne" = true WHERE id = 'perf-gros'`);
+await prisma.$executeRawUnsafe(`INSERT INTO "ImageAtelier"(id, "atelierId", mime, taille, contenu) SELECT 'perf-img-' || g, 'perf-gros', 'image/jpeg', 2048, decode(repeat('ff', 2048), 'hex') FROM generate_series(1, 200) g`);
+await prisma.$executeRawUnsafe(`INSERT INTO "Modele"(id, "atelierId", nom, categorie, description, publie, tags, "updatedAt") SELECT 'perf-mod-' || g, 'perf-gros', 'Modele ' || g, 'ROBE', 'Description du modele numero ' || g, g % 3 <> 0, ARRAY[CASE WHEN g % 5 = 0 THEN 'mariage' ELSE 'quotidien' END], now() FROM generate_series(1, 3000) g`);
+await prisma.$executeRawUnsafe(`INSERT INTO "PhotoModele"(id, "modeleId", "imageId", ordre) SELECT 'perf-ph-' || g, 'perf-mod-' || ((g - 1) % 3000 + 1), 'perf-img-' || ((g - 1) % 200 + 1), g / 3000 FROM generate_series(1, 4000) g`);
+await prisma.$executeRawUnsafe(`INSERT INTO "DemandeCommande"(id, "atelierId", origine, "contactPrenom", "contactNom", "contactTelephone", "consentementLe", description, statut, "updatedAt") SELECT 'perf-dem-' || g, 'perf-gros', 'VITRINE', 'Pre' || g, 'Nom' || g, '9' || lpad(g::text, 7, '0'), now(), 'Demande ' || g, CASE WHEN g % 4 = 0 THEN 'EN_ATTENTE' ELSE 'REFUSEE' END::"StatutDemandeCommande", now() FROM generate_series(1, 2000) g`);
+
 const server = app.listen(0);
 await once(server, "listening");
 const base = `http://127.0.0.1:${server.address().port}`;
@@ -150,6 +158,13 @@ const ROUTES = [
   ["Notifications — compteur", "/api/notifications/nombre-non-lues"],
   ["Notifications — liste", "/api/notifications"],
   ["Stock — liste", "/api/stock"],
+  ["Vitrine — page 1", "/api/public/vitrines/perf-vitrine"],
+  ["Vitrine — page 80", "/api/public/vitrines/perf-vitrine?page=80"],
+  ["Vitrine — recherche texte", "/api/public/vitrines/perf-vitrine?q=numero%2012"],
+  ["Vitrine — filtre tag", "/api/public/vitrines/perf-vitrine?tag=mariage"],
+  ["Vitrine — image", "/api/public/vitrines/perf-vitrine/images/perf-img-1"],
+  ["Lookbook — liste modèles", "/api/modeles?page=1&pageSize=20"],
+  ["Demandes — liste", "/api/demandes?page=1&pageSize=20"],
 ];
 
 const resultats = [];
