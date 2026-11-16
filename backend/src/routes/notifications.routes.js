@@ -1,24 +1,21 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
+import { aPermission } from "../lib/permissions.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
-import { reconcilierNotifications } from "../lib/notifications.js";
-import {
-  listNotificationsQuerySchema,
-  patchNotificationSchema,
-  idsBodySchema,
-} from "../schemas/notification.schema.js";
+import { quantitesArticles } from "../lib/stock.js";
+import { reconcilierNotifications, whereVisiblePour, whereNonLuePour } from "../lib/notifications.js";
+import { listNotificationsQuerySchema, patchNotificationSchema, idsBodySchema } from "../schemas/notification.schema.js";
 
 const router = Router();
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission("notifications.lire"), masquerFinancesSiNonAutorise);
 router.param("id", requireValidIdParam);
 
-// Champs commande nécessaires pour reconstruire l'affichage (client, modèle,
-// statut, date de livraison) — voir demande Phase 4. Aucun texte de
-// notification stocké : tout vient de là, à la lecture (voir schema.prisma,
-// commentaire du modèle Notification).
+// Champs nécessaires pour reconstruire l'affichage : aucun texte de notification n'est stocké, tout vient de la
+// commande, de l'article ou de l'achat réels à la lecture (voir schema.prisma, modèle Notification).
 const COMMANDE_SELECT = {
   id: true,
   numero: true,
@@ -28,9 +25,16 @@ const COMMANDE_SELECT = {
   cliente: { select: { id: true, nom: true, prenom: true, telephone: true } },
   modele: { select: { nom: true } },
 };
+const INCLUDE = {
+  commande: { select: COMMANDE_SELECT },
+  article: { select: { id: true, nom: true, unite: true, seuilAlerte: true } },
+  achat: { select: { id: true, numero: true, dateAttendue: true, fournisseur: { select: { nom: true } } } },
+};
 
-// GET /api/notifications?lu=&page=&pageSize= — réconcilie puis liste, plus
-// récente d'abord. `lu` omis = toutes confondues.
+/** Ce que la personne voit ET (pour un employé) ce qu'elle a lu : un employé ne touche jamais l'état du PDG. */
+const lue = (n, user) => (user.role === "ADMIN" ? n.lu : n.lectures.length > 0);
+
+// GET /api/notifications?lu=&page=&pageSize= — réconcilie puis liste, plus récente d'abord. `lu` omis = toutes.
 router.get("/", async (req, res) => {
   const parsed = listNotificationsQuerySchema.safeParse(req.query);
   if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
@@ -38,79 +42,84 @@ router.get("/", async (req, res) => {
 
   await reconcilierNotifications(prisma, req.user.atelierId);
 
-  const where = { commande: { atelierId: req.user.atelierId }, ...(lu === undefined ? {} : { lu }) };
-  const [data, total] = await Promise.all([
+  const where = { AND: [whereVisiblePour(req.user), ...(lu === undefined ? [] : [whereNonLuePour(req.user, lu)])] };
+  const [rows, total] = await Promise.all([
     prisma.notification.findMany({
       where,
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { commande: { select: COMMANDE_SELECT } },
+      include: { ...INCLUDE, lectures: { where: { userId: req.user.id }, select: { userId: true } } },
     }),
     prisma.notification.count({ where }),
   ]);
 
+  // Quantité actuelle des articles en stock bas (une requête groupée pour toute la page).
+  const ids = rows.filter((n) => n.articleId).map((n) => n.articleId);
+  const quantites = await quantitesArticles(prisma, ids);
+  const data = rows.map(({ lectures, ...n }) => ({
+    ...n,
+    lu: lue({ ...n, lectures }, req.user),
+    ...(n.articleId ? { article: { ...n.article, quantite: quantites.get(n.articleId).toString() } } : {}),
+  }));
+
   res.json({ data, meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) } });
 });
 
-// GET /api/notifications/nombre-non-lues — pastille de l'en-tête (voir
-// AppLayout.jsx). Déclarée avant "/:id" pour ne pas être capturée comme un
-// identifiant (même précaution que /derniere sur Mesures).
-//
-// Inclut aussi les demandes de commande EN_ATTENTE (voir
-// routes/demandes.routes.js) : ce ne sont pas des `Notification` au sens du
-// schéma (pas liées à une Commande, DemandeCommande est un modèle séparé —
-// voir schema.prisma), mais elles réclament la même attention de l'ADMIN.
-// Sans ça, la cloche de l'en-tête restait silencieuse à chaque nouvelle
-// demande envoyée par un client, seule la page Demandes le révélait.
-// `demandes` renvoyé séparément pour que la page Notifications puisse
-// expliquer le total affiché par la cloche (jamais un chiffre muet).
+// GET /api/notifications/nombre-non-lues — pastille de l'en-tête. Déclarée avant "/:id".
+// Inclut les demandes de commande EN_ATTENTE (modèle séparé, même attention requise) pour qui peut les voir.
 router.get("/nombre-non-lues", async (req, res) => {
   await reconcilierNotifications(prisma, req.user.atelierId);
   const [notifications, demandes] = await Promise.all([
-    prisma.notification.count({ where: { lu: false, commande: { atelierId: req.user.atelierId } } }),
-    prisma.demandeCommande.count({ where: { atelierId: req.user.atelierId, statut: "EN_ATTENTE" } }),
+    prisma.notification.count({ where: { AND: [whereVisiblePour(req.user), whereNonLuePour(req.user, false)] } }),
+    aPermission(req.user, "demandes.lire")
+      ? prisma.demandeCommande.count({ where: { atelierId: req.user.atelierId, statut: "EN_ATTENTE" } })
+      : 0,
   ]);
   res.json({ count: notifications + demandes, notifications, demandes });
 });
 
-// PATCH /api/notifications/:id — { lu: true|false }, marquer lu/non lu à l'unité.
+/** Marque lue / non lue UNE notification pour cette personne (drapeau partagé pour le PDG, lecture individuelle pour un employé). */
+async function appliquerLecture(req, ids, lu) {
+  if (req.user.role === "ADMIN") {
+    return (await prisma.notification.updateMany({ where: { AND: [whereVisiblePour(req.user), { id: { in: ids } }] }, data: { lu } })).count;
+  }
+  // Employé : seulement parmi ce qu'il a le droit de voir (un identifiant hors de sa vue est ignoré, jamais modifié).
+  const visibles = await prisma.notification.findMany({ where: { AND: [whereVisiblePour(req.user), { id: { in: ids } }] }, select: { id: true } });
+  const idsVisibles = visibles.map((n) => n.id);
+  if (lu) {
+    await prisma.notificationLue.createMany({ data: idsVisibles.map((notificationId) => ({ notificationId, userId: req.user.id })), skipDuplicates: true });
+  } else {
+    await prisma.notificationLue.deleteMany({ where: { userId: req.user.id, notificationId: { in: idsVisibles } } });
+  }
+  return idsVisibles.length;
+}
+
+// PATCH /api/notifications/:id — { lu: true|false }
 router.patch("/:id", async (req, res) => {
   const parsed = patchNotificationSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
-
-  const notif = await prisma.notification.findFirst({
-    where: { id: req.params.id, commande: { atelierId: req.user.atelierId } },
-  });
-  if (!notif) throw new HttpError(404, "Notification introuvable.");
-
-  const updated = await prisma.notification.update({ where: { id: req.params.id }, data: parsed.data });
-  res.json(updated);
+  const modifiees = await appliquerLecture(req, [req.params.id], parsed.data.lu);
+  if (modifiees === 0) throw new HttpError(404, "Notification introuvable.");
+  const notif = await prisma.notification.findUnique({ where: { id: req.params.id }, include: { lectures: { where: { userId: req.user.id }, select: { userId: true } } } });
+  const { lectures, ...reste } = notif;
+  res.json({ ...reste, lu: lue(notif, req.user) });
 });
 
-// POST /api/notifications/marquer-lu { ids: [...] } — sélection multiple.
-// atelierId dans le where : un id d'une autre atelier dans la sélection est
-// silencieusement ignoré (0 ligne affectée pour lui), jamais modifié (IDOR).
+// POST /api/notifications/marquer-lu { ids: [...] } — sélection multiple ; un identifiant hors de la vue est ignoré.
 router.post("/marquer-lu", async (req, res) => {
   const parsed = idsBodySchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
-  const result = await prisma.notification.updateMany({
-    where: { id: { in: parsed.data.ids }, commande: { atelierId: req.user.atelierId } },
-    data: { lu: true },
-  });
-  res.json({ count: result.count });
+  res.json({ count: await appliquerLecture(req, parsed.data.ids, true) });
 });
 
-// POST /api/notifications/supprimer { ids: [...] } — sélection multiple.
-// Note (voir audit Phase 4) : une notification supprimée réapparaîtra à la
-// prochaine réconciliation si sa cause est toujours vraie (ex. commande
-// toujours en retard) — comportement voulu, pas un bug.
+// POST /api/notifications/supprimer { ids: [...] } — réservé au PDG : supprimer agit sur l'état de tout l'atelier
+// (la notification réapparaît à la prochaine réconciliation si sa cause est toujours vraie — comportement voulu).
 router.post("/supprimer", async (req, res) => {
+  if (req.user.role !== "ADMIN") throw new HttpError(403, "Seul le responsable de l'atelier peut supprimer des notifications.");
   const parsed = idsBodySchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
-  const result = await prisma.notification.deleteMany({
-    where: { id: { in: parsed.data.ids }, commande: { atelierId: req.user.atelierId } },
-  });
+  const result = await prisma.notification.deleteMany({ where: { AND: [whereVisiblePour(req.user), { id: { in: parsed.data.ids } }] } });
   res.json({ count: result.count });
 });
 

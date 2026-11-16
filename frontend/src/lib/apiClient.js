@@ -1,6 +1,9 @@
 import { queryClient } from "./queryClient.js";
-import { ApiError } from "./apiError.js";
+import { ApiError, erreurDepuisReponse } from "./apiError.js";
 import { useAbonnementStore } from "../stores/abonnementStore.js";
+import { signalerReseauIndisponible } from "./connexion.js";
+import { effacerInstantane } from "./instantaneStockage.js";
+import { effacerFile } from "./fileStockage.js";
 
 // Ré-exportée pour compatibilité : tout le code existant importe `ApiError`
 // depuis ce fichier. La classe elle-même vit dans apiError.js pour éviter un
@@ -13,13 +16,28 @@ export { ApiError };
  * cookie de session HttpOnly part automatiquement avec chaque requête
  * same-origin.
  */
-async function request(path, { method = "GET", body, signal } = {}) {
-  const res = await fetch(`/api${path}`, {
-    method,
-    headers: body !== undefined ? { "Content-Type": "application/json" } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-    signal,
-  });
+// Au-delà, la requête est abandonnée : sans délai, une connexion qui ne répond plus laissait
+// l'écran en « chargement » indéfiniment.
+export const DELAI_REQUETE_MS = 40_000;
+
+async function request(path, { method = "GET", body, signal, headers } = {}) {
+  const delai = AbortSignal.timeout(DELAI_REQUETE_MS);
+  let res;
+  try {
+    res = await fetch(`/api${path}`, {
+      method,
+      headers: body !== undefined || headers ? { ...(body !== undefined ? { "Content-Type": "application/json" } : {}), ...headers } : undefined,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: signal ? AbortSignal.any([signal, delai]) : delai,
+    });
+  } catch (err) {
+    // Annulation voulue par l'appelant (changement de page, TanStack Query) : ce n'est pas une panne.
+    if (signal?.aborted) throw err;
+    // Aucune réponse : coupure réseau / hors ligne, ou délai dépassé. L'application bascule en consultation hors ligne
+    // (requêtes en pause avec leurs données, jamais en erreur) et sonde le retour du serveur (voir connexion.js).
+    signalerReseauIndisponible();
+    throw new ApiError(0, "Le serveur n'a pas répondu.", undefined, { kind: delai.aborted ? "timeout" : "network" });
+  }
 
   if (res.status === 204) return null;
 
@@ -39,6 +57,9 @@ async function request(path, { method = "GET", body, signal } = {}) {
     // (ex : mauvais mot de passe sur /auth/login, déjà "non authentifié").
     if (res.status === 401) {
       queryClient.setQueryData(["auth", "me"], null);
+      // Session terminée : plus aucune donnée personnelle ne doit rester sur l'appareil.
+      effacerInstantane();
+      effacerFile();
     }
     // 402 = essai gratuit terminé sans abonnement actif (voir
     // requireAbonnementActif, auth.middleware.js) — signale l'état via
@@ -46,10 +67,12 @@ async function request(path, { method = "GET", body, signal } = {}) {
     // (components/PaywallBanner.jsx) s'en sert pour rediriger vers
     // /abonnement depuis n'importe quelle page, sans qu'aucun appelant ici
     // n'ait besoin de connaître ce comportement.
-    if (res.status === 402) {
+    // Exception : un 402 « lecture seule » (details.lectureSeule) refuse UNE écriture, alors que la consultation reste
+    // possible. Pas de redirection : le message du serveur s'affiche là où l'utilisateur a tenté d'écrire.
+    if (res.status === 402 && !payload?.details?.lectureSeule) {
       useAbonnementStore.getState().setBloque(true);
     }
-    throw new ApiError(res.status, payload?.error ?? "Une erreur est survenue.", payload?.details);
+    throw erreurDepuisReponse(res.status, payload, res.headers);
   }
 
   // Une requête réussie prouve que l'atelier n'est plus bloqué (ex : juste

@@ -69,7 +69,7 @@ export default function MesureFormPage() {
     if (Object.keys(autres).length > 0) payload.autres = autres;
 
     createMesure.mutate(payload, {
-      onSuccess: () => navigate(`/clientes/${id}`),
+      onSuccess: () => navigate(`/clientes/${id}`), // en attente ou enregistrée : le bandeau indique l'attente
     });
   }
 

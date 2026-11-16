@@ -68,6 +68,9 @@ enum StatutAbonnement {
   EN_ATTENTE
   CONFIRME
   ANNULE
+  // Pause décidée par le SUPERADMIN (litige, fraude suspectée) : l'abonnement ne donne plus accès mais garde ses
+  // dates ; la réactivation le remet en CONFIRME. Distinct de Atelier.actif (suspension de tout l'atelier).
+  SUSPENDU
 }
 
 // Valeur AMANA conservée telle quelle (historique) même si le prestataire est
@@ -78,6 +81,11 @@ enum MoyenPaiement {
   WAVE
   NITA
   AMANA
+  // Paiements hors plateforme déclarés par l'atelier et confirmés par le SUPERADMIN (opérateur précisé en texte libre).
+  MOBILE_MONEY
+  ESPECES
+  VIREMENT
+  AUTRE
 }
 
 // pending/paid/failed/cancelled/expired (§ architecture paiement abonnement)
@@ -95,6 +103,8 @@ enum StatutTransaction {
   ECHOUEE
   ANNULEE
   EXPIREE
+  // Paiement réussi puis remboursé (voir Transaction.rembourseLe). La ligne n'est jamais supprimée.
+  REMBOURSEE
 }
 
 // Historique des changements d'abonnement d'un atelier (§ abonnement géré
@@ -104,6 +114,12 @@ enum ActionAbonnement {
   MODIFICATION
   EXPIRATION
   DESACTIVATION
+  SOUSCRIPTION
+  CONFIRMATION_PAIEMENT
+  REJET_PAIEMENT
+  SUSPENSION
+  REACTIVATION
+  REMBOURSEMENT
 }
 
 // Multi-tenant (Phase 8) — plateforme "Gestion d'Atelier" : SUPERADMIN gère
@@ -119,6 +135,9 @@ enum RoleUtilisateur {
   SUPERADMIN
   ADMIN
   USER
+  // Employé d'un atelier : n'a accès qu'aux fonctions que le PDG lui a accordées (User.permissions). Ne peut jamais
+  // administrer l'atelier (employés, paramètres, abonnement).
+  EMPLOYE
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -152,6 +171,15 @@ model User {
   // uniquement à l'affichage (fiche atelier côté SUPERADMIN), jamais à une
   // décision d'autorisation.
   derniereConnexionAt DateTime?
+  // Compte actif ? Un compte désactivé ne peut plus ni se connecter ni utiliser une session ouverte ; il n'est jamais
+  // supprimé (ses actions passées restent attribuées). Tous les comptes existants sont actifs.
+  actif               Boolean         @default(true)
+  desactiveLe         DateTime?
+  // Employés uniquement : poste (modèle de permissions, voir backend/src/lib/permissions.js), permissions accordées
+  // par le PDG (relues en base à chaque requête : un retrait prend effet immédiatement) et téléphone professionnel.
+  poste               String?
+  permissions         String[]        @default([])
+  telephone           String?
   // null tant que le lien envoyé par email (voir POST /auth/inscription-atelier)
   // n'a pas été cliqué — jamais une condition bloquante pour se connecter ou
   // utiliser l'application (voir décision : accès immédiat après inscription),
@@ -167,10 +195,15 @@ model User {
   // expiration, quoi qu'il arrive côté base).
   sessionVersion      Int             @default(0)
 
-  tokensAction TokenAction[]
+  tokensAction        TokenAction[]
   // Présent UNIQUEMENT pour un compte USER (voir Cliente.userId) — null pour
   // ADMIN/SUPERADMIN, qui ne sont jamais reliés à une Cliente.
-  cliente      Cliente?      @relation
+  cliente             Cliente?              @relation
+  commandesAssignees  Commande[]            @relation("CommandesAssignees")
+  affectationsRecues  AffectationCommande[] @relation("AffectationEmploye")
+  affectationsFaites  AffectationCommande[] @relation("AffectationAuteur")
+  notificationsRecues Notification[]        @relation("NotificationsRecues")
+  notificationsLues   NotificationLue[]     @relation("NotificationsLues")
 
   @@index([atelierId])
 }
@@ -210,33 +243,43 @@ model TokenAction {
 /// logo, coordonnées, comptes ADMIN et données métier (Clientes, Commandes,
 /// Modèles, Dépenses, Abonnement) — jamais partagés entre ateliers.
 model Atelier {
-  id          String    @id @default(cuid())
-  nom         String
-  logoUrl     String?
-  telephone   String?
-  adresse     String?
+  id                 String    @id @default(cuid())
+  nom                String
+  logoUrl            String?
+  telephone          String?
+  adresse            String?
   // Distincts d'`adresse` (rue/complément, en texte libre) — ajoutés pour
   // l'inscription en libre-service (Phase 8), qui les demande séparément.
-  ville       String?
-  pays        String?
-  slogan      String?
-  devise      String    @default("FCFA")
-  recuConfig  Json?
+  ville              String?
+  pays               String?
+  slogan             String?
+  devise             String    @default("FCFA")
+  recuConfig         Json?
+  // Vitrine publique (7.2) : désactivée par défaut, rien n'est visible sans geste explicite du PDG. `slug` = identifiant
+  // dans l'adresse publique (/a/<slug>). `vitrineContact` : le téléphone, l'adresse et la ville ne sont montrés que si
+  // le PDG le choisit. `couleurPrincipale` : #RRGGBB, contraste vérifié (texte blanc lisible).
+  slug               String?   @unique
+  vitrineActive      Boolean   @default(false)
+  vitrineDescription String?
+  couleurPrincipale  String?
+  vitrineContact     Boolean   @default(false)
+  // 7.3 : la vitrine accepte les demandes de commande des visiteurs sans compte (désactivé par défaut).
+  demandesEnLigne    Boolean   @default(false)
   // Suspension par le SUPERADMIN (ex: impayé, litige) — bloque IMMÉDIATEMENT
   // les nouvelles requêtes de tout compte de cet atelier (vérifié à chaque
   // requête via requireAtelier, pas seulement à la connexion : voir
   // auth.middleware.js), sans supprimer aucune donnée.
-  actif       Boolean   @default(true)
-  suspenduLe  DateTime?
+  actif              Boolean   @default(true)
+  suspenduLe         DateTime?
   // Essai gratuit de 7 jours — posé UNE SEULE FOIS à la création (voir
   // atelierProvisioning.js:creerAtelierEtAdmin), jamais recalculé ni
   // prolongé après coup, jamais accepté depuis le frontend. `null` pour
   // tout atelier créé AVANT l'introduction de cette fonctionnalité : ces
   // ateliers "légataires" ne sont jamais bloqués par le trial (voir
   // lib/trial.js) — seuls les ateliers créés après ont une échéance réelle.
-  trialEndsAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  trialEndsAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   users                User[]
   clientes             Cliente[]
@@ -244,8 +287,13 @@ model Atelier {
   commandes            Commande[]
   depenses             Depense[]
   articlesStock        ArticleStock[]
+  fournisseurs         Fournisseur[]
+  achats               Achat[]
+  images               ImageAtelier[]
+  notifications        Notification[]
   abonnements          Abonnement[]
   historiqueAbonnement HistoriqueAbonnement[]
+  rappelsAbonnement    RappelAbonnement[]
   demandesCommande     DemandeCommande[]
 }
 
@@ -254,23 +302,28 @@ model Atelier {
 // ─────────────────────────────────────────────────────────────────────────
 
 model Cliente {
-  id         String    @id @default(cuid())
-  atelierId  String
-  atelier    Atelier   @relation(fields: [atelierId], references: [id], onDelete: Restrict)
-  nom        String
-  prenom     String
-  telephone  String
-  telephone2 String?
+  id                    String    @id @default(cuid())
+  atelierId             String
+  atelier               Atelier   @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  nom                   String
+  prenom                String
+  telephone             String
+  telephone2            String?
   // Optionnel — sert UNIQUEMENT à l'envoi automatique du lien d'invitation
   // (voir POST /clientes/:id/inviter) : l'identifiant de connexion du compte
   // USER reste le téléphone, jamais cet email (pas d'unicité imposée ici).
-  email      String?
-  adresse    String?
-  sexe       Sexe?
-  notes      String?
-  archivedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  email                 String?
+  adresse               String?
+  sexe                  Sexe?
+  notes                 String?
+  archivedAt            DateTime?
+  // Droit à l'effacement (7.4) : la cliente a fermé son compte et demande l'effacement de ses données personnelles
+  // (suppressionDemandeeLe), puis l'atelier les a anonymisées (anonymiseeLe). Les commandes et paiements restent
+  // (obligation comptable) mais ne portent plus d'identité.
+  suppressionDemandeeLe DateTime?
+  anonymiseeLe          DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   // Lien OPTIONNEL vers un compte de connexion (§ plan rôle USER, Phase 3) —
   // Cliente reste l'unique source de vérité métier, User n'est qu'un MOYEN
@@ -330,10 +383,15 @@ model Modele {
   description   String?
   prixIndicatif Decimal?          @db.Decimal(10, 2)
   photoUrl      String?
+  // Lookbook (7.1) : publié = destiné à être montré aux clientes (vitrine, 7.2). Faux par défaut : rien n'est public sans
+  // geste explicite du PDG. `tags` : mots libres (occasion, tissu…), 12 au plus.
+  publie        Boolean           @default(false)
+  tags          String[]          @default([])
   archivedAt    DateTime?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
+  photos           PhotoModele[]
   commandes        Commande[]
   demandesCommande DemandeCommande[]
 
@@ -379,9 +437,16 @@ model Commande {
   photoTissuUrl  String?
   photoModeleUrl String?
 
+  // Production (Phase 6.3) : employé à qui la commande est confiée (un seul à la fois ; l'historique complet est dans
+  // AffectationCommande). Aucune incidence sur le statut, ni sur les droits : l'affectation organise le travail.
+  assigneAId String?
+  assigneA   User?     @relation("CommandesAssignees", fields: [assigneAId], references: [id], onDelete: SetNull)
+  assigneLe  DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  affectations        AffectationCommande[]
   paiements           Paiement[]
   // Livraison[] (et non Livraison? comme avant) : une livraison peut être
   // annulée (annuleAt) pour cause d'erreur de saisie, auquel cas une
@@ -406,6 +471,7 @@ model Commande {
   @@index([clienteId])
   @@index([statut])
   @@index([dateLivraisonPrevue])
+  @@index([atelierId, assigneAId, statut])
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -421,14 +487,29 @@ enum StatutDemandeCommande {
   REFUSEE
 }
 
+enum OrigineDemande {
+  CLIENT // envoyée par une cliente connectée (espace client)
+  VITRINE // envoyée par un visiteur sans compte depuis la vitrine publique (7.3)
+}
+
 model DemandeCommande {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   atelierId String
-  atelier   Atelier @relation(fields: [atelierId], references: [id], onDelete: Restrict)
-  clienteId String
-  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
-  modeleId  String?
-  modele    Modele? @relation(fields: [modeleId], references: [id], onDelete: SetNull)
+  atelier   Atelier  @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  // Nul tant qu'une demande de la vitrine n'a pas été rattachée à une fiche cliente par l'atelier.
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+
+  origine          OrigineDemande @default(CLIENT)
+  // Données personnelles d'un VISITEUR (sans fiche cliente) : minimales, avec consentement horodaté. Effacées dès que la
+  // demande est rattachée à une fiche cliente (les données vivent alors sur la fiche) ou purgées après un délai
+  // (voir lib/demandesPubliques.js).
+  contactPrenom    String?
+  contactNom       String?
+  contactTelephone String?
+  consentementLe   DateTime?
+  modeleId         String?
+  modele           Modele?        @relation(fields: [modeleId], references: [id], onDelete: SetNull)
 
   description String?
 
@@ -447,6 +528,7 @@ model DemandeCommande {
   @@index([atelierId])
   @@index([clienteId])
   @@index([statut])
+  @@index([origine, createdAt])
 }
 
 model Paiement {
@@ -511,6 +593,9 @@ enum NotificationType {
   PRET // statut = TERMINEE (prête à récupérer, pas encore livrée)
   LIVRAISON_PROCHE // dateLivraisonPrevue dans les prochains jours (voir lib/notifications.js)
   IMPAYE // 0 FCFA encaissé, hors ANNULEE
+  TACHE_AFFECTEE // (6.6) commande ouverte confiée à un employé : visible par lui seul
+  STOCK_BAS // (6.6) article dont la quantité est au seuil d'alerte ou en dessous
+  ACHAT_EN_RETARD // (6.6) achat non annulé, pas entièrement reçu, dont la date attendue est passée
 }
 
 /// Contenu volontairement minimal : AUCUN texte/libellé stocké — le message
@@ -523,16 +608,46 @@ enum NotificationType {
 /// une ligne est créée (non lue) dès qu'une condition devient vraie, et
 /// supprimée automatiquement dès qu'elle ne l'est plus (commande livrée,
 /// payée...). @@unique évite les doublons lors de cette réconciliation.
+///
+/// Phase 6.6 : une notification porte désormais sur une COMMANDE, un ARTICLE de stock ou un ACHAT (une seule de ces
+/// trois références) et appartient directement à un atelier (atelierId). `destinataireId` limite la vue à une
+/// personne (TACHE_AFFECTEE). `lu` reste l'état de lecture du PDG (et de l'espace client pour PRET/LIVRAISON_PROCHE) ;
+/// chaque EMPLOYÉ a le sien (NotificationLue) : il ne modifie jamais celui du PDG.
 model Notification {
-  id         String           @id @default(cuid())
-  type       NotificationType
-  commandeId String
-  commande   Commande         @relation(fields: [commandeId], references: [id], onDelete: Cascade)
-  lu         Boolean          @default(false)
-  createdAt  DateTime         @default(now())
+  id             String           @id @default(cuid())
+  atelierId      String
+  atelier        Atelier          @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  type           NotificationType
+  commandeId     String?
+  commande       Commande?        @relation(fields: [commandeId], references: [id], onDelete: Cascade)
+  articleId      String?
+  article        ArticleStock?    @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  achatId        String?
+  achat          Achat?           @relation(fields: [achatId], references: [id], onDelete: Cascade)
+  destinataireId String?
+  destinataire   User?            @relation("NotificationsRecues", fields: [destinataireId], references: [id], onDelete: Cascade)
+  lu             Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  lectures NotificationLue[]
 
   @@unique([type, commandeId])
+  @@unique([type, articleId])
+  @@unique([type, achatId])
   @@index([lu])
+  @@index([atelierId])
+}
+
+/// État de lecture d'une notification par un EMPLOYÉ (présence de la ligne = lue). Le PDG n'en a pas : voir Notification.lu.
+model NotificationLue {
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation("NotificationsLues", fields: [userId], references: [id], onDelete: Cascade)
+  luLe           DateTime     @default(now())
+
+  @@id([notificationId, userId])
+  @@index([userId])
 }
 
 enum TypeNotificationClient {
@@ -565,6 +680,9 @@ model NotificationClient {
   commande   Commande?              @relation(fields: [commandeId], references: [id], onDelete: SetNull)
   type       TypeNotificationClient
   message    String
+  // 7.7 : code et paramètres du message, composé à la lecture dans la langue de la cliente. NULL pour les lignes antérieures.
+  code       String?
+  params     Json?
   lu         Boolean                @default(false)
   createdAt  DateTime               @default(now())
 
@@ -590,6 +708,8 @@ model Depense {
   // Annulation logique — mêmes principes que Paiement.annuleAt ci-dessus.
   annuleAt    DateTime?
   annuleMotif String?
+
+  achat Achat?
 
   // atelierId : même correction de drift que Commande ci-dessus (index déjà
   // en base depuis la Phase 8, non déclaré jusqu'ici).
@@ -637,24 +757,30 @@ model ArticleStock {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  mouvements MouvementStock[]
+  mouvements    MouvementStock[]
+  lignesAchat   LigneAchat[]
+  notifications Notification[]
 
   @@index([atelierId])
   @@index([nom])
 }
 
 model MouvementStock {
-  id        String             @id @default(cuid())
-  articleId String
-  article   ArticleStock       @relation(fields: [articleId], references: [id], onDelete: Restrict)
-  type      TypeMouvementStock
+  id           String             @id @default(cuid())
+  articleId    String
+  article      ArticleStock       @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  type         TypeMouvementStock
   // Toujours positive : le signe est déterminé par `type`, jamais encodé
   // dans la valeur (évite un ENTREE négatif ou une SORTIE positive incohérents).
-  quantite  Decimal            @db.Decimal(10, 2)
-  motif     String?
-  createdAt DateTime           @default(now())
+  quantite     Decimal            @db.Decimal(10, 2)
+  motif        String?
+  // Renseigné quand l'entrée vient de la réception d'un achat (Phase 6.5) : trace et garde-fou contre le double comptage.
+  ligneAchatId String?
+  ligneAchat   LigneAchat?        @relation(fields: [ligneAchatId], references: [id], onDelete: Restrict)
+  createdAt    DateTime           @default(now())
 
   @@index([articleId])
+  @@index([ligneAchatId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -716,31 +842,104 @@ model Abonnement {
 }
 
 model Transaction {
-  id                   String            @id @default(cuid())
-  numero               String            @unique // TRX-2026-0001
+  id                   String             @id @default(cuid())
+  numero               String             @unique // TRX-2026-0001
   abonnementId         String
-  abonnement           Abonnement        @relation(fields: [abonnementId], references: [id], onDelete: Restrict)
+  abonnement           Abonnement         @relation(fields: [abonnementId], references: [id], onDelete: Restrict)
   moyenPaiement        MoyenPaiement
-  montant              Decimal           @db.Decimal(10, 2)
-  statut               StatutTransaction @default(EN_ATTENTE)
+  montant              Decimal            @db.Decimal(10, 2)
+  statut               StatutTransaction  @default(EN_ATTENTE)
   // Notre clé d'idempotence — envoyée à Wave comme client_reference : permet
   // de retrouver la transaction depuis le webhook sans jamais en créer deux
   // pour un même paiement (rejeu webhook, double-clic sur "Payer"...).
-  referenceInterne     String            @unique
+  referenceInterne     String             @unique
   // Id de session Wave (cos-...), ou référence de transfert saisie
   // manuellement pour NITA/Amana (voir confirmeManuellement ci-dessous).
   referenceExterne     String?
   // true UNIQUEMENT pour NITA/Amana — jamais mis à true automatiquement,
   // seulement via une action explicite de l'admin (voir notifications.routes
   // équivalent pour abonnements : POST .../confirmer-manuellement).
-  confirmeManuellement Boolean           @default(false)
+  confirmeManuellement Boolean            @default(false)
+  // Atelier propriétaire, dénormalisé depuis l'abonnement pour filtrer et totaliser sans jointure.
+  atelierId            String?
+  // Paiement manuel : déclaré par l'atelier (qui, quand, quelle preuve), puis confirmé ou rejeté par le SUPERADMIN.
+  // Rien de cela ne vaut confirmation : seule la décision du SUPERADMIN (confirmePar/confirmeLe) fait passer la
+  // transaction à REUSSIE.
+  declarePar           String?
+  declareLe            DateTime?
+  operateur            String? // ex. « Airtel Money », pour MOBILE_MONEY
+  preuveNote           String?
+  confirmePar          String?
+  confirmeLe           DateTime?
+  motifRejet           String?
+  // Remboursement : jamais de suppression, la transaction passe à REMBOURSEE avec qui, quand, pourquoi.
+  rembourseLe          DateTime?
+  rembourseePar        String?
+  motifRemboursement   String?
+  facture              FactureAbonnement?
   // Payload webhook Wave brut, conservé pour audit/litige — jamais
   // réinterprété après coup, juste une preuve horodatée de ce qui a été reçu.
   donneesBrutesWebhook Json?
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   @@index([abonnementId])
+  @@index([atelierId, statut])
+  @@index([statut, createdAt])
+}
+
+/// Justificatif de paiement d'un abonnement. Émise à la confirmation d'une transaction, numérotée (FAC-AAAA-NNNN)
+/// et IMMUTABLE : les champs ci-dessous sont des instantanés au jour de l'émission (renommer l'atelier ou le plan
+/// plus tard ne réécrit pas une facture). Un remboursement ne la supprime pas : il la marque annulée.
+model FactureAbonnement {
+  id                String        @id @default(cuid())
+  numero            String        @unique
+  transactionId     String        @unique
+  transaction       Transaction   @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  abonnementId      String
+  atelierId         String
+  atelierNom        String
+  planNom           String?
+  dureeMois         Int?
+  periodeDebut      DateTime?
+  periodeFin        DateTime?
+  montant           Decimal       @db.Decimal(10, 2)
+  devise            String        @default("FCFA")
+  moyenPaiement     MoyenPaiement
+  referencePaiement String?
+  emisLe            DateTime      @default(now())
+  annuleeLe         DateTime?
+  annuleeMotif      String?
+
+  @@index([atelierId, emisLe])
+}
+
+/// Rappel d'abonnement déjà envoyé (fin d'essai, échéance d'abonnement). La contrainte d'unicité garantit qu'un
+/// même rappel n'est envoyé qu'une seule fois par échéance, même si la tâche quotidienne est rejouée ou lancée
+/// en double. `cle` = date de l'échéance concernée (AAAA-MM-JJ) : une nouvelle échéance donne de nouveaux rappels.
+model RappelAbonnement {
+  id        String   @id @default(cuid())
+  atelierId String
+  atelier   Atelier  @relation(fields: [atelierId], references: [id], onDelete: Cascade)
+  type      String
+  cle       String
+  envoyeLe  DateTime @default(now())
+
+  @@unique([atelierId, type, cle])
+}
+
+/// Événement reçu d'un prestataire de paiement (webhook), mémorisé pour ne jamais traiter deux fois le même.
+/// Wave peut dupliquer, retarder ou désordonner ses envois : l'identifiant de l'événement (`evenementId`) est
+/// la seule clé fiable. La ligne est écrite DANS la transaction qui applique l'effet : si l'effet échoue, la ligne
+/// n'existe pas et la nouvelle livraison du prestataire est traitée normalement.
+model EvenementPaiement {
+  id          String   @id @default(cuid())
+  fournisseur String
+  evenementId String
+  type        String
+  recuLe      DateTime @default(now())
+
+  @@unique([fournisseur, evenementId])
 }
 
 /// Plans d'abonnement de la plateforme (Essentiel, Professionnel...) —
@@ -752,6 +951,9 @@ model PlanAbonnement {
   description     String?
   prixMensuel     Decimal  @db.Decimal(10, 2)
   fonctionnalites String[]
+  // Limites chiffrées (ex. { "clientes": 500, "comptes": 3 }). Vide = aucune limite. Structure prévue ; aucune
+  // limite n'est appliquée par le code tant qu'elle n'est pas définie par le SUPERADMIN (décision 15/11/2026).
+  limites         Json     @default("{}")
   // Durées proposées avec remise : [{ dureeMois, remisePourcent }] — vide =
   // durées standard (1/3/6/12 mois) sans remise. Voir lib/abonnement.js
   // (prixPourDuree) : le prix figé à l'activation utilise la même règle.
@@ -785,9 +987,14 @@ model HistoriqueAbonnement {
 /// Réglages globaux de la plateforme (ligne unique, id "plateforme") —
 /// aujourd'hui : le contact WhatsApp affiché aux PDG sur la page Abonnement.
 model ParametresPlateforme {
-  id              String   @id @default("plateforme")
-  contactWhatsapp String?
-  updatedAt       DateTime @updatedAt
+  id                   String   @id @default("plateforme")
+  contactWhatsapp      String?
+  // Jours de grâce après la fin d'un essai ou d'un abonnement : accès complet avec bandeau, puis lecture seule.
+  joursGrace           Int      @default(7)
+  // Texte libre affiché à l'atelier qui souscrit : où et comment payer (numéro de mobile money, compte bancaire...).
+  // Saisi par le SUPERADMIN ; la plateforme n'en déduit rien.
+  instructionsPaiement String?
+  updatedAt            DateTime @updatedAt
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -843,4 +1050,187 @@ model JournalImpersonation {
 
   @@index([atelierId])
   @@index([superadminId])
+}
+
+// Journal de sécurité PERSISTANT (connexions, changements de mot de passe,
+// impersonation, suspension...). Écrit par backend/src/lib/securityLog.js.
+//
+// - Aucune clé étrangère VOLONTAIREMENT : le journal doit survivre à la
+//   suppression d'un compte ou d'un atelier (c'est précisément là qu'on en a
+//   besoin), et une écriture de journal ne doit jamais pouvoir échouer à cause
+//   d'une contrainte.
+// - JAMAIS de mot de passe, jeton, cookie, identifiant saisi ni corps de
+//   requête : `details` est filtré par securityLog.js (liste blanche de clés).
+// - `ip` est une donnée personnelle : conservation limitée à 365 jours, purge
+//   quotidienne par le cron (cron.routes.js, RETENTION_JOURNAL_SECURITE_JOURS).
+// - `evenement` est un texte libre (pas un enum) : ajouter un type d'événement
+//   ne doit pas exiger une migration.
+model JournalSecurite {
+  id        String   @id @default(cuid())
+  evenement String
+  userId    String?
+  atelierId String?
+  ip        String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([evenement, createdAt])
+  @@index([atelierId, createdAt])
+  @@index([userId, createdAt])
+}
+
+// Clé d'idempotence (sous-phase 3.3, docs/IDEMPOTENCE.md) : mémorise la réponse 2xx d'une requête
+// d'écriture envoyée avec l'en-tête `Idempotency-Key`, pour qu'un réessai (double clic, délai dépassé,
+// relance réseau) rejoue la réponse d'origine au lieu de ré-exécuter l'opération (double paiement,
+// commande en double…).
+//
+// - `portee` : « atelier:<id> » ou « superadmin:<id> » — une clé n'est valable que dans SA portée, jamais
+//   partagée entre ateliers. Pas de clé étrangère (même choix que JournalSecurite) : purge par durée de vie.
+// - `empreinte` : SHA-256 de (méthode, chemin, corps). Même clé + empreinte différente = requête différente → 422.
+// - `statut` : EN_COURS (réservée, en traitement) ou TERMINEE (réponse 2xx mémorisée). Seules les réponses
+//   2xx sont mémorisées : un 4xx ou 5xx supprime la réservation, le réessai est réévalué.
+// - `expireLe` : durée de vie 24 h ; purge quotidienne par le cron.
+model CleIdempotence {
+  id            String   @id @default(cuid())
+  portee        String
+  cle           String
+  methode       String
+  chemin        String
+  empreinte     String
+  statut        String
+  reponseStatut Int?
+  reponseCorps  Json?
+  createdAt     DateTime @default(now())
+  expireLe      DateTime
+
+  @@unique([portee, cle])
+  @@index([expireLe])
+}
+
+// Historique des affectations d'une commande (Phase 6.3) : qui l'a confiée à qui, et quand. employeId null = la commande
+// a été retirée à son employé (désaffectée, ou compte désactivé). Jamais modifié ni supprimé.
+model AffectationCommande {
+  id         String   @id @default(cuid())
+  atelierId  String
+  commandeId String
+  commande   Commande @relation(fields: [commandeId], references: [id], onDelete: Restrict)
+  employeId  String?
+  employe    User?    @relation("AffectationEmploye", fields: [employeId], references: [id], onDelete: SetNull)
+  parId      String?
+  par        User?    @relation("AffectationAuteur", fields: [parId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([commandeId, createdAt])
+  @@index([atelierId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Fournisseurs (Phase 6.4) — personnes ou entreprises auprès desquelles l'atelier achète tissus et fournitures.
+// Jamais supprimés (archivage) : les achats de la 6.5 s'y référeront. Nom unique par atelier, sans tenir compte de la casse.
+// ─────────────────────────────────────────────────────────────────────────
+model Fournisseur {
+  id         String    @id @default(cuid())
+  atelierId  String
+  atelier    Atelier   @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  nom        String
+  contact    String?
+  telephone  String?
+  email      String?
+  adresse    String?
+  notes      String?
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  achats Achat[]
+
+  @@index([atelierId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Achats (Phase 6.5) — bons de commande aux fournisseurs : réception → entrées de stock ; paiement → une dépense.
+// Rien de dérivé n'est stocké : état de réception = lignes (quantiteRecue / quantite) ; payé = dépense liée non annulée ;
+// total = somme des lignes. Jamais supprimés : on annule (tant que rien n'est reçu ni payé).
+// ─────────────────────────────────────────────────────────────────────────
+enum StatutAchat {
+  COMMANDE
+  ANNULE
+}
+
+model Achat {
+  id            String      @id @default(cuid())
+  atelierId     String
+  atelier       Atelier     @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  numero        String      @unique // ACH-2026-0001, même Counter que CMD/REC
+  fournisseurId String
+  fournisseur   Fournisseur @relation(fields: [fournisseurId], references: [id], onDelete: Restrict)
+  statut        StatutAchat @default(COMMANDE)
+  dateCommande  DateTime    @default(now())
+  // Date à laquelle la marchandise est attendue (sert aux rappels de la 6.6).
+  dateAttendue  DateTime?
+  notes         String?
+  // Dépense créée au paiement. Si elle est ensuite annulée (module Dépenses), l'achat redevient « non payé ».
+  depenseId     String?     @unique
+  depense       Depense?    @relation(fields: [depenseId], references: [id], onDelete: Restrict)
+  annuleAt      DateTime?
+  annuleMotif   String?
+  creeParId     String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  lignes        LigneAchat[]
+  notifications Notification[]
+
+  @@index([atelierId, statut])
+  @@index([fournisseurId])
+}
+
+model LigneAchat {
+  id            String       @id @default(cuid())
+  achatId       String
+  achat         Achat        @relation(fields: [achatId], references: [id], onDelete: Restrict)
+  articleId     String
+  article       ArticleStock @relation(fields: [articleId], references: [id], onDelete: Restrict)
+  quantite      Decimal      @db.Decimal(10, 2)
+  prixUnitaire  Decimal      @db.Decimal(10, 2)
+  quantiteRecue Decimal      @default(0) @db.Decimal(10, 2)
+
+  mouvements MouvementStock[]
+
+  @@unique([achatId, articleId])
+  @@index([articleId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Images du lookbook (Phase 7.1). Stockage derrière l'interface lib/stockageImages.js : cette table est l'adaptateur
+// « base de données » (développement, tests, petits ateliers). Un adaptateur objet (S3, R2, Blob) remplacera `contenu`
+// par une référence externe sans changer le reste. Une image appartient toujours à UN atelier.
+// ─────────────────────────────────────────────────────────────────────────
+model ImageAtelier {
+  id        String   @id @default(cuid())
+  atelierId String
+  atelier   Atelier  @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  mime      String
+  taille    Int
+  contenu   Bytes
+  createdAt DateTime @default(now())
+
+  photos PhotoModele[]
+
+  @@index([atelierId])
+}
+
+/// Une photo d'un modèle dans le lookbook ; `ordre` = position d'affichage (0 = photo de couverture).
+model PhotoModele {
+  id        String       @id @default(cuid())
+  modeleId  String
+  modele    Modele       @relation(fields: [modeleId], references: [id], onDelete: Restrict)
+  imageId   String
+  image     ImageAtelier @relation(fields: [imageId], references: [id], onDelete: Restrict)
+  ordre     Int
+  legende   String?
+  createdAt DateTime     @default(now())
+
+  @@index([modeleId, ordre])
 }

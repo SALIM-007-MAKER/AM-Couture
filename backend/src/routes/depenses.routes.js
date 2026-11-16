@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule } from "../middlewares/auth.middleware.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import {
@@ -17,7 +18,9 @@ const router = Router();
 
 // Toutes les routes Dépenses exigent une session valide et un compte ADMIN
 // rattaché à un atelier (Phase 8 — multi-tenant).
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+// Membres de l'atelier (PDG ou employé) ; l'employé doit en plus avoir la permission « depenses.lire » (GET) ou
+// « depenses.ecrire » (autres méthodes), contrôlée avant toute route.
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule("depenses"));
 
 router.param("id", requireValidIdParam);
 
@@ -43,7 +46,7 @@ function buildWhere(atelierId, { categorie, dateFrom, dateTo, q }) {
 }
 
 // POST /api/depenses — création
-router.post("/", async (req, res) => {
+router.post("/", idempotence, async (req, res) => {
   const parsed = createDepenseSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));

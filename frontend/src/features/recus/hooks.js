@@ -5,11 +5,12 @@ import { recusApi } from "./api.js";
 // liés à un paiement précis confondus) — le composant Paiements retrouve le
 // reçu de chaque ligne par `recus.find(r => r.paiementId === paiement.id)`
 // plutôt que de refaire une requête par paiement (évite les N+1).
-export function useRecusQuery(commandeId) {
+// `actif: false` : pas de requête (l'employé n'a pas « paiements.lire », le serveur répondrait 403).
+export function useRecusQuery(commandeId, { actif = true } = {}) {
   return useQuery({
     queryKey: ["commandes", commandeId, "recus", "list"],
     queryFn: () => recusApi.listForCommande(commandeId, { page: 1, pageSize: 50 }),
-    enabled: Boolean(commandeId),
+    enabled: Boolean(commandeId) && actif,
   });
 }
 

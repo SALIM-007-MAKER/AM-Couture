@@ -21,8 +21,14 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Inbox,
+  UserCog,
+  Hammer,
+  Store,
+  ShoppingCart,
+  Globe,
 } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
+import { peutAcceder, filtrerNavigation } from "../features/employes/permissions.js";
 import { useParametresQuery } from "../features/parametres/hooks.js";
 import { useNombreNonLuesQuery } from "../features/notifications/hooks.js";
 import { useUiStore } from "../stores/uiStore.js";
@@ -30,6 +36,9 @@ import { useTranslation } from "../i18n/index.js";
 import EmailVerificationBanner from "../components/EmailVerificationBanner.jsx";
 import ImpersonationBanner from "../components/ImpersonationBanner.jsx";
 import PaywallBanner from "../components/PaywallBanner.jsx";
+import HorsLigneBanner from "../components/HorsLigneBanner.jsx";
+import FileEcrituresBanner from "../components/FileEcrituresBanner.jsx";
+import AccesBanner from "../features/abonnement/components/AccesBanner.jsx";
 import LanguageSwitcher from "../components/LanguageSwitcher.jsx";
 import LocaleSync from "../components/LocaleSync.jsx";
 
@@ -50,7 +59,10 @@ const NAV_GROUPS = [
       { labelKey: "nav.clients", to: "/clientes", icon: Users },
       { labelKey: "nav.models", to: "/modeles", icon: Shirt },
       { labelKey: "nav.stock", to: "/stock", icon: Package },
+      { labelKey: "nav.suppliers", to: "/fournisseurs", icon: Store },
+      { labelKey: "nav.purchases", to: "/achats", icon: ShoppingCart },
       { labelKey: "nav.orders", to: "/commandes", icon: ClipboardList },
+      { labelKey: "nav.production", to: "/production", icon: Hammer },
       { labelKey: "nav.requests", to: "/demandes", icon: Inbox },
       { labelKey: "nav.deliveries", to: "/livraisons", icon: Truck },
     ],
@@ -73,6 +85,8 @@ const NAV_GROUPS = [
   {
     labelKey: "nav.groupSettings",
     items: [
+      { labelKey: "nav.employees", to: "/employes", icon: UserCog },
+      { labelKey: "nav.storefront", to: "/vitrine", icon: Globe },
       { labelKey: "nav.settings", to: "/parametres", icon: Settings },
       { labelKey: "nav.myAccount", to: "/compte", icon: UserCircle },
       { labelKey: "nav.subscription", to: "/abonnement", icon: CreditCard },
@@ -106,13 +120,18 @@ const MOBILE_DRAWER_GROUPS = [
   {
     key: "secondaire",
     items: [
+      { labelKey: "nav.production", to: "/production", icon: Hammer },
       { labelKey: "nav.deliveries", to: "/livraisons", icon: Truck },
       { labelKey: "nav.stock", to: "/stock", icon: Package },
+      { labelKey: "nav.suppliers", to: "/fournisseurs", icon: Store },
+      { labelKey: "nav.purchases", to: "/achats", icon: ShoppingCart },
       { labelKey: "nav.requests", to: "/demandes", icon: Inbox },
       { labelKey: "nav.receipts", to: "/recus", icon: FileText },
       { labelKey: "nav.reports", to: "/rapports", icon: BarChart3 },
       { labelKey: "nav.calendar", to: "/calendrier", icon: Calendar },
       { labelKey: "nav.notifications", to: "/notifications", icon: Bell },
+      { labelKey: "nav.employees", to: "/employes", icon: UserCog },
+      { labelKey: "nav.storefront", to: "/vitrine", icon: Globe },
       { labelKey: "nav.settings", to: "/parametres", icon: Settings },
       { labelKey: "nav.myAccount", to: "/compte", icon: UserCircle },
       { labelKey: "nav.subscription", to: "/abonnement", icon: CreditCard },
@@ -122,9 +141,12 @@ const MOBILE_DRAWER_GROUPS = [
 
 function NavContent({ collapsed, onNavigate, groups = NAV_GROUPS }) {
   const { t } = useTranslation();
+  const { data: user } = useMeQuery();
+  // Un employé ne voit que les écrans auxquels il a droit ; le PDG voit tout.
+  const visibles = filtrerNavigation(groups, user);
   return (
     <nav className="flex flex-col gap-4 p-3">
-      {groups.map((group) => (
+      {visibles.map((group) => (
         <div key={group.key ?? group.labelKey} className="space-y-0.5">
           {!collapsed && group.labelKey && (
             <p className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-600">
@@ -175,12 +197,15 @@ const BOTTOM_NAV_ITEMS = [
 
 function BottomNav() {
   const { t } = useTranslation();
+  const { data: user } = useMeQuery();
+  const items = BOTTOM_NAV_ITEMS.filter((item) => peutAcceder(user, item.to));
+  if (items.length === 0) return null;
   return (
     <nav
       aria-label={t("nav.mainNavigation")}
       className="md:hidden fixed inset-x-0 bottom-0 z-30 flex bg-white dark:bg-neutral-900 border-t border-neutral-200 dark:border-neutral-800 pb-[env(safe-area-inset-bottom)]"
     >
-      {BOTTOM_NAV_ITEMS.map((item) => (
+      {items.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
@@ -339,7 +364,10 @@ export default function AppLayout() {
       </div>
 
       <div className="flex-1 flex flex-col min-w-0">
+        <HorsLigneBanner />
+        <FileEcrituresBanner />
         <PaywallBanner />
+        <AccesBanner />
         <ImpersonationBanner />
         <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-4 py-3">
           <div className="flex items-center gap-3 min-w-0">

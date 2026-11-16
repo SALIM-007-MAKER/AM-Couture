@@ -179,6 +179,14 @@ export function useExpirerAbonnementMutation(atelierId) {
   );
 }
 
+export function useSuspendreAbonnementMutation(atelierId) {
+  return useAbonnementMutation(atelierId, ({ abonnementId, note }) => ateliersApi.suspendreAbonnement(atelierId, abonnementId, { note }));
+}
+
+export function useReactiverAbonnementMutation(atelierId) {
+  return useAbonnementMutation(atelierId, ({ abonnementId, note }) => ateliersApi.reactiverAbonnement(atelierId, abonnementId, { note }));
+}
+
 export function useDesactiverAbonnementMutation(atelierId) {
   return useAbonnementMutation(atelierId, ({ abonnementId, note }) =>
     ateliersApi.desactiverAbonnement(atelierId, abonnementId, note ? { note } : {}),

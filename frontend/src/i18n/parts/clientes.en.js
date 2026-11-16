@@ -105,13 +105,19 @@ export default {
       "RETARD": "Overdue",
       "PRET": "Ready",
       "LIVRAISON_PROCHE": "Delivery soon",
-      "IMPAYE": "Unpaid"
+      "IMPAYE": "Unpaid",
+      "TACHE_AFFECTEE": "Job assigned to you",
+      "STOCK_BAS": "Low stock",
+      "ACHAT_EN_RETARD": "Purchase overdue"
     },
     "msg": {
       "RETARD": "{{numero}} ({{modele}}) — overdue, delivery expected on {{date}}.",
       "PRET": "{{numero}} ({{modele}}) — ready for pickup (status: {{statut}}).",
       "LIVRAISON_PROCHE": "{{numero}} ({{modele}}) — to be delivered on {{date}}.",
-      "IMPAYE": "{{numero}} ({{modele}}) — no payment recorded."
+      "IMPAYE": "{{numero}} ({{modele}}) — no payment recorded.",
+      "TACHE_AFFECTEE": "{{numero}} ({{modele}}) — this job is assigned to you, delivery due {{date}}.",
+      "STOCK_BAS": "{{nom}} — low stock: {{quantite}} {{unite}} (alert threshold: {{seuil}}).",
+      "ACHAT_EN_RETARD": "Purchase {{numero}} from {{fournisseur}} — expected {{date}}, not fully received."
     },
     "filterAll": "All",
     "filterUnread": "Unread",

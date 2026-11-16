@@ -1,29 +1,59 @@
-/**
- * Middleware d'erreur centralisé.
- * Règle de sécurité : ne jamais logger ni renvoyer le contenu brut d'une
- * erreur (peut contenir des requêtes SQL, des tokens, des données de
- * clientes). On logue uniquement un message technique court côté serveur,
- * et on renvoie un message générique au client sauf si l'erreur est
- * explicitement marquée "publique" (validation Zod, 404 métier, etc.).
- */
-export function errorMiddleware(err, req, res, next) {
-  const status = err.status ?? 500;
-  const isPublic = Boolean(err.expose);
+import { HttpError } from "../lib/httpError.js";
+import { classifierErreur, RETRY_AFTER_SECONDES } from "../lib/classifierErreur.js";
+import { journaliser } from "../lib/logger.js";
 
-  // Log serveur : jamais err.stack complet en prod, jamais req.body brut.
-  console.error(`[${req.method} ${req.originalUrl}] ${status} — ${err.message}`);
+// Réexporté : toutes les routes importent HttpError depuis ce module.
+export { HttpError };
 
-  res.status(status).json({
-    error: isPublic ? err.message : "Une erreur est survenue.",
-    ...(isPublic && err.details ? { details: err.details } : {}),
-  });
+const LONGUEUR_MESSAGE_LOG = 300;
+const LIGNES_PILE_LOG = 8;
+
+/** Chemin SANS query-string : un jeton passé en paramètre (?token=…) ne doit jamais atteindre les journaux. */
+function cheminSansQuery(req) {
+  return String(req.originalUrl ?? req.url ?? "").split("?")[0];
 }
 
-export class HttpError extends Error {
-  constructor(status, message, details) {
-    super(message);
-    this.status = status;
-    this.expose = true;
-    this.details = details;
-  }
+function ecrireJournal(niveau, ligne) {
+  const { type, date: _date, ...champs } = ligne;
+  journaliser(niveau, type, champs);
+}
+
+/**
+ * Middleware d'erreur centralisé.
+ *
+ * - Le client ne reçoit JAMAIS le contenu brut d'une erreur (SQL, noms de contraintes, messages de
+ *   bibliothèques) : seulement un message sûr en français choisi par `classifierErreur`.
+ * - Toute réponse 5xx porte une référence (`requestId`, identique à l'en-tête X-Request-Id) qui
+ *   retrouve la ligne de journal correspondante.
+ * - Journal : une ligne JSON par erreur, sans corps de requête ni query-string ; la pile n'est
+ *   conservée que pour les 5xx ; niveau `warn` pour les erreurs attendues (4xx).
+ */
+export function errorMiddleware(err, req, res, next) {
+  const c = classifierErreur(err);
+  const serveur = c.status >= 500;
+
+  ecrireJournal(serveur ? "error" : "warn", {
+    type: "erreur",
+    date: new Date().toISOString(),
+    requestId: req.id,
+    methode: req.method,
+    chemin: cheminSansQuery(req),
+    status: c.status,
+    categorie: c.categorie,
+    ...(typeof err?.code === "string" ? { code: err.code } : {}),
+    message: String(err?.message ?? err).replace(/\s+/g, " ").slice(0, LONGUEUR_MESSAGE_LOG),
+    ...(req.user ? { userId: req.user.id, atelierId: req.user.atelierId, role: req.user.role } : {}),
+    ...(serveur && err?.stack ? { pile: String(err.stack).split("\n").slice(0, LIGNES_PILE_LOG).join("\n") } : {}),
+  });
+
+  // Les en-têtes sont déjà partis : on ne peut plus écrire une réponse propre, Express ferme la connexion.
+  if (res.headersSent) return next(err);
+
+  if (c.retryAfter) res.setHeader("Retry-After", String(c.retryAfter ?? RETRY_AFTER_SECONDES));
+
+  res.status(c.status).json({
+    error: c.message,
+    ...(c.details ? { details: c.details } : {}),
+    ...(serveur && req.id ? { requestId: req.id } : {}),
+  });
 }

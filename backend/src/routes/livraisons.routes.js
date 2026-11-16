@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requirePermission } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
+import { aPermission } from "../lib/permissions.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { isUniqueConstraintViolation } from "../lib/prismaErrors.js";
@@ -36,12 +39,15 @@ router.use(async (req, res, next) => {
 });
 
 // POST /api/commandes/:commandeId/livraisons — création (+ paiement final optionnel, atomique)
-router.post("/", async (req, res) => {
+router.post("/", idempotence, async (req, res) => {
   const parsed = createLivraisonSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
   const { dateLivraison, commentaire, paiementFinal } = parsed.data;
+  if (paiementFinal && !aPermission(req.user, "paiements.ecrire")) {
+    throw new HttpError(403, "Vous n'avez pas l'autorisation d'enregistrer un paiement.", { permission: "paiements.ecrire" });
+  }
   const { commandeId } = req.params;
 
   let result;
@@ -106,7 +112,7 @@ router.post("/", async (req, res) => {
             clienteId: commande.clienteId,
             commandeId,
             type: "PAIEMENT_ENREGISTRE",
-            message: `Paiement de ${paiement.montant} enregistré sur votre commande ${commande.numero}.`,
+            params: { montant: paiement.montant, numero: commande.numero },
           });
         }
 
@@ -127,7 +133,7 @@ router.post("/", async (req, res) => {
           clienteId: commande.clienteId,
           commandeId,
           type: "LIVRAISON_ENREGISTREE",
-          message: `Votre commande ${commande.numero} a été livrée.`,
+          params: { numero: commande.numero },
         });
 
         return {
@@ -264,7 +270,7 @@ router.post("/:livraisonId/annuler", async (req, res) => {
 // (paiements.routes.js) : lecture seule, requireAuth explicite.
 // ───────────────────────────────────────────────────────────────────────
 export const livraisonsGlobalRouter = Router();
-livraisonsGlobalRouter.use(requireAuth, requireAtelier);
+livraisonsGlobalRouter.use(requireAuth, requireMembreAtelier, requirePermission("livraisons.lire"), masquerFinancesSiNonAutorise);
 
 const LIVRAISON_GLOBAL_INCLUDE = {
   commande: {

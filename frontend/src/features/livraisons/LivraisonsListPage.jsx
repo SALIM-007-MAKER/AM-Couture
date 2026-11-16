@@ -1,3 +1,4 @@
+import { useCan } from "../../hooks/usePermissions.js";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Truck, Search } from "lucide-react";
@@ -21,6 +22,7 @@ function formatDate(iso) {
 // fiche Commande (features/commandes/components/LivraisonSection.jsx), qui
 // seule connaît le statut de la commande et le solde restant.
 export default function LivraisonsListPage() {
+  const voirFinances = useCan()("finances.voir");
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Number(searchParams.get("page") ?? "1");
@@ -101,7 +103,7 @@ export default function LivraisonsListPage() {
                   <th className="px-4 py-3 font-medium">{t("livr.colDate")}</th>
                   <th className="px-4 py-3 font-medium">{t("livr.colCommande")}</th>
                   <th className="px-4 py-3 font-medium">{t("livr.colClient")}</th>
-                  <th className="px-4 py-3 font-medium text-right">{t("livr.colSolde")}</th>
+                  {voirFinances && <th className="px-4 py-3 font-medium text-right">{t("livr.colSolde")}</th>}
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
@@ -122,7 +124,9 @@ export default function LivraisonsListPage() {
                     <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">
                       {l.commande.cliente.nom} {l.commande.cliente.prenom}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-neutral-900 dark:text-neutral-100">{l.montantRestant}</td>
+                    {voirFinances && (
+                      <td className="px-4 py-3 text-right tabular-nums text-neutral-900 dark:text-neutral-100">{l.montantRestant}</td>
+                    )}
                     <td className="px-4 py-3 text-right">{l.annuleAt && <AnnuleBadge />}</td>
                   </tr>
                 ))}

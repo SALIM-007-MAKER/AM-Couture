@@ -1,52 +1,72 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { langueDemandee } from "../lib/messagesServeur.js";
+import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import {
+  requireAuth,
+  requireMembreAtelier,
+  requireAbonnementActif,
+  requirePermission,
+  requireUnePermission,
+  droitsParModule,
+} from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
+import { aPermission, peutVoirFinances } from "../lib/permissions.js";
 import { formatZodError } from "../lib/validation.js";
 import { nextNumero } from "../lib/numero.js";
 import { computeSolde, statutPaiement } from "../lib/money.js";
 import { streamFicheCommandePdf } from "../lib/recuPdf.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { buildCsv, envoyerCsv } from "../lib/csv.js";
-import { creerNotificationClient, STATUT_COMMANDE_LABELS } from "../lib/notificationsClient.js";
+import { creerNotificationClient } from "../lib/notificationsClient.js";
 import {
   createCommandeSchema,
   updateCommandeSchema,
   changeStatutSchema,
   listCommandesQuerySchema,
+  affectationSchema,
   STATUT_TRANSITIONS,
 } from "../schemas/commande.schema.js";
 import paiementsRouter from "./paiements.routes.js";
 import livraisonsRouter from "./livraisons.routes.js";
 import { recusCommandeRouter } from "./recus.routes.js";
+import { STATUTS_OUVERTS, debutDuJour, estEnRetard, estAffectable } from "../lib/production.js";
 
 const router = Router();
 
 // Toutes les routes Commandes (et Paiements/Livraisons/Reçus, montées
 // ci-dessous) exigent une session valide et un compte ADMIN rattaché à un
 // atelier (Phase 8 — multi-tenant).
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+// Membres de l'atelier ; les permissions (commandes.*, paiements.*, livraisons.*) sont contrôlées route par route
+// ci-dessous et à l'entrée de chaque sous-module. Sans « finances.voir », les montants sont retirés des réponses.
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, masquerFinancesSiNonAutorise);
 
 // Valide le format de :id / :commandeId sur toutes les routes avant toute requête Prisma.
 router.param("id", requireValidIdParam);
 router.param("commandeId", requireValidIdParam);
 
 // Modules Paiements/Livraisons/Reçus — routes imbriquées sous /api/commandes/:commandeId/...
-router.use("/:commandeId/paiements", paiementsRouter);
-router.use("/:commandeId/livraisons", livraisonsRouter);
-router.use("/:commandeId/recus", recusCommandeRouter);
+router.use("/:commandeId/paiements", droitsParModule("paiements"), paiementsRouter);
+router.use("/:commandeId/livraisons", droitsParModule("livraisons"), livraisonsRouter);
+router.use("/:commandeId/recus", droitsParModule("paiements"), recusCommandeRouter);
 
 const CLIENTE_SUMMARY_SELECT = { id: true, nom: true, prenom: true, telephone: true, archivedAt: true };
 const MODELE_SUMMARY_SELECT = { id: true, nom: true, categorie: true, archivedAt: true };
+const EMPLOYE_SUMMARY_SELECT = { id: true, prenom: true, nom: true, identifiant: true, actif: true };
 
 // POST /api/commandes — création (+ paiement initial optionnel, atomique)
-router.post("/", async (req, res) => {
+router.post("/", requirePermission("commandes.ecrire"), idempotence, async (req, res) => {
   const parsed = createCommandeSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
   const data = parsed.data;
+  // Enregistrer un acompte est une opération d'argent : il faut le droit « paiements.ecrire » en plus de créer la commande.
+  if (data.paiementInitial && !aPermission(req.user, "paiements.ecrire")) {
+    throw new HttpError(403, "Vous n'avez pas l'autorisation d'enregistrer un paiement.", { permission: "paiements.ecrire" });
+  }
 
   const cliente = await prisma.cliente.findFirst({
     where: { id: data.clienteId, atelierId: req.user.atelierId },
@@ -101,7 +121,7 @@ router.post("/", async (req, res) => {
         clienteId: commande.clienteId,
         commandeId: commande.id,
         type: "COMMANDE_CREEE",
-        message: `Votre commande ${numero} a été enregistrée.`,
+        params: { numero },
       });
 
       let paiement = null;
@@ -113,7 +133,7 @@ router.post("/", async (req, res) => {
           clienteId: commande.clienteId,
           commandeId: commande.id,
           type: "PAIEMENT_ENREGISTRE",
-          message: `Paiement de ${paiement.montant} enregistré sur votre commande ${numero}.`,
+          params: { montant: paiement.montant, numero },
         });
       }
       return { commande, paiement };
@@ -135,8 +155,14 @@ router.post("/", async (req, res) => {
 // GET /api/commandes — liste, recherche, filtres, pagination (sans N+1 : un seul findMany avec select imbriqué)
 // Filtre partagé entre GET / (paginé) et GET /export (tout en un CSV) —
 // même principe que buildClientesWhere (clientes.routes.js).
-function buildCommandesWhere(atelierId, { q, statut, priorite, clienteId, livraisonDu, livraisonAu }) {
+function buildCommandesWhere(atelierId, { q, statut, priorite, clienteId, livraisonDu, livraisonAu, assigneA, enRetard }, userId) {
   const where = { atelierId };
+  if (assigneA === "aucun") where.assigneAId = null;
+  else if (assigneA) where.assigneAId = assigneA === "moi" ? userId : assigneA;
+  if (enRetard === "true") {
+    where.statut = { in: STATUTS_OUVERTS };
+    where.dateLivraisonPrevue = { lt: debutDuJour() };
+  }
   if (statut) where.statut = statut;
   if (priorite) where.priorite = priorite;
   if (clienteId) where.clienteId = clienteId;
@@ -158,13 +184,13 @@ function buildCommandesWhere(atelierId, { q, statut, priorite, clienteId, livrai
   return where;
 }
 
-router.get("/", async (req, res) => {
+router.get("/", requirePermission("commandes.lire"), async (req, res) => {
   const parsed = listCommandesQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
   }
   const { page, pageSize } = parsed.data;
-  const where = buildCommandesWhere(req.user.atelierId, parsed.data);
+  const where = buildCommandesWhere(req.user.atelierId, parsed.data, req.user.id);
 
   const [rows, total] = await Promise.all([
     prisma.commande.findMany({
@@ -188,6 +214,8 @@ router.get("/", async (req, res) => {
         observations: true,
         createdAt: true,
         updatedAt: true,
+        assigneLe: true,
+        assigneA: { select: EMPLOYE_SUMMARY_SELECT },
         cliente: { select: CLIENTE_SUMMARY_SELECT },
         modele: { select: MODELE_SUMMARY_SELECT },
         // annuleAt: null — seuls les paiements actifs entrent dans le calcul
@@ -201,7 +229,7 @@ router.get("/", async (req, res) => {
 
   const data = rows.map(({ paiements, ...commande }) => {
     const { totalPaye, solde } = computeSolde(commande.prixTotal, paiements);
-    return { ...commande, totalPaye, solde, statutPaiement: statutPaiement(commande.prixTotal, totalPaye) };
+    return { ...commande, enRetard: estEnRetard(commande), totalPaye, solde, statutPaiement: statutPaiement(commande.prixTotal, totalPaye) };
   });
 
   res.json({
@@ -214,12 +242,13 @@ router.get("/", async (req, res) => {
 // pagination. Défini AVANT /:id (même raison que /export sur Clientes —
 // sinon Express matcherait "export" comme une valeur de :id).
 const LIMITE_EXPORT = 20_000;
-router.get("/export", async (req, res) => {
+// L'export contient prix, payé et solde de chaque commande : il exige « finances.voir ».
+router.get("/export", requirePermission("commandes.lire"), requirePermission("finances.voir"), async (req, res) => {
   const parsed = listCommandesQuerySchema.safeParse(req.query);
   if (!parsed.success) {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
   }
-  const where = buildCommandesWhere(req.user.atelierId, parsed.data);
+  const where = buildCommandesWhere(req.user.atelierId, parsed.data, req.user.id);
 
   const rows = await prisma.commande.findMany({
     where,
@@ -258,8 +287,47 @@ router.get("/export", async (req, res) => {
   envoyerCsv(res, `commandes-${new Date().toISOString().slice(0, 10)}.csv`, csv);
 });
 
+// GET /api/commandes/production — tableau de bord de la production : charge de chaque employé (commandes ouvertes, dont
+// en retard), commandes non affectées et retards. Sert aussi de liste des personnes à qui l'on peut affecter une commande.
+// Défini AVANT /:id. Réservé à qui peut affecter (le PDG, ou un employé avec « commandes.affecter »).
+router.get("/production", requirePermission("commandes.affecter"), async (req, res) => {
+  const { atelierId } = req.user;
+  const ouvertes = await prisma.commande.findMany({
+    where: { atelierId, statut: { in: STATUTS_OUVERTS } },
+    select: { id: true, statut: true, dateLivraisonPrevue: true, assigneAId: true },
+  });
+  const personnes = await prisma.user.findMany({
+    where: { atelierId, actif: true, role: { in: ["ADMIN", "EMPLOYE"] } },
+    orderBy: [{ role: "asc" }, { prenom: "asc" }, { nom: "asc" }],
+    select: { id: true, prenom: true, nom: true, identifiant: true, role: true, poste: true },
+  });
+  const maintenant = new Date();
+  const charge = new Map(personnes.map((p) => [p.id, { ouvertes: 0, enRetard: 0 }]));
+  let nonAffectees = 0;
+  let nonAffecteesEnRetard = 0;
+  for (const c of ouvertes) {
+    const retard = estEnRetard(c, maintenant);
+    const ligne = c.assigneAId ? charge.get(c.assigneAId) : undefined;
+    if (ligne) {
+      ligne.ouvertes += 1;
+      if (retard) ligne.enRetard += 1;
+    } else {
+      // Non affectée, ou affectée à un compte désormais inactif : dans les deux cas, personne ne s'en occupe.
+      nonAffectees += 1;
+      if (retard) nonAffecteesEnRetard += 1;
+    }
+  }
+  res.json({
+    employes: personnes.map((p) => ({ ...p, ...charge.get(p.id) })),
+    nonAffectees,
+    nonAffecteesEnRetard,
+    enRetard: ouvertes.filter((c) => estEnRetard(c, maintenant)).length,
+    ouvertes: ouvertes.length,
+  });
+});
+
 // GET /api/commandes/:id — détail : commande + cliente + modèle + paiements + livraisons + totaux calculés
-router.get("/:id", async (req, res) => {
+router.get("/:id", requirePermission("commandes.lire"), async (req, res) => {
   const commande = await prisma.commande.findFirst({
     where: { id: req.params.id, atelierId: req.user.atelierId },
     include: {
@@ -270,6 +338,11 @@ router.get("/:id", async (req, res) => {
       // disparaître. Seuls les totaux ci-dessous les excluent.
       paiements: { orderBy: { date: "desc" } },
       livraisons: { orderBy: { createdAt: "desc" } },
+      assigneA: { select: EMPLOYE_SUMMARY_SELECT },
+      affectations: {
+        orderBy: { createdAt: "desc" },
+        select: { id: true, createdAt: true, employe: { select: EMPLOYE_SUMMARY_SELECT }, par: { select: EMPLOYE_SUMMARY_SELECT } },
+      },
     },
   });
   if (!commande) throw new HttpError(404, "Commande introuvable.");
@@ -278,7 +351,7 @@ router.get("/:id", async (req, res) => {
     commande.prixTotal,
     commande.paiements.filter((p) => !p.annuleAt),
   );
-  res.json({ ...commande, totalPaye, solde, statutPaiement: statutPaiement(commande.prixTotal, totalPaye) });
+  res.json({ ...commande, enRetard: estEnRetard(commande), totalPaye, solde, statutPaiement: statutPaiement(commande.prixTotal, totalPaye) });
 });
 
 // GET /api/commandes/:id/fiche-pdf — fiche commande à jour (PDF), à partager
@@ -286,7 +359,7 @@ router.get("/:id", async (req, res) => {
 // (recus.routes.js) : ce document n'est jamais persisté et recalcule le
 // solde/statut en direct à chaque appel, contrairement au Reçu qui est un
 // instantané figé (voir commentaire dans recus.routes.js).
-router.get("/:id/fiche-pdf", async (req, res) => {
+router.get("/:id/fiche-pdf", requirePermission("commandes.lire"), async (req, res) => {
   const commande = await prisma.commande.findFirst({
     where: { id: req.params.id, atelierId: req.user.atelierId },
     include: {
@@ -303,11 +376,11 @@ router.get("/:id/fiche-pdf", async (req, res) => {
   // 8 (multi-tenant), voir requireAtelier : req.user.atelierId == commande.atelierId ici.
   const atelier = await prisma.atelier.findUnique({ where: { id: req.user.atelierId } });
 
-  streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde });
+  streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde, avecMontants: peutVoirFinances(req.user), langue: langueDemandee(req) });
 });
 
 // PATCH /api/commandes/:id — modification partielle des champs non financiers/non système
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", requirePermission("commandes.ecrire"), async (req, res) => {
   const parsed = updateCommandeSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
@@ -342,13 +415,56 @@ router.patch("/:id", async (req, res) => {
   res.json(commande);
 });
 
+// PUT /api/commandes/:id/affectation — confie la commande à un employé actif de l'atelier (ou au PDG), ou la retire
+// (employeId: null). Seules les commandes ouvertes se réaffectent. Répéter la même affectation ne change rien.
+// L'affectation organise le travail : elle ne donne aucun droit supplémentaire à l'employé concerné.
+router.put("/:id/affectation", requirePermission("commandes.affecter"), async (req, res) => {
+  const parsed = affectationSchema.safeParse(req.body);
+  if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
+  const { employeId } = parsed.data;
+  const { id } = req.params;
+  const { atelierId } = req.user;
+  const RESUME = { id: true, assigneAId: true, assigneLe: true, assigneA: { select: EMPLOYE_SUMMARY_SELECT } };
+
+  const commande = await prisma.commande.findFirst({ where: { id, atelierId }, select: { statut: true, assigneAId: true } });
+  if (!commande) throw new HttpError(404, "Commande introuvable.");
+  if (!estAffectable(commande.statut)) {
+    throw new HttpError(409, "Cette commande est livrée ou annulée : elle ne peut plus être affectée.", { statut: commande.statut });
+  }
+  if (employeId) {
+    // Même atelier, compte actif, rôle ADMIN ou EMPLOYE : jamais une cliente, jamais un autre atelier.
+    const cible = await prisma.user.findFirst({
+      where: { id: employeId, atelierId, actif: true, role: { in: ["ADMIN", "EMPLOYE"] } },
+      select: { id: true },
+    });
+    if (!cible) throw new HttpError(404, "Employé introuvable ou désactivé.");
+  }
+  if ((commande.assigneAId ?? null) === employeId) {
+    const inchangee = await prisma.commande.findUnique({ where: { id }, select: RESUME });
+    return res.json({ ...inchangee, dejaTraite: true });
+  }
+
+  const misAJour = await prisma.$transaction(async (tx) => {
+    // Compare-and-swap : l'affectation n'est changée que si personne d'autre ne l'a modifiée entre-temps.
+    const r = await tx.commande.updateMany({
+      where: { id, atelierId, statut: { in: STATUTS_OUVERTS }, assigneAId: commande.assigneAId },
+      data: { assigneAId: employeId, assigneLe: employeId ? new Date() : null },
+    });
+    if (r.count === 0) throw new HttpError(409, "L'affectation a changé entre-temps, réessayez.");
+    await tx.affectationCommande.create({ data: { atelierId, commandeId: id, employeId, parId: req.user.id } });
+    return tx.commande.findUnique({ where: { id }, select: RESUME });
+  });
+  res.json({ ...misAJour, dejaTraite: false });
+});
+
 // POST /api/commandes/:id/statut — changement de statut via la machine à états dédiée
-router.post("/:id/statut", async (req, res) => {
+// Faire avancer une commande : « commandes.statut » (couturier) ou « commandes.ecrire ».
+router.post("/:id/statut", requireUnePermission("commandes.statut", "commandes.ecrire"), idempotence, async (req, res) => {
   const parsed = changeStatutSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
-  const { statut: nextStatut } = parsed.data;
+  const { statut: nextStatut, statutAttendu } = parsed.data;
   const { id } = req.params;
 
   // LIVREE est un cas à part : cette route ne fait QUE changer le champ
@@ -373,6 +489,15 @@ router.post("/:id/statut", async (req, res) => {
   });
   if (!current) throw new HttpError(404, "Commande introuvable.");
 
+  // Écriture rejouée après un passage hors ligne : on n'applique que sur l'état que l'utilisateur voyait.
+  if (statutAttendu !== undefined && statutAttendu !== current.statut) {
+    throw new HttpError(409, `Le statut de la commande a changé entre-temps (${current.statut}).`, {
+      code: "STATUT_CHANGE",
+      statutActuel: current.statut,
+      statutAttendu,
+    });
+  }
+
   const allowed = STATUT_TRANSITIONS[current.statut] ?? [];
   if (!allowed.includes(nextStatut)) {
     throw new HttpError(409, `Transition de statut invalide : ${current.statut} → ${nextStatut}.`, {
@@ -384,25 +509,31 @@ router.post("/:id/statut", async (req, res) => {
   // Compare-and-swap atomique : si le statut a changé entre la lecture et
   // l'écriture (course concurrente), count=0 -> conflit propre plutôt qu'une
   // transition appliquée sur un état qui n'est plus le bon.
-  const result = await prisma.commande.updateMany({
-    where: { id, atelierId: req.user.atelierId, statut: current.statut },
-    data: { statut: nextStatut },
-  });
-  if (result.count === 0) {
-    throw new HttpError(409, "Le statut de la commande a changé entre-temps, réessayez.");
-  }
+  // Le changement de statut et l'événement client qui le décrit sont écrits dans la MÊME transaction
+  // (comme la création de commande, le paiement, la livraison et le reçu) : si l'événement ne peut pas
+  // être écrit, le statut n'est pas modifié. Avant, un échec entre les deux laissait un statut changé
+  // sans événement pour la cliente (anomalie 8).
+  const commande = await prisma.$transaction(
+    async (tx) => {
+      const result = await tx.commande.updateMany({
+        where: { id, atelierId: req.user.atelierId, statut: current.statut },
+        data: { statut: nextStatut },
+      });
+      if (result.count === 0) {
+        throw new HttpError(409, "Le statut de la commande a changé entre-temps, réessayez.");
+      }
 
-  await creerNotificationClient(prisma, {
-    clienteId: current.clienteId,
-    commandeId: id,
-    type: nextStatut === "ANNULEE" ? "COMMANDE_ANNULEE" : "COMMANDE_STATUT_CHANGE",
-    message:
-      nextStatut === "ANNULEE"
-        ? `Votre commande ${current.numero} a été annulée.`
-        : `Votre commande ${current.numero} est maintenant : ${STATUT_COMMANDE_LABELS[nextStatut] ?? nextStatut}.`,
-  });
+      await creerNotificationClient(tx, {
+        clienteId: current.clienteId,
+        commandeId: id,
+        type: nextStatut === "ANNULEE" ? "COMMANDE_ANNULEE" : "COMMANDE_STATUT_CHANGE",
+        params: { numero: current.numero, statut: nextStatut },
+      });
 
-  const commande = await prisma.commande.findUnique({ where: { id } });
+      return tx.commande.findUnique({ where: { id } });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
   res.json(commande);
 });
 

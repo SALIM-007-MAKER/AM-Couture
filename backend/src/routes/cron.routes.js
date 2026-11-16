@@ -1,8 +1,17 @@
+import { log, messageErreur } from "../lib/logger.js";
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { reconcilierNotifications } from "../lib/notifications.js";
 import { envoyerEmail } from "../lib/resend.js";
+import { origineApplication } from "../lib/appUrl.js";
 import { rappelsQuotidiensTemplate } from "../lib/emailTemplates.js";
+import { UTILISATEURS_RESUME_QUOTIDIEN } from "../lib/rappelsQuotidiens.js";
+import { purgerJournalSecurite } from "../lib/securityLog.js";
+import { purgerClesIdempotence } from "../lib/idempotence.js";
+import { purgerDemandesPubliques } from "../lib/demandesPubliques.js";
+import { envoyerRappelsAbonnement } from "../lib/rappelsAbonnement.js";
+import { rattraperTransactionsWave } from "../lib/paiementEnLigne.js";
+import { paiementWaveActif } from "../lib/wave.js";
 
 const router = Router();
 
@@ -11,6 +20,8 @@ const LIBELLES = {
   PRET: "Commande(s) prête(s) à récupérer",
   LIVRAISON_PROCHE: "Livraison(s) prévue(s) sous 3 jours",
   IMPAYE: "Commande(s) impayée(s)",
+  STOCK_BAS: "Article(s) en stock bas",
+  ACHAT_EN_RETARD: "Achat(s) en retard de livraison",
 };
 
 // GET /api/cron/rappels-quotidiens — appelée par Vercel Cron (voir vercel.json),
@@ -32,51 +43,100 @@ router.get("/rappels-quotidiens", async (req, res) => {
     return res.status(401).json({ error: "Non autorisé." });
   }
 
-  const origin = `${req.protocol}://${req.get("host")}`;
+  // Conservation limitée du journal de sécurité (IP = donnée personnelle) —
+  // un échec de purge ne doit jamais empêcher l'envoi des rappels.
+  const journalPurge = await purgerJournalSecurite().catch((err) => {
+    log.error("erreur", { categorie: "cron", operation: "purge_journal_securite", message: messageErreur(err) });
+    return null;
+  });
+
+  // Clés d'idempotence expirées (durée de vie 24 h) : même principe, un échec ne bloque pas les rappels.
+  const clesPurgees = await purgerClesIdempotence().catch((err) => {
+    log.error("erreur", { categorie: "cron", operation: "purge_cles_idempotence", message: messageErreur(err) });
+    return null;
+  });
+
+  // Demandes de la vitrine sans suite : données personnelles de visiteurs, conservation limitée (voir lib/demandesPubliques.js).
+  const demandesPurgees = await purgerDemandesPubliques(prisma).catch((err) => {
+    log.error("erreur", { categorie: "cron", operation: "purge_demandes_publiques", message: messageErreur(err) });
+    return null;
+  });
+
+  const origin = origineApplication(req);
   const ateliers = await prisma.atelier.findMany({
     where: { actif: true },
     select: {
       id: true,
-      users: { where: { email: { not: null } }, select: { email: true, prenom: true } },
+      users: { where: UTILISATEURS_RESUME_QUOTIDIEN, select: { email: true, prenom: true } },
     },
   });
 
   let emailsEnvoyes = 0;
   const erreurs = [];
 
+  // Un atelier en erreur (supprimé pendant la tâche, donnée incohérente…) ne doit pas empêcher le résumé des autres : l'erreur est
+  // consignée dans le compte rendu et la tâche continue.
   for (const atelier of ateliers) {
     if (atelier.users.length === 0) continue;
+    try {
+      await reconcilierNotifications(prisma, atelier.id);
 
-    await reconcilierNotifications(prisma, atelier.id);
+      const comptes = await prisma.notification.groupBy({
+        by: ["type"],
+        // Hors travail confié à un employé (TACHE_AFFECTEE, destinataireId renseigné) : il ne concerne pas le PDG.
+        where: { lu: false, atelierId: atelier.id, destinataireId: null },
+        _count: true,
+      });
+      const total = comptes.reduce((acc, c) => acc + c._count, 0);
+      if (total === 0) continue;
 
-    const comptes = await prisma.notification.groupBy({
-      by: ["type"],
-      where: { lu: false, commande: { atelierId: atelier.id } },
-      _count: true,
-    });
-    const total = comptes.reduce((acc, c) => acc + c._count, 0);
-    if (total === 0) continue;
+      const lignes = Object.entries(LIBELLES).map(([type, label]) => ({
+        label,
+        nombre: comptes.find((c) => c.type === type)?._count ?? 0,
+      }));
 
-    const lignes = Object.entries(LIBELLES).map(([type, label]) => ({
-      label,
-      nombre: comptes.find((c) => c.type === type)?._count ?? 0,
-    }));
-
-    for (const user of atelier.users) {
-      try {
-        await envoyerEmail({
-          to: user.email,
-          subject: "Gestion d'Atelier — vos rappels du jour",
-          html: rappelsQuotidiensTemplate({ prenom: user.prenom, lignes, lienNotifications: `${origin}/notifications` }),
-        });
-        emailsEnvoyes += 1;
-      } catch (err) {
-        erreurs.push({ atelierId: atelier.id, email: user.email, message: err.message });
+      for (const user of atelier.users) {
+        try {
+          await envoyerEmail({
+            to: user.email,
+            subject: "Gestion d'Atelier — vos rappels du jour",
+            html: rappelsQuotidiensTemplate({ prenom: user.prenom, lignes, lienNotifications: `${origin}/notifications` }),
+          });
+          emailsEnvoyes += 1;
+        } catch (err) {
+          erreurs.push({ atelierId: atelier.id, email: user.email, message: err.message });
+        }
       }
+    } catch (err) {
+      log.error("erreur", { categorie: "cron", operation: "resume_quotidien", atelierId: atelier.id, message: messageErreur(err) });
+      erreurs.push({ atelierId: atelier.id, email: null, message: "Traitement de l'atelier en échec." });
     }
   }
 
-  res.json({ ateliersTraites: ateliers.length, emailsEnvoyes, erreurs });
+  // Rappels d'abonnement (fin d'essai, échéance) : un échec ici ne doit pas masquer le reste du compte rendu.
+  const rappelsAbonnement = await envoyerRappelsAbonnement({ prisma, envoyer: envoyerEmail, origine: origin }).catch((err) => {
+    log.error("erreur", { categorie: "cron", operation: "rappels_abonnement", message: messageErreur(err) });
+    return null;
+  });
+
+  // Rattrapage des paiements Wave restés en attente (seulement si Wave est activé).
+  const rattrapageWave = paiementWaveActif()
+    ? await rattraperTransactionsWave(prisma).catch((err) => {
+        log.error("erreur", { categorie: "cron", operation: "rattrapage_wave", message: messageErreur(err) });
+        return null;
+      })
+    : null;
+
+  res.json({
+    ateliersTraites: ateliers.length,
+    emailsEnvoyes,
+    erreurs,
+    journalSecuritePurge: journalPurge,
+    clesIdempotencePurgees: clesPurgees,
+    demandesPubliquesPurgees: demandesPurgees,
+    rappelsAbonnement,
+    rattrapageWave,
+  });
 });
 
 export default router;

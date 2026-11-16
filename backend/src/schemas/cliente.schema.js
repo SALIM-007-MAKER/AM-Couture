@@ -74,6 +74,8 @@ export const updateClienteSchema = z
 export const listClientesQuerySchema = z.object({
   q: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(120).optional()),
   archived: z.enum(["true", "false", "all"]).optional().default("false"),
+  // Effacement demandé par la cliente, pas encore traité par l'atelier (7.4).
+  effacement: z.enum(["true"]).optional(),
   page: z.coerce.number().int().min(1).optional().default(1),
   pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
 });

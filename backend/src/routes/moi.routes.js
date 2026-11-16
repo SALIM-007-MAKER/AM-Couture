@@ -12,6 +12,12 @@ import { RECU_INCLUDE } from "../lib/recuInclude.js";
 import { streamRecuPdf } from "../lib/recuPdf.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { nextNumero } from "../lib/numero.js";
+import bcrypt from "bcryptjs";
+import { exporterDonnees } from "../lib/donneesCliente.js";
+import { rateLimitPersistant } from "../lib/rateLimiter.js";
+import { journaliserSecurite } from "../lib/securityLog.js";
+import { clearAuthCookie } from "../lib/authCookie.js";
+import { rendreNotification, langueDemandee } from "../lib/messagesServeur.js";
 
 // Espace client final (§ plan rôle USER, Phase 3) — un USER voit UNIQUEMENT
 // ses propres données. RÈGLE ABSOLUE, répétée sur chaque route ci-dessous :
@@ -178,7 +184,7 @@ router.get("/notifications", async (req, res) => {
       createdAt: n.createdAt,
       lu: n.lu,
       source: "evenement",
-      message: n.message,
+      message: rendreNotification(n, req.user.langue),
       commande: n.commande,
       canMarkLu: true,
     })),
@@ -325,7 +331,40 @@ router.get("/recus/:id/pdf", async (req, res) => {
   const cliente = await prisma.cliente.findUnique({ where: { id: req.user.clienteId }, select: { atelierId: true } });
   const atelier = await prisma.atelier.findUnique({ where: { id: cliente.atelierId } });
 
-  streamRecuPdf(res, { recu, atelier });
+  streamRecuPdf(res, { recu, atelier, langue: langueDemandee(req) });
+});
+
+// GET /api/moi/export — « télécharger mes données » : tout ce que l'atelier détient sur ELLE (profil, mesures, commandes avec
+// paiements et livraisons, reçus, demandes, fil d'activité), en JSON lisible. Toujours filtré par le clienteId du jeton.
+const limiteExport = rateLimitPersistant({ prefixe: "moi-export", limite: 10, fenetreMs: 60 * 60_000, message: "Trop d'exports demandés. Réessayez plus tard." });
+router.get("/export", limiteExport, async (req, res) => {
+  const donnees = await exporterDonnees(prisma, req.user.clienteId);
+  if (!donnees) throw new HttpError(404, "Profil introuvable.");
+  res.setHeader("Content-Disposition", `attachment; filename="mes-donnees-${new Date().toISOString().slice(0, 10)}.json"`);
+  res.setHeader("Cache-Control", "no-store");
+  res.type("application/json").send(JSON.stringify(donnees, null, 2));
+});
+
+// POST /api/moi/suppression — « supprimer mon compte et mes données ». Le mot de passe est redemandé (une session volée ne
+// doit pas suffire). Effet immédiat : le compte de connexion est supprimé (la session s'arrête), la fiche est marquée
+// « effacement demandé ». L'atelier anonymise ensuite la fiche (POST /api/clientes/:id/anonymiser) : ses commandes et
+// paiements restent (obligation comptable) sans l'identité. Rien n'est supprimé de force côté atelier à son insu.
+const limiteSuppression = rateLimitPersistant({ prefixe: "moi-suppression", limite: 5, fenetreMs: 60 * 60_000 });
+router.post("/suppression", limiteSuppression, async (req, res) => {
+  const parsed = z.object({ motDePasse: z.string().min(1).max(200) }).strict().safeParse(req.body);
+  if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
+  const user = await prisma.user.findUnique({ where: { id: req.user.id }, select: { passwordHash: true } });
+  if (!user || !(await bcrypt.compare(parsed.data.motDePasse, user.passwordHash))) {
+    throw new HttpError(400, "Mot de passe incorrect.", { motDePasse: ["Mot de passe incorrect."] });
+  }
+  const cliente = await prisma.cliente.findUnique({ where: { id: req.user.clienteId }, select: { atelierId: true } });
+  await prisma.$transaction(async (tx) => {
+    await tx.cliente.update({ where: { id: req.user.clienteId }, data: { suppressionDemandeeLe: new Date() } });
+    await tx.user.delete({ where: { id: req.user.id } }); // Cliente.userId passe à null (SetNull), jetons supprimés (Cascade)
+  });
+  await journaliserSecurite("COMPTE_CLIENT_SUPPRIME", { req, userId: req.user.id, atelierId: cliente?.atelierId, details: { clienteId: req.user.clienteId } });
+  clearAuthCookie(res);
+  res.json({ ok: true });
 });
 
 export default router;

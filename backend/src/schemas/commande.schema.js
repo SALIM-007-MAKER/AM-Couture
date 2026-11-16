@@ -117,15 +117,25 @@ export const updateCommandeSchema = z
   .strict()
   .refine((data) => Object.keys(data).length > 0, { message: "Aucune donnée à modifier." });
 
-export const changeStatutSchema = z.object({ statut: z.enum(STATUTS_COMMANDE) }).strict();
+// `statutAttendu` : garde facultative des écritures rejouées hors ligne (7.6) — le statut que l utilisateur VOYAIT en décidant.
+// S il a changé entre-temps, la transition est refusée (409) au lieu d être appliquée sur un état que personne n a vu.
+export const changeStatutSchema = z.object({ statut: z.enum(STATUTS_COMMANDE), statutAttendu: z.enum(STATUTS_COMMANDE).optional() }).strict();
 
 export const listCommandesQuerySchema = z.object({
   q: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(120).optional()),
   statut: z.preprocess(emptyToUndefined, z.enum(STATUTS_COMMANDE).optional()),
   priorite: z.preprocess(emptyToUndefined, z.enum(PRIORITES).optional()),
   clienteId: z.preprocess(emptyToUndefined, z.string().trim().min(1).optional()),
+  // Production : « moi » (mes travaux), « aucun » (non affectées) ou l'identifiant d'un employé ; enRetard=true.
+  assigneA: z.preprocess(emptyToUndefined, z.string().trim().min(1).optional()),
+  enRetard: z.preprocess(emptyToUndefined, z.enum(["true", "false"]).optional()),
   livraisonDu: z.preprocess(emptyToUndefined, dateField.optional()),
   livraisonAu: z.preprocess(emptyToUndefined, dateField.optional()),
   page: z.coerce.number().int().min(1).optional().default(1),
   pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
+
+// Affectation : un employé (ou le PDG) à qui confier la commande, ou null pour la retirer.
+export const affectationSchema = z
+  .object({ employeId: z.union([z.string().trim().min(1, "Identifiant requis."), z.null()]) })
+  .strict();

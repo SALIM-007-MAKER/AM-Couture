@@ -1,11 +1,15 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { idempotence } from "../lib/idempotence.js";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth, requireSuperadmin } from "../middlewares/auth.middleware.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { formatZodError } from "../lib/validation.js";
 import { nextNumero } from "../lib/numero.js";
 import { activerAbonnementSchema, modifierAbonnementSchema, noteSchema } from "../schemas/abonnement.schema.js";
+import { suspensionSchema } from "../schemas/abonnementPaiement.schema.js";
+import { suspendreAbonnement, reactiverAbonnement } from "../lib/souscription.js";
+import { journaliserSecurite } from "../lib/securityLog.js";
 import { calculerDateExpiration, etatAbonnementAtelier, statutEffectif, prixPourDuree } from "../lib/abonnement.js";
 
 // Gestion MANUELLE de l'abonnement d'un atelier par le SUPERADMIN (§
@@ -111,7 +115,7 @@ router.get("/:atelierId/abonnement", async (req, res) => {
 // début future donne un abonnement "En attente d'activation" jusqu'à cette
 // date. Le prix est figé à l'activation : prix mensuel × durée, avec la remise
 // de la durée si elle fait partie des durées proposées du plan (prixPourDuree).
-router.post("/:atelierId/abonnement/activer", async (req, res) => {
+router.post("/:atelierId/abonnement/activer", idempotence, async (req, res) => {
   const parsed = activerAbonnementSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   const { planId, note } = parsed.data;
@@ -227,5 +231,37 @@ router.post("/:atelierId/abonnement/:abonnementId/desactiver", async (req, res) 
   });
   res.json(serialiser(maj));
 });
+
+// POST .../suspendre { note } — pause décidée par la plateforme : l'abonnement ne donne plus accès (lecture seule
+// immédiate, sans période de grâce) mais garde ses dates. Réversible par .../reactiver.
+async function changerSuspension(req, res, { evenement, appliquer }) {
+  const parsed = suspensionSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
+  const { abonnement, deja } = await prisma.$transaction((tx) =>
+    appliquer(tx, {
+      atelierId: req.params.atelierId,
+      abonnementId: req.params.abonnementId,
+      par: req.user.identifiant,
+      note: parsed.data.note,
+    }),
+  );
+  if (!deja) {
+    await journaliserSecurite(evenement, {
+      req,
+      userId: req.user.id,
+      atelierId: req.params.atelierId,
+      details: { prefixe: abonnement.numero },
+    });
+  }
+  res.json(serialiser(abonnement));
+}
+
+router.post("/:atelierId/abonnement/:abonnementId/suspendre", (req, res) =>
+  changerSuspension(req, res, { evenement: "ABONNEMENT_SUSPENDU", appliquer: suspendreAbonnement }),
+);
+
+router.post("/:atelierId/abonnement/:abonnementId/reactiver", (req, res) =>
+  changerSuspension(req, res, { evenement: "ABONNEMENT_REACTIVE", appliquer: reactiverAbonnement }),
+);
 
 export default router;

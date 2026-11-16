@@ -3,6 +3,10 @@ import { ApiError } from "./apiError.js";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
+    // Une écriture faite sans réseau doit ÉCHOUER tout de suite, avec un message. Par défaut TanStack la mettrait en
+    // attente et la rejouerait au retour du réseau : un paiement ou un changement de statut partirait alors à l'insu de
+    // l'utilisateur. Les écritures hors ligne sûres, avec leurs règles de conflit, sont une étape à part (7.6).
+    mutations: { networkMode: "always" },
     queries: {
       staleTime: 30_000,
       // Une erreur 4xx (400-499 : 404 "introuvable", 400 "invalide", 401,

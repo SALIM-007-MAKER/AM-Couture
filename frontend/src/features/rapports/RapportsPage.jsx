@@ -1,3 +1,4 @@
+import { useCan } from "../../hooks/usePermissions.js";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -367,6 +368,9 @@ function ModelesStatsSection({ period }) {
 }
 
 export default function RapportsPage() {
+  const can = useCan();
+  const voirFinances = can("finances.voir");
+  const peutAvances = can("rapports.avances");
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const period = {
@@ -392,15 +396,26 @@ export default function RapportsPage() {
         actions={<PeriodSelector value={period} onChange={handlePeriodChange} />}
       />
 
-      <div className="space-y-3">
-        <SectionTitle icon={Wallet}>{t("rapports.finances")}</SectionTitle>
-        <FinancesSection period={period} />
-      </div>
+      {peutAvances && (
+        <Link to="/rapports/avances" data-testid="lien-rapports-avances" className="inline-flex items-center gap-1 text-sm underline">
+          <BarChart3 className="size-4" aria-hidden="true" />
+          {t("ra.lien")}
+        </Link>
+      )}
 
-      <div className="space-y-3">
-        <SectionTitle icon={TrendingUp}>{t("rapports.evolution")}</SectionTitle>
-        <EvolutionSection />
-      </div>
+      {voirFinances && (
+        <div className="space-y-3">
+          <SectionTitle icon={Wallet}>{t("rapports.finances")}</SectionTitle>
+          <FinancesSection period={period} />
+        </div>
+      )}
+
+      {voirFinances && (
+        <div className="space-y-3">
+          <SectionTitle icon={TrendingUp}>{t("rapports.evolution")}</SectionTitle>
+          <EvolutionSection />
+        </div>
+      )}
 
       <div className="space-y-3">
         <SectionTitle icon={ClipboardList}>{t("rapports.commandes")}</SectionTitle>

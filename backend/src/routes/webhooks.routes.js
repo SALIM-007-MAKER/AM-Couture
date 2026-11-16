@@ -1,31 +1,31 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
-import { verifierSignatureWebhook, recupererSession } from "../lib/wave.js";
-import { activerAbonnement } from "../lib/abonnement.js";
+import { log, messageErreur } from "../lib/logger.js";
+import { verifierSignatureWebhook, paiementWaveActif, ErreurWave } from "../lib/wave.js";
+import { traiterEvenementWave } from "../lib/paiementEnLigne.js";
 
-// PAS de requireAuth sur ce routeur : Wave appelle cette route directement,
-// sans cookie de session. La confiance vient EXCLUSIVEMENT de la signature
-// HMAC (voir lib/wave.js) — jamais d'exception "on fait confiance quand
-// même" si le secret n'est pas configuré ou si la signature ne correspond
-// pas.
+// PAS de requireAuth ni de cookie : Wave appelle cette route directement. La confiance vient EXCLUSIVEMENT de la
+// signature HMAC (lib/wave.js), jamais d'une exception « on fait confiance quand même » si le secret est absent
+// ou si la signature ne correspond pas. Même avec une signature valide, le contenu n'est qu'un déclencheur : l'état
+// du paiement est relu chez Wave (lib/paiementEnLigne.js).
 const router = Router();
 
-// POST /api/webhooks/wave — voir docs.wave.com (checkout.session.completed).
+// POST /api/webhooks/wave — événements Wave (docs.wave.com/webhook) :
+//   checkout.session.completed       → relecture de la session, confirmation si tout concorde
+//   checkout.session.payment_failed  → tracé, sans conclure (la session reste ouverte jusqu'à son expiration)
+// Autres types : accusé de réception sans effet.
+//
+// Codes de réponse : 200 = événement pris en compte (ou sans objet) ; 401 = signature invalide ; 503 = on ne peut
+// pas conclure maintenant (Wave injoignable, paiement Wave non activé) — Wave réessaie alors pendant 3 jours.
 router.post("/wave", async (req, res) => {
-  const secret = process.env.WAVE_WEBHOOK_SECRET;
-  if (!secret) {
-    // Aucun secret configuré : impossible de vérifier quoi que ce soit —
-    // on refuse, jamais de confirmation "en confiance" en son absence.
-    return res.status(503).json({ error: "Webhook Wave non configuré." });
+  // Fonction désactivée : aucune exception, aucun traitement.
+  if (!paiementWaveActif()) {
+    return res.status(503).json({ error: "Paiement Wave non activé." });
   }
+  const secret = process.env.WAVE_WEBHOOK_SECRET;
 
-  // req.rawBody : Buffer brut capturé par express.json({ verify }) dans
-  // app.js — la signature Wave porte sur les octets exacts reçus, jamais
-  // sur une reconstruction JSON.stringify(req.body) qui pourrait différer
-  // (ordre des clés, espaces...).
-  const signatureHeader = req.get("Wave-Signature");
-  const signatureValide = verifierSignatureWebhook(req.rawBody, signatureHeader, secret);
-  if (!signatureValide) {
+  // req.rawBody : octets exacts reçus (voir app.js). La signature porte sur eux, pas sur un JSON reconstruit.
+  if (!req.rawBody || !verifierSignatureWebhook(req.rawBody, req.get("Wave-Signature"), secret)) {
     return res.status(401).json({ error: "Signature invalide." });
   }
 
@@ -36,83 +36,17 @@ router.post("/wave", async (req, res) => {
     return res.status(400).json({ error: "Corps invalide." });
   }
 
-  // Répondre 200 rapidement pour tout type d'événement qu'on ne traite pas
-  // encore — Wave réessaie jusqu'à 3 jours sur un code hors 2xx, inutile de
-  // déclencher des retries pour un événement qu'on ignore volontairement.
-  if (event.type !== "checkout.session.completed") {
-    return res.status(200).json({ received: true });
-  }
-
-  const referenceInterne = event.data?.client_reference;
-  if (!referenceInterne) {
-    return res.status(200).json({ received: true });
-  }
-
-  const transaction = await prisma.transaction.findUnique({
-    where: { referenceInterne },
-    include: { abonnement: { include: { formule: true } } },
-  });
-  // Transaction inconnue ou pas la nôtre (moyenPaiement autre que WAVE,
-  // improbable mais vérifié) : rien à faire, on accuse quand même réception.
-  if (!transaction || transaction.moyenPaiement !== "WAVE") {
-    return res.status(200).json({ received: true });
-  }
-
-  // Idempotence : un webhook rejoué sur une transaction déjà tranchée ne
-  // refait rien — jamais de double activation ni de double comptage, quel
-  // que soit le nombre de fois où Wave renvoie cet événement.
-  if (transaction.statut !== "EN_ATTENTE") {
-    return res.status(200).json({ received: true });
-  }
-
-  // Défense en profondeur : on ne confirme JAMAIS un paiement sur la seule
-  // foi du contenu du webhook, même signé — seule une relecture
-  // AUTHENTIFIÉE de la session directement chez Wave fait foi ici (voir
-  // consigne : "aucun paiement confirmé sans vérification fiable").
-  let session;
   try {
-    session = await recupererSession(event.data.id);
+    await traiterEvenementWave(prisma, event);
   } catch (err) {
-    // Échec de LA RELECTURE (panne réseau/API Wave), pas du webhook lui-même
-    // — on log pour investigation et on répond 200 : renvoyer une erreur ici
-    // ferait réessayer Wave indéfiniment pour un problème qui nous est
-    // propre, sans jamais le résoudre. Le webhook suivant (ou une
-    // vérification manuelle) pourra retrancher plus tard.
-    console.error("Webhook Wave : échec de la relecture de session", err);
-    return res.status(200).json({ received: true });
-  }
-
-  // Vérification de cohérence supplémentaire (référence + montant) avant de
-  // confirmer quoi que ce soit — appartient à la même logique de défense en
-  // profondeur que la relecture elle-même.
-  const coherent =
-    session.client_reference === referenceInterne && Number(session.amount) === Number(transaction.montant);
-  const reussi = coherent && session.checkout_status === "complete" && session.payment_status === "succeeded";
-  // Distingue "expirée" (fenêtre de paiement dépassée sans action) de
-  // "annulée" (l'atelier a fermé/refusé le paiement) de "échouée" (tout
-  // autre refus, ex: fonds insuffisants côté Wave) — même statut cohérent
-  // que la relecture manuelle (voir statuts_transaction_etendus, schema.prisma).
-  const statutFinal = reussi
-    ? "REUSSIE"
-    : session.checkout_status === "expired"
-      ? "EXPIREE"
-      : session.payment_status === "cancelled"
-        ? "ANNULEE"
-        : "EN_ATTENTE";
-
-  await prisma.$transaction(async (tx) => {
-    await tx.transaction.update({
-      where: { id: transaction.id },
-      data: { statut: statutFinal, donneesBrutesWebhook: event },
-    });
-    if (reussi) {
-      await activerAbonnement(tx, {
-        abonnementId: transaction.abonnementId,
-        dureeMois: transaction.abonnement.dureeMois ?? transaction.abonnement.formule?.dureeMois,
-      });
+    if (err instanceof ErreurWave) {
+      // Relecture impossible (panne chez Wave ou chez nous) : état INCONNU, on ne conclut rien et on demande une
+      // nouvelle livraison plutôt que de répondre 200 et d'oublier l'événement.
+      log.warn("abonnement", { evenement: "webhook_wave_relecture_echec", evenementId: event?.id, message: messageErreur(err) });
+      return res.status(503).json({ error: "Vérification auprès de Wave impossible pour le moment." });
     }
-  });
-
+    throw err;
+  }
   res.status(200).json({ received: true });
 });
 

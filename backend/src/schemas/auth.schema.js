@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { nouveauMotDePasseField } from "../lib/passwordPolicy.js";
 
 export const loginSchema = z.object({
   identifiant: z.string().trim().min(1, "Identifiant requis."),
@@ -19,5 +20,5 @@ export const motDePasseOublieSchema = z.object({
 // pas de userId dans le corps de la requête.
 export const reinitialiserMotDePasseTokenSchema = z.object({
   token: z.string().trim().min(1, "Jeton requis."),
-  nouveauMotDePasse: z.string().min(8, "8 caractères minimum."),
+  nouveauMotDePasse: nouveauMotDePasseField,
 });

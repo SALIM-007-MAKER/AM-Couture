@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Scissors, LayoutDashboard, Building2, CreditCard, Tag, UserCircle, Menu, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Scissors, LayoutDashboard, Building2, CreditCard, Tag, TrendingUp, Banknote, UserCircle, Menu, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { useUiStore } from "../stores/uiStore.js";
 import { useTranslation } from "../i18n/index.js";
@@ -19,7 +19,9 @@ import { useTranslation } from "../i18n/index.js";
 const NAV_ITEMS = [
   { labelKey: "sa.layout.overview", shortKey: "sa.layout.overviewShort", to: "/vue-ensemble", icon: LayoutDashboard, end: true },
   { labelKey: "sa.layout.workshops", shortKey: "sa.layout.workshopsShort", to: "/ateliers", icon: Building2 },
+  { labelKey: "sa.layout.commerce", shortKey: "sa.layout.commerceShort", to: "/commerce", icon: TrendingUp },
   { labelKey: "sa.layout.subscriptions", shortKey: "sa.layout.subscriptionsShort", to: "/gestion-abonnements", icon: CreditCard },
+  { labelKey: "sa.layout.payments", shortKey: "sa.layout.paymentsShort", to: "/paiements-abonnement", icon: Banknote },
   { labelKey: "sa.layout.pricing", shortKey: "sa.layout.pricingShort", to: "/tarifs-abonnement", icon: Tag },
   { labelKey: "nav.myAccount", shortKey: "sa.layout.accountShort", to: "/mon-compte", icon: UserCircle },
 ];

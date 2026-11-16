@@ -7,6 +7,7 @@ import { formatZodError } from "../lib/validation.js";
 import { changePasswordSchema, updateCompteSchema } from "../schemas/compte.schema.js";
 import { signAuthToken } from "../lib/jwt.js";
 import { setAuthCookie } from "../lib/authCookie.js";
+import { journaliserSecurite } from "../lib/securityLog.js";
 
 // "Mon compte" (Phase 6) — distinct de /api/parametres (profil ATELIER) :
 // ce module concerne uniquement le compte de connexion (identifiant unique
@@ -56,6 +57,7 @@ router.patch("/mot-de-passe", async (req, res) => {
   });
   const token = signAuthToken(userMaj);
   setAuthCookie(res, token);
+  await journaliserSecurite("MOT_DE_PASSE_CHANGE", { req, userId: user.id, atelierId: user.atelierId });
   res.status(204).end();
 });
 

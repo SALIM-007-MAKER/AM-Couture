@@ -1,9 +1,20 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import { errorMiddleware } from "./middlewares/error.middleware.js";
+import { securityHeaders, csrfOriginGuard } from "./middlewares/security.middleware.js";
+import { requestId } from "./middlewares/requestId.middleware.js";
+import { requestLog } from "./middlewares/requestLog.middleware.js";
+import { log, messageErreur } from "./lib/logger.js";
+import { installerGestionnairesProcessus } from "./lib/processHandlers.js";
+import { prisma } from "./lib/prisma.js";
 import authRouter from "./routes/auth.routes.js";
 import clientesRouter from "./routes/clientes.routes.js";
 import modelesRouter from "./routes/modeles.routes.js";
+import imagesRouter from "./routes/images.routes.js";
+import vitrineRouter from "./routes/vitrine.routes.js";
+import vitriniquePubliqueRouter from "./routes/vitrinePublique.routes.js";
+import fournisseursRouter from "./routes/fournisseurs.routes.js";
+import achatsRouter from "./routes/achats.routes.js";
 import commandesRouter from "./routes/commandes.routes.js";
 import { paiementsGlobalRouter } from "./routes/paiements.routes.js";
 import { livraisonsGlobalRouter } from "./routes/livraisons.routes.js";
@@ -23,17 +34,31 @@ import cronRouter from "./routes/cron.routes.js";
 import stockRouter from "./routes/stock.routes.js";
 import moiRouter from "./routes/moi.routes.js";
 import demandesRouter from "./routes/demandes.routes.js";
+import employesRouter from "./routes/employes.routes.js";
+import webhooksRouter from "./routes/webhooks.routes.js";
+import commerceRouter from "./routes/commerce.routes.js";
 
 // Pas de app.listen() ici : ce fichier est importé à la fois par
 // backend/src/server.js (dev local) et par api/index.js (Vercel Function).
 // Frontend et API partagent le même domaine en prod → pas de CORS nécessaire.
 // En dev, le proxy Vite (frontend/vite.config.js) joue ce rôle.
 
+// Journalise les rejets et exceptions non gérés (désactivé en test : le lanceur de tests a ses propres gestionnaires).
+if (process.env.NODE_ENV !== "test") installerGestionnairesProcessus();
+
 const app = express();
 
 // Vercel place l'app derrière un proxy : indispensable pour que req.ip
 // (rate limiting) et les cookies "secure" reflètent la vraie requête client.
 app.set("trust proxy", 1);
+app.disable("x-powered-by");
+
+// En-têtes de sécurité + garde Origin (CSRF) AVANT tout parsing de corps et tout
+// routeur — voir middlewares/security.middleware.js.
+// L'identifiant de requête vient en PREMIER : même une erreur d'analyse du corps en porte un.
+app.use(requestId);
+app.use(requestLog);
+app.use("/api", securityHeaders, csrfOriginGuard);
 
 // 5mb : les photos (modèles) et le logo de l'atelier sont uploadés en base64
 // dans le corps JSON (voir optionalImageField, zodHelpers.js) — une image de
@@ -57,6 +82,12 @@ app.use(cookieParser());
 app.use("/api/auth", authRouter);
 app.use("/api/clientes", clientesRouter);
 app.use("/api/modeles", modelesRouter);
+app.use("/api/images", imagesRouter);
+app.use("/api/vitrine", vitrineRouter);
+// Sans compte : lecture seule de la vitrine d'un atelier qui l'a activée (voir vitrinePublique.routes.js).
+app.use("/api/public", vitriniquePubliqueRouter);
+app.use("/api/fournisseurs", fournisseursRouter);
+app.use("/api/achats", achatsRouter);
 app.use("/api/commandes", commandesRouter);
 // Lecture seule, toutes commandes confondues — voir commentaire dans
 // paiements.routes.js / livraisons.routes.js. La création/annulation reste
@@ -72,6 +103,8 @@ app.use("/api/notifications", notificationsRouter);
 app.use("/api/compte", compteRouter);
 app.use("/api/abonnements", abonnementsRouter);
 app.use("/api/plans-abonnement", plansRouter);
+// Tableau de bord commercial : monté AVANT /api/plateforme, dont le routeur s'applique à tout son préfixe.
+app.use("/api/plateforme/commerce", commerceRouter);
 app.use("/api/plateforme", plateformeRouter);
 app.use("/api/stock", stockRouter);
 // Espace client final (§ plan rôle USER, Phase 3) — réservé aux comptes
@@ -79,11 +112,11 @@ app.use("/api/stock", stockRouter);
 app.use("/api/moi", moiRouter);
 // Gestion ADMIN des demandes de commande envoyées par des clients USER.
 app.use("/api/demandes", demandesRouter);
-// Pas de requireAuth : Wave appelle cette route directement (voir
-// webhooks.routes.js — confiance basée sur la signature HMAC, pas un cookie).
-// Webhooks de paiement (routes/webhooks.routes.js) : volontairement NON montés
-// tant qu'aucun paiement en ligne n'existe (abonnements activés
-// manuellement par le SUPERADMIN). À remonter ici avec l'intégration réelle.
+app.use("/api/employes", employesRouter);
+// Webhooks de paiement (routes/webhooks.routes.js) : pas de requireAuth, Wave appelle cette route directement ;
+// la confiance vient de la signature HMAC. Montés mais INERTES tant que le paiement Wave n'est pas activé
+// (WAVE_ENABLED=1 + clés) : la route répond alors 503 sans rien traiter.
+app.use("/api/webhooks", webhooksRouter);
 // Réservé SUPERADMIN (Phase 8 — multi-tenant) : gestion des ateliers/tenants.
 // Abonnement d'un atelier (activation manuelle) : monté AVANT ateliersRouter,
 // qui porte des routes /:id plus génériques.
@@ -94,8 +127,32 @@ app.use("/api/ateliers", ateliersRouter);
 // cron.routes.js).
 app.use("/api/cron", cronRouter);
 
+// Liveness : le processus répond. Volontairement indépendante de la base (un moniteur ne doit pas
+// redémarrer l'application parce que la base est momentanément indisponible).
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "gestion-atelier-api" });
+});
+
+// Readiness : l'application PEUT servir des requêtes, donc la base répond (SELECT 1, durée bornée).
+// 503 sinon. Aucun détail technique dans la réponse (ni adresse, ni message d'erreur de la base).
+const DELAI_READINESS_MS = 2500;
+app.get("/api/health/ready", async (req, res) => {
+  const debut = Date.now();
+  let minuterie;
+  try {
+    await Promise.race([
+      prisma.$queryRaw`SELECT 1`,
+      new Promise((_, rejeter) => {
+        minuterie = setTimeout(() => rejeter(new Error("délai de readiness dépassé")), DELAI_READINESS_MS);
+      }),
+    ]);
+    res.json({ status: "ok", db: "ok", latenceMs: Date.now() - debut });
+  } catch (err) {
+    log.warn("sante", { requestId: req.id, db: "indisponible", message: messageErreur(err) });
+    res.status(503).json({ status: "degraded", db: "indisponible" });
+  } finally {
+    clearTimeout(minuterie);
+  }
 });
 
 // Paiements/Livraisons/Reçus : toute ÉCRITURE (création, annulation) reste

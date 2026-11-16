@@ -18,3 +18,11 @@ export const contactSchema = z
       .transform((v) => (v ? v : null)),
   })
   .strict();
+
+export const journalSecuriteQuerySchema = z.object({
+  evenement: z.string().trim().max(60).optional(),
+  atelierId: z.string().trim().max(60).optional(),
+  userId: z.string().trim().max(60).optional(),
+  page: z.coerce.number().int().min(1).optional().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).optional().default(50),
+});

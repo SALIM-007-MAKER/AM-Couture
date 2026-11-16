@@ -1,11 +1,14 @@
 import { Router } from "express";
+import { langueDemandee } from "../lib/messagesServeur.js";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { nextNumero } from "../lib/numero.js";
+import { verrouillerCommande } from "../lib/verrous.js";
 import { streamRecuPdf } from "../lib/recuPdf.js";
 import { RECU_INCLUDE } from "../lib/recuInclude.js";
 import { createRecuSchema, listRecusQuerySchema, listRecusGlobalQuerySchema } from "../schemas/recu.schema.js";
@@ -47,6 +50,8 @@ recusCommandeRouter.post("/", async (req, res) => {
 
   const recu = await prisma.$transaction(
     async (tx) => {
+      // Même verrou que les paiements : le total « encaissé » du reçu correspond à un état réellement atteint.
+      await verrouillerCommande(tx, commandeId);
       const commande = await tx.commande.findUnique({
         where: { id: commandeId },
         select: { id: true, numero: true, clienteId: true },
@@ -80,7 +85,7 @@ recusCommandeRouter.post("/", async (req, res) => {
         clienteId: commande.clienteId,
         commandeId,
         type: "RECU_EMIS",
-        message: `Un reçu est disponible pour votre commande ${commande.numero}.`,
+        params: { numero: commande.numero },
       });
       return nouveauRecu;
     },
@@ -129,7 +134,8 @@ recusCommandeRouter.get("/", async (req, res) => {
 // ───────────────────────────────────────────────────────────────────────
 const router = Router();
 
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+// Un reçu porte des montants : consultation réservée à qui a « paiements.lire ».
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission("paiements.lire"), masquerFinancesSiNonAutorise);
 router.param("id", requireValidIdParam);
 
 // GET /api/recus — liste globale (tous reçus, toutes commandes confondues),
@@ -198,7 +204,7 @@ router.get("/:id/pdf", async (req, res) => {
   // déjà vérifié par le where ci-dessus.
   const atelier = await prisma.atelier.findUnique({ where: { id: req.user.atelierId } });
 
-  streamRecuPdf(res, { recu, atelier });
+  streamRecuPdf(res, { recu, atelier, langue: langueDemandee(req) });
 });
 
 // Volontairement aucune route PATCH ni DELETE : un reçu est un document

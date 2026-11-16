@@ -9,6 +9,7 @@ export default {
       ACTIF: "Actif",
       EXPIRE: "Expiré",
       EN_ATTENTE: "En attente d'activation",
+      SUSPENDU: "Suspendu",
       AUCUN: "Aucun abonnement",
     },
     plan: "Formule",

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { Scissors, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { useVerifierEmailMutation } from "../../hooks/useAuth.js";
-import { ApiError } from "../../lib/apiClient.js";
+import { messageUtilisateur } from "../../lib/errorMessage.js";
 import { useTranslation } from "../../i18n/index.js";
 
 // Page atteinte depuis le lien envoyé par email à l'inscription (voir POST
@@ -32,7 +32,7 @@ export default function VerifierEmailPage() {
   }, [token]);
 
   const messageErreur =
-    mutation.error instanceof ApiError ? mutation.error.message : t("ui.errorGeneric");
+    messageUtilisateur(mutation.error, t).message;
 
   return (
     <div className="dark min-h-svh relative flex items-center justify-center overflow-hidden bg-neutral-950 px-4 py-12">

@@ -8,9 +8,20 @@ const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   throw new Error("JWT_SECRET est manquant dans les variables d'environnement.");
 }
+// Un secret court se casse par force brute hors ligne à partir d'un seul cookie.
+// Refusé en production ; toléré en dev/test pour ne pas gêner les environnements jetables.
+if (process.env.NODE_ENV === "production" && JWT_SECRET.length < 32) {
+  throw new Error("JWT_SECRET trop court : 32 caractères minimum en production.");
+}
 
 // Durée alignée sur celle du cookie (voir authCookie.js).
 const EXPIRES_IN = "7d";
+// Une session d'impersonation donne les droits d'un ADMIN d'atelier : durée courte.
+export const IMPERSONATION_EXPIRES_IN = "2h";
+
+// Algorithme épinglé à la signature ET à la vérification : empêche toute
+// confusion d'algorithme (ex. jeton « none » ou RS256 forgé).
+const ALGORITHM = "HS256";
 
 // role/atelierId (Phase 8, multi-tenant) embarqués dans le token — évite une
 // requête DB supplémentaire à chaque requête juste pour savoir de quel
@@ -45,13 +56,13 @@ export function signAuthToken(user, { impersonatedBy } = {}) {
       ...(impersonatedBy ? { impersonatedBy } : {}),
     },
     JWT_SECRET,
-    { expiresIn: EXPIRES_IN },
+    { expiresIn: impersonatedBy ? IMPERSONATION_EXPIRES_IN : EXPIRES_IN, algorithm: ALGORITHM },
   );
 }
 
 export function verifyAuthToken(token) {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    return jwt.verify(token, JWT_SECRET, { algorithms: [ALGORITHM] });
   } catch {
     throw new HttpError(401, "Session invalide ou expirée.");
   }

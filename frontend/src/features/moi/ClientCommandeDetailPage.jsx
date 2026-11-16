@@ -11,6 +11,7 @@ import Button from "../../components/Button.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
 import CommandeStatutBadge from "../commandes/components/CommandeStatutBadge.jsx";
 import PaiementStatutBadge from "../commandes/components/PaiementStatutBadge.jsx";
+import EtapesCommande from "./EtapesCommande.jsx";
 import { useTranslation } from "../../i18n/index.js";
 import { useLocaleStore } from "../../stores/localeStore.js";
 
@@ -62,6 +63,10 @@ export default function ClientCommandeDetailPage() {
           </span>
         }
       />
+
+      <Card>
+        <EtapesCommande statut={commande.statut} />
+      </Card>
 
       <div className="space-y-2">
         <SectionTitle icon={Shirt}>{t("client.sectionDetails")}</SectionTitle>

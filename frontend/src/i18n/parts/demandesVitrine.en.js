@@ -1,0 +1,36 @@
+// English translations — order requests sent from the public storefront. Namespaces "dvit" (public form, seen by
+// visitors) and "dvitadm" (handling by the workshop).
+export default {
+  dvit: {
+    askGeneral: "Send an order request",
+    askModel: "Request this design",
+    title: "Your request",
+    intro: "Leave your details: the workshop will contact you to agree on measurements, price and timing. No payment is asked here.",
+    firstName: "First name",
+    lastName: "Last name",
+    phone: "Phone (WhatsApp preferred)",
+    message: "Your message (optional)",
+    messagePlaceholder: "Occasion, preferred fabric, wanted date…",
+    model: "Requested design: {{nom}}",
+    consent: "I agree that the workshop keeps my name and phone number to handle this request and contact me back. If nothing follows, this information is deleted automatically after 30 to 90 days.",
+    send: "Send my request",
+    sending: "Sending…",
+    cancel: "Cancel",
+    sentTitle: "Request sent",
+    sentText: "Thank you! The workshop will contact you soon on the number provided.",
+    close: "Close",
+    errorGeneric: "The request cannot be sent right now. Please try again in a moment.",
+    errorTooMany: "Too many requests sent. Try again later, or contact the workshop directly.",
+  },
+  dvitadm: {
+    settingLabel: "Receive online order requests",
+    settingHelp: "Storefront visitors can send you their name, phone number and a message (with their consent). You handle them in “Requests”. Requires the storefront to be enabled.",
+    badge: "Storefront",
+    visitor: "Storefront visitor (no client record yet)",
+    visitorHelp: "Create their client record to prepare an order. Their details will then move to the record and be erased from the request.",
+    createCard: "Create the client record",
+    existing: "The same phone number already existed: the existing record was used.",
+    needRight: "You are not allowed to create client records.",
+    retention: "If nothing follows, this request is erased automatically.",
+  },
+};

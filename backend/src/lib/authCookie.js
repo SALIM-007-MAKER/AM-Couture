@@ -16,8 +16,10 @@ function cookieOptions() {
   };
 }
 
-export function setAuthCookie(res, token) {
-  res.cookie(COOKIE_NAME, token, { ...cookieOptions(), maxAge: MAX_AGE_MS });
+const IMPERSONATION_MAX_AGE_MS = 2 * 60 * 60 * 1000; // aligné sur IMPERSONATION_EXPIRES_IN (jwt.js)
+
+export function setAuthCookie(res, token, { impersonation = false } = {}) {
+  res.cookie(COOKIE_NAME, token, { ...cookieOptions(), maxAge: impersonation ? IMPERSONATION_MAX_AGE_MS : MAX_AGE_MS });
 }
 
 export function clearAuthCookie(res) {

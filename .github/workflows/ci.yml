@@ -1,12 +1,26 @@
 name: CI
 
-# Vérifie automatiquement chaque push/PR sur main : lint, build frontend,
-# tests unitaires backend, tests d'intégration multi-tenant. Aucun secret
-# nécessaire nulle part dans ce workflow.
+# Vérifie automatiquement chaque push/PR sur main : lint, build frontend, tests unitaires (backend, frontend,
+# scripts de déploiement), tests d'intégration multi-tenant, cohérence schéma/migrations, et (non bloquant) tests
+# de bout en bout. Aucun secret nécessaire nulle part dans ce workflow.
+#
+# PORTE DE DÉPLOIEMENT : le job `ci-ok` (en bas) est LE contrôle à exiger dans la protection de branche de main.
+# Ce workflow ne peut pas, à lui seul, empêcher Vercel de déployer un push direct sur main : voir
+# docs/DEPLOIEMENT.md (« Porte de déploiement »).
 on:
   push:
     branches: [main]
   pull_request:
+
+# Le workflow ne fait que lire le dépôt.
+permissions:
+  contents: read
+
+# Un nouveau push sur la même branche annule l'exécution précédente (sauf sur main : chaque commit de main
+# garde sa vérification complète).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # Lint + build + tests UNITAIRES (sans base de données, voir
@@ -14,6 +28,7 @@ jobs:
   # jamais la base Neon partagée dev/prod.
   verifier:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +56,14 @@ jobs:
 
       - run: npm run build -w frontend
 
-      - run: npm test
+      - name: Tests unitaires backend
+        run: npm run test -w backend
+
+      - name: Tests unitaires frontend
+        run: npm run test -w frontend
+
+      - name: Tests de la politique de déploiement
+        run: node --test scripts/__tests__/*.test.mjs
 
   # Tests d'INTÉGRATION multi-tenant (isolation entre ateliers, IDOR, essai
   # gratuit, abonnement, impersonation — voir backend/src/integration-tests/)
@@ -51,6 +73,7 @@ jobs:
   # dédiée aux tests.
   tests-integration:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17
@@ -90,6 +113,106 @@ jobs:
           DATABASE_URL: postgresql://test:test@localhost:5432/gestion_atelier_test
           DIRECT_URL: postgresql://test:test@localhost:5432/gestion_atelier_test
 
+      # Le schéma Prisma doit correspondre EXACTEMENT à ce que produisent les migrations : sinon la base de
+      # production (migrée par les fichiers) diverge de ce que le code croit. Code de sortie 2 = écart détecté.
+      # Corriger en créant la migration manquante (`prisma migrate dev`), jamais en ignorant ce contrôle.
+      - name: Le schéma Prisma correspond aux migrations
+        run: npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/gestion_atelier_test
+          DIRECT_URL: postgresql://test:test@localhost:5432/gestion_atelier_test
+
       - run: npm run test:integration
         env:
           TEST_DATABASE_URL: postgresql://test:test@localhost:5432/gestion_atelier_test
+
+  # Tests de BOUT EN BOUT (navigateur réel → frontend → API → Postgres) : parcours SUPERADMIN, PDG, CLIENT,
+  # permissions et isolation entre ateliers (voir e2e/ et docs/TESTS.md). Base jetable du service ci-dessous ;
+  # son nom contient « e2e », exigé par e2e/seed.js qui VIDE la base à chaque exécution.
+  #
+  # NON BLOQUANT (continue-on-error) tant qu'il n'a pas tourné au moins une fois sur GitHub : il a été validé
+  # en local (Windows, Chrome du système), pas encore sur ce runner. À retirer après une première exécution verte,
+  # puis à ajouter aux vérifications obligatoires de la branche main.
+  tests-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: gestion_atelier_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd=pg_isready
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma generate --schema prisma/schema.prisma
+        env:
+          DIRECT_URL: postgresql://test:test@localhost:5432/gestion_atelier_e2e
+
+      - run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/gestion_atelier_e2e
+          DIRECT_URL: postgresql://test:test@localhost:5432/gestion_atelier_e2e
+
+      - run: npm run test:e2e
+        env:
+          E2E_DATABASE_URL: postgresql://test:test@localhost:5432/gestion_atelier_e2e
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-rapport
+          path: |
+            e2e-report/
+            e2e-resultats/
+          retention-days: 7
+
+  # Vulnérabilités connues des dépendances d'EXÉCUTION (sans les outils de développement). Non bloquant : un
+  # nouvel avis de sécurité peut apparaître sans qu'aucune ligne du dépôt n'ait changé, et ne doit pas empêcher
+  # de déployer un correctif sans rapport. Le résultat reste visible sur chaque exécution.
+  audit-dependances:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm audit --omit=dev --audit-level=high
+
+  # Résultat unique des contrôles OBLIGATOIRES (verifier + tests-integration). C'est ce nom, stable, à exiger
+  # dans la protection de branche de main : ajouter un job obligatoire plus tard ne demande alors que de
+  # l'ajouter à `needs` ici, sans retoucher les réglages GitHub. `if: always()` : sans lui, un job en échec
+  # ferait « sauter » celui-ci, et GitHub considère un contrôle sauté comme réussi.
+  # tests-e2e et audit-dependances n'en font volontairement pas partie (voir leurs commentaires).
+  ci-ok:
+    if: always()
+    needs: [verifier, tests-integration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Tous les contrôles obligatoires ont réussi
+        run: |
+          echo "verifier: ${{ needs.verifier.result }}"
+          echo "tests-integration: ${{ needs.tests-integration.result }}"
+          test "${{ needs.verifier.result }}" = "success" && test "${{ needs.tests-integration.result }}" = "success"

@@ -1,3 +1,4 @@
+import { traduire, normaliserLangue, libelleStatut, libelleVetement, LOCALE_DATES } from "./messagesServeur.js";
 import PDFDocument from "pdfkit";
 
 // Génération des PDF (Reçu, Fiche commande) — pdfkit uniquement (pur
@@ -14,30 +15,30 @@ const OR = "#B8912F";
 const SOMBRE = "#1A1A1A";
 const GRIS = "#4A4A4A";
 
-function formatDate(date) {
-  return new Date(date).toLocaleDateString("fr-FR", {
+export function formatDate(date, langue) {
+  return new Date(date).toLocaleDateString(LOCALE_DATES[normaliserLangue(langue)], {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 }
 
-function formatDateHeure(date) {
+function formatDateHeure(date, langue) {
   const d = new Date(date);
-  const jour = formatDate(d);
-  const heure = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-  return `${jour} à ${heure}`;
+  const jour = formatDate(d, langue);
+  const heure = d.toLocaleTimeString(LOCALE_DATES[normaliserLangue(langue)], { hour: "2-digit", minute: "2-digit" });
+  return traduire(langue, "pdf.dateHeure", { jour, heure });
 }
 
 // Mention "Émis à <lieu> le <date> à <heure>" — lieu = Atelier.adresse (pas
 // de champ "ville" dédié, voir Phase 2/6 : l'adresse le contient déjà, ex.
 // "niamey 2000"). Sans adresse configurée, dégrade proprement en omettant
 // le lieu plutôt que d'afficher "Émis à  le...".
-function formatEmission(date, atelier, { feminin = false } = {}) {
-  const verbe = feminin ? "Émise" : "Émis";
-  const dateHeure = formatDateHeure(date);
+function formatEmission(date, atelier, { feminin = false, langue } = {}) {
+  const verbe = traduire(langue, feminin ? "pdf.emisF" : "pdf.emisM");
+  const dateHeure = formatDateHeure(date, langue);
   const lieu = atelier?.adresse ? sanitizeForPdf(atelier.adresse) : null;
-  return lieu ? `${verbe} à ${lieu} le ${dateHeure}` : `${verbe} le ${dateHeure}`;
+  return lieu ? traduire(langue, "pdf.emissionLieu", { verbe, lieu, dateHeure }) : traduire(langue, "pdf.emissionSans", { verbe, dateHeure });
 }
 
 function formatMontant(montant, devise) {
@@ -69,7 +70,7 @@ const PDF_SYMBOL_FALLBACKS = {
   "✘": "X",
 };
 
-function sanitizeForPdf(value) {
+export function sanitizeForPdf(value) {
   if (value === null || value === undefined) return "";
   const str = String(value);
   let out = "";
@@ -294,7 +295,8 @@ function drawPiedDePage(doc, { mention }) {
  * fonction invoquée, les en-têtes HTTP sont envoyés et il n'est plus
  * possible de répondre avec une erreur JSON classique.
  */
-export function streamRecuPdf(res, { recu, atelier }) {
+export function streamRecuPdf(res, { recu, atelier, langue }) {
+  const t = (cle, p) => traduire(langue, cle, p);
   const devise = sanitizeForPdf(atelier?.devise || "FCFA");
 
   res.setHeader("Content-Type", "application/pdf");
@@ -306,9 +308,9 @@ export function streamRecuPdf(res, { recu, atelier }) {
   drawCornerOrnaments(doc);
   drawEnTete(doc, atelier);
 
-  doc.font("Helvetica-Bold").fontSize(14).text(`REÇU N° ${sanitizeForPdf(recu.numero)}`, { align: "center" });
+  doc.font("Helvetica-Bold").fontSize(14).text(t("pdf.recu", { numero: sanitizeForPdf(recu.numero) }), { align: "center" });
   doc.moveDown(0.3);
-  doc.font("Helvetica").fontSize(10).text(formatEmission(recu.createdAt, atelier), { align: "center" });
+  doc.font("Helvetica").fontSize(10).text(formatEmission(recu.createdAt, atelier, { langue }), { align: "center" });
   doc.moveDown(1.2);
 
   const cliente = recu.commande?.cliente;
@@ -316,17 +318,17 @@ export function streamRecuPdf(res, { recu, atelier }) {
     cliente ? sanitizeForPdf(`${cliente.prenom} ${cliente.nom}`) : "—",
     cliente?.telephone ? sanitizeForPdf(cliente.telephone) : null,
   ].filter(Boolean);
-  drawSectionEncadree(doc, "Client", ligneClient);
+  drawSectionEncadree(doc, t("pdf.client"), ligneClient);
 
-  const lignesDetails = [`Commande N° ${sanitizeForPdf(recu.commande?.numero ?? "—")}`];
+  const lignesDetails = [t("pdf.commandeNo", { numero: sanitizeForPdf(recu.commande?.numero ?? "—") })];
   if (recu.paiement) {
-    lignesDetails.push(`Date paiement : ${formatDate(recu.paiement.date)}`);
-    lignesDetails.push(`Mode : ${sanitizeForPdf(recu.paiement.mode)}`);
-    if (recu.paiement.reference) lignesDetails.push(`Référence : ${sanitizeForPdf(recu.paiement.reference)}`);
+    lignesDetails.push(t("pdf.datePaiement", { valeur: formatDate(recu.paiement.date, langue) }));
+    lignesDetails.push(t("pdf.mode", { valeur: sanitizeForPdf(recu.paiement.mode) }));
+    if (recu.paiement.reference) lignesDetails.push(t("pdf.reference", { valeur: sanitizeForPdf(recu.paiement.reference) }));
   }
   drawLignesTableau(doc, lignesDetails);
 
-  const libelleMontant = recu.paiement ? "Montant payé" : "Total encaissé à ce jour";
+  const libelleMontant = recu.paiement ? t("pdf.montantPaye") : t("pdf.totalEncaisse");
   drawEncadreMontants(doc, [{ label: libelleMontant, valeur: formatMontant(recu.montantPaye, devise), taille: 14 }]);
 
   if (isNonEmptyRecuConfig(atelier?.recuConfig)) {
@@ -339,40 +341,10 @@ export function streamRecuPdf(res, { recu, atelier }) {
     doc.moveDown(0.4);
   }
 
-  drawPiedDePage(doc, { mention: "Document généré automatiquement — conserver comme preuve de paiement." });
+  drawPiedDePage(doc, { mention: t("pdf.mentionRecu") });
 
   doc.end();
 }
-
-// Copie de présentation de frontend/src/features/commandes/constants.js
-// (STATUTS_COMMANDE) — à garder synchronisée si l'enum change. Le backend ne
-// peut pas importer un module frontend, d'où cette duplication volontaire et
-// minimale (7 libellés fixes), plutôt qu'un partage de code cross-bundle.
-const STATUT_LABELS = {
-  NOUVELLE: "Nouvelle",
-  EN_CONFECTION: "En confection",
-  ESSAYAGE: "Essayage",
-  RETOUCHES: "Retouches",
-  TERMINEE: "Terminée",
-  LIVREE: "Livrée",
-  ANNULEE: "Annulée",
-};
-
-// Copie de présentation de frontend/src/features/modeles/constants.js
-// (CATEGORIES_VETEMENT) — utilisée uniquement en repli quand la commande
-// n'a pas de modèle de catalogue associé (commande sur mesure directe).
-const TYPE_VETEMENT_LABELS = {
-  ROBE: "Robe",
-  BOUBOU: "Boubou",
-  ENSEMBLE: "Ensemble",
-  PANTALON: "Pantalon",
-  CHEMISE: "Chemise",
-  JUPE: "Jupe",
-  KAFTAN: "Kaftan",
-  COSTUME: "Costume",
-  TENUE_TRADITIONNELLE: "Tenue traditionnelle",
-  AUTRE: "Autre",
-};
 
 /**
  * Fiche commande — document DISTINCT du Reçu ci-dessus (voir décision Phase
@@ -382,7 +354,8 @@ const TYPE_VETEMENT_LABELS = {
  * passés en paramètres, jamais stockés — voir computeSolde/statutPaiement,
  * commandes.routes.js) : jamais persisté, comme le Reçu.
  */
-export function streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde }) {
+export function streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde, avecMontants = true, langue }) {
+  const t = (cle, p) => traduire(langue, cle, p);
   const devise = sanitizeForPdf(atelier?.devise || "FCFA");
 
   res.setHeader("Content-Type", "application/pdf");
@@ -394,9 +367,9 @@ export function streamFicheCommandePdf(res, { commande, atelier, totalPaye, sold
   drawCornerOrnaments(doc);
   drawEnTete(doc, atelier);
 
-  doc.font("Helvetica-Bold").fontSize(14).text(`COMMANDE N° ${sanitizeForPdf(commande.numero)}`, { align: "center" });
+  doc.font("Helvetica-Bold").fontSize(14).text(t("pdf.commande", { numero: sanitizeForPdf(commande.numero) }), { align: "center" });
   doc.moveDown(0.3);
-  doc.font("Helvetica").fontSize(10).text(formatEmission(commande.createdAt, atelier, { feminin: true }), { align: "center" });
+  doc.font("Helvetica").fontSize(10).text(formatEmission(commande.createdAt, atelier, { feminin: true, langue }), { align: "center" });
   doc.moveDown(1.2);
 
   const cliente = commande.cliente;
@@ -404,24 +377,29 @@ export function streamFicheCommandePdf(res, { commande, atelier, totalPaye, sold
     cliente ? sanitizeForPdf(`${cliente.prenom} ${cliente.nom}`) : "—",
     cliente?.telephone ? sanitizeForPdf(cliente.telephone) : null,
   ].filter(Boolean);
-  drawSectionEncadree(doc, "Client", ligneClient);
+  drawSectionEncadree(doc, t("pdf.client"), ligneClient);
 
-  doc.font("Helvetica-Bold").fontSize(11).fillColor(SOMBRE).text("Détails");
+  doc.font("Helvetica-Bold").fontSize(11).fillColor(SOMBRE).text(t("pdf.details"));
   doc.moveDown(0.3);
-  const modeleLabel = commande.modele?.nom || TYPE_VETEMENT_LABELS[commande.typeVetement] || commande.typeVetement;
+  const modeleLabel = commande.modele?.nom || libelleVetement(commande.typeVetement, langue);
   drawLignesTableau(doc, [
-    `Modèle : ${sanitizeForPdf(modeleLabel)}`,
-    `Statut : ${sanitizeForPdf(STATUT_LABELS[commande.statut] || commande.statut)}`,
-    `Livraison prévue : ${formatDate(commande.dateLivraisonPrevue)}`,
+    t("pdf.modele", { valeur: sanitizeForPdf(modeleLabel) }),
+    t("pdf.statut", { valeur: sanitizeForPdf(libelleStatut(commande.statut, langue)) }),
+    t("pdf.livraisonPrevue", { valeur: formatDate(commande.dateLivraisonPrevue, langue) }),
   ]);
 
-  drawEncadreMontants(doc, [
-    { label: "Montant total", valeur: formatMontant(commande.prixTotal, devise), taille: 11 },
-    { label: "Montant payé", valeur: formatMontant(totalPaye, devise), taille: 11 },
-    { label: "Solde restant", valeur: formatMontant(solde, devise), taille: 15 },
-  ]);
+  // Sans le droit de voir les montants (employé), la fiche de travail ne porte aucun montant.
+  if (avecMontants) {
+    drawEncadreMontants(doc, [
+      { label: t("pdf.montantTotal"), valeur: formatMontant(commande.prixTotal, devise), taille: 11 },
+      { label: t("pdf.montantPaye"), valeur: formatMontant(totalPaye, devise), taille: 11 },
+      { label: t("pdf.soldeRestant"), valeur: formatMontant(solde, devise), taille: 15 },
+    ]);
+  }
 
-  drawPiedDePage(doc, { mention: "Document généré automatiquement — montants à jour au moment de l'émission." });
+  drawPiedDePage(doc, {
+    mention: avecMontants ? t("pdf.mentionFicheMontants") : t("pdf.mentionFiche"),
+  });
 
   doc.end();
 }

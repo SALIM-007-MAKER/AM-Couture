@@ -19,9 +19,12 @@ import StatutTransitions from "./components/StatutTransitions.jsx";
 import WhatsAppActions from "./components/WhatsAppActions.jsx";
 import PaiementsSection from "./components/PaiementsSection.jsx";
 import LivraisonSection from "./components/LivraisonSection.jsx";
+import AffectationSection from "./components/AffectationSection.jsx";
+import BadgeRetard from "../production/BadgeRetard.jsx";
 import RecusSection from "../recus/components/RecusSection.jsx";
 import { useRecusQuery } from "../recus/hooks.js";
 import { ApiError } from "../../lib/apiClient.js";
+import { useCan } from "../../hooks/usePermissions.js";
 
 function categorieLabelLocal(value) {
   return CATEGORIES_VETEMENT.find((c) => c.value === value)?.label ?? value;
@@ -46,10 +49,13 @@ export default function CommandeDetailPage() {
 
 function CommandeDetailContent({ id, commande }) {
   const { t } = useTranslation();
+  const can = useCan();
+  const voirFinances = can("finances.voir");
+  const voirPaiements = can("paiements.lire");
   // Chargée une seule fois ici, partagée entre PaiementsSection (lien "voir
   // le reçu" par ligne) et RecusSection (liste + émission récapitulative) —
   // pas de requête dupliquée.
-  const recusQuery = useRecusQuery(id);
+  const recusQuery = useRecusQuery(id, { actif: voirPaiements });
   const recus = recusQuery.data?.data ?? [];
 
   // Dernière prise de mesures de la cliente, affichée directement sur la
@@ -75,7 +81,8 @@ function CommandeDetailContent({ id, commande }) {
         subtitle={
           <span className="flex items-center gap-2 flex-wrap">
             <CommandeStatutBadge statut={commande.statut} />
-            <PaiementStatutBadge statut={commande.statutPaiement} />
+            {commande.enRetard && <BadgeRetard />}
+            {voirFinances && <PaiementStatutBadge statut={commande.statutPaiement} />}
             {prioriteLabel(commande.priorite)}
           </span>
         }
@@ -84,15 +91,19 @@ function CommandeDetailContent({ id, commande }) {
             <Button as="a" href={fichePdfUrl(id)} target="_blank" rel="noreferrer" variant="secondary" icon={Download}>
               {t("cmd.fichePdf")}
             </Button>
-            <Button as={Link} to={`/commandes/${id}/modifier`} variant="secondary" icon={Pencil}>
-              {t("common.edit")}
-            </Button>
+            {can("commandes.ecrire") && (
+              <Button as={Link} to={`/commandes/${id}/modifier`} variant="secondary" icon={Pencil}>
+                {t("common.edit")}
+              </Button>
+            )}
           </>
         }
       />
 
-      <StatutTransitions commandeId={id} statutActuel={commande.statut} />
-      <WhatsAppActions commande={commande} atelier={atelier} />
+      {(can("commandes.statut") || can("commandes.ecrire")) && <StatutTransitions commandeId={id} statutActuel={commande.statut} />}
+      <WhatsAppActions commande={commande} atelier={atelier} avecMontants={voirFinances} />
+
+      <AffectationSection commande={commande} />
 
       <div className="space-y-2">
         <SectionTitle icon={User}>{t("cmd.sectionClient")}</SectionTitle>
@@ -196,6 +207,7 @@ function CommandeDetailContent({ id, commande }) {
         </Card>
       </div>
 
+      {voirFinances && (
       <div className="space-y-2">
         <SectionTitle icon={Banknote}>{t("cmd.sectionFinances")}</SectionTitle>
         <Card className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm text-center">
@@ -219,6 +231,7 @@ function CommandeDetailContent({ id, commande }) {
           </div>
         </Card>
       </div>
+      )}
 
       <div className="space-y-2">
         <SectionTitle icon={Truck}>{t("cmd.sectionLivraison")}</SectionTitle>
@@ -230,15 +243,19 @@ function CommandeDetailContent({ id, commande }) {
         />
       </div>
 
-      <div className="space-y-2">
-        <SectionTitle icon={Wallet}>{t("cmd.sectionPaiements")}</SectionTitle>
-        <PaiementsSection commandeId={id} statutActuel={commande.statut} recus={recus} />
-      </div>
+      {voirPaiements && (
+        <div className="space-y-2">
+          <SectionTitle icon={Wallet}>{t("cmd.sectionPaiements")}</SectionTitle>
+          <PaiementsSection commandeId={id} statutActuel={commande.statut} recus={recus} />
+        </div>
+      )}
 
-      <div className="space-y-2">
-        <SectionTitle icon={FileText}>{t("cmd.sectionRecus")}</SectionTitle>
-        <RecusSection commandeId={id} recus={recus} isLoading={recusQuery.isPending} />
-      </div>
+      {voirPaiements && (
+        <div className="space-y-2">
+          <SectionTitle icon={FileText}>{t("cmd.sectionRecus")}</SectionTitle>
+          <RecusSection commandeId={id} recus={recus} isLoading={recusQuery.isPending} />
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,9 @@ import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
+import { peutVoirFinances } from "../lib/permissions.js";
 import { formatZodError } from "../lib/validation.js";
 import { resolvePeriod, dateRangeWhere } from "../lib/period.js";
 import { periodQuerySchema, recentQuerySchema } from "../schemas/dashboard.schema.js";
@@ -11,7 +13,7 @@ import { whereCommandesImpayees } from "../lib/commandesImpayees.js";
 // Module PUREMENT consultatif : aucune route de ce fichier n'écrit en base
 // (que des `count`/`aggregate`/`findMany` en lecture seule).
 const router = Router();
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, requirePermission("dashboard.lire"), masquerFinancesSiNonAutorise);
 
 // "en cours" / "terminées" / "livrées" sont des compartiments MUTUELLEMENT
 // EXCLUSIFS (chaque commande n'appartient qu'à un seul), contrairement à
@@ -94,6 +96,7 @@ router.get("/summary", async (req, res) => {
   const totalEncaisse = dec(paiementsPeriode._sum.montant);
   const totalDepenses = dec(depensesPeriode._sum.montant);
 
+  const voitFinances = peutVoirFinances(req.user);
   res.json({
     periode: from || to ? { from: from?.toISOString() ?? null, to: to?.toISOString() ?? null } : null,
     clientes: {
@@ -102,15 +105,15 @@ router.get("/summary", async (req, res) => {
     commandes: {
       // "activité de la période"
       nombre: commandesPeriode._count,
-      valeurTotale: valeurCommandes.toString(),
+      ...(voitFinances ? { valeurTotale: valeurCommandes.toString() } : {}),
       // "état actuel" — toujours globaux, non filtrés par la période demandée
       enCours: commandesEnCours,
       terminees: commandesTerminees,
       livrees: commandesLivrees,
       enRetard: commandesEnRetard,
-      nonPayees: commandesNonPayees,
+      ...(voitFinances ? { nonPayees: commandesNonPayees } : {}),
     },
-    finances: {
+    ...(!voitFinances ? {} : { finances: {
       // Chiffre d'affaires (valeur des commandes) ≠ argent réellement
       // encaissé — jamais confondus (voir commandes.valeurTotale ci-dessus).
       totalEncaisse: totalEncaisse.toString(),
@@ -122,7 +125,7 @@ router.get("/summary", async (req, res) => {
       // revient/marge par commande, donc aucun calcul de profit réel n'est
       // possible avec les données actuelles (voir rapport, point signalé).
       resultatTresorerie: totalEncaisse.minus(totalDepenses).toString(),
-    },
+    } }),
   });
 });
 

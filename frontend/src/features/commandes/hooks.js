@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { commandesApi } from "./api.js";
+import { ecrireOuMettreEnFile } from "../../lib/fileSynchro.js";
 
-export function useCommandesQuery(params) {
+export function useCommandesQuery(params, { enabled = true } = {}) {
   return useQuery({
     queryKey: ["commandes", "list", params],
     queryFn: () => commandesApi.list(params),
     placeholderData: (prev) => prev,
+    enabled,
   });
 }
 
@@ -50,10 +52,31 @@ export function useUpdateCommandeMutation(id) {
 export function useChangeStatutMutation(id) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (statut) => commandesApi.changeStatut(id, statut),
+    // `statutAttendu` : le statut que l'utilisateur voit. Le serveur refuse si la commande a changé entre-temps (7.6).
+    mutationFn: ({ statut, statutAttendu }) =>
+      ecrireOuMettreEnFile({
+        type: "commande.statut",
+        chemin: `/commandes/${id}/statut`,
+        corps: { statut, statutAttendu },
+        libelle: `Commande : passer à ${statut}`,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["commandes", "detail", id] });
       queryClient.invalidateQueries({ queryKey: ["commandes", "list"] });
+    },
+  });
+}
+
+export function useProductionQuery({ enabled = true } = {}) {
+  return useQuery({ queryKey: ["commandes", "production"], queryFn: () => commandesApi.production(), enabled });
+}
+
+export function useAffecterMutation(id) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (employeId) => commandesApi.affecter(id, employeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["commandes"] });
     },
   });
 }

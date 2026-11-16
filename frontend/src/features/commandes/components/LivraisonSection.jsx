@@ -10,6 +10,7 @@ import Button from "../../../components/Button.jsx";
 import AnnulerControl from "../../../components/AnnulerControl.jsx";
 import AnnuleBadge from "../../../components/AnnuleBadge.jsx";
 import { ApiError } from "../../../lib/apiClient.js";
+import { useCan } from "../../../hooks/usePermissions.js";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString(dateLocale(), { year: "numeric", month: "long", day: "numeric" });
@@ -17,6 +18,7 @@ function formatDate(iso) {
 
 function LivraisonForm({ commandeId, solde }) {
   const { t } = useTranslation();
+  const peutPayer = useCan()("paiements.ecrire");
   const [commentaire, setCommentaire] = useState("");
   const [avecPaiementFinal, setAvecPaiementFinal] = useState(false);
   const [montant, setMontant] = useState("");
@@ -35,16 +37,18 @@ function LivraisonForm({ commandeId, solde }) {
   return (
     <Card as="form" onSubmit={handleSubmit} variant="outlined" className="space-y-3">
       <GlobalFormError error={mutation.error} />
-      <p className="text-sm text-neutral-500">{t("cmd.livrSoldeAvant", { solde })}</p>
+      {solde !== undefined && <p className="text-sm text-neutral-500">{t("cmd.livrSoldeAvant", { solde })}</p>}
       <label className="block space-y-1">
         <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t("cmd.livrCommentaire")}</span>
         <input value={commentaire} onChange={(e) => setCommentaire(e.target.value)} className={inputClass} />
       </label>
-      <label className="flex items-center gap-2 text-sm font-medium text-neutral-700 dark:text-neutral-300">
-        <input type="checkbox" checked={avecPaiementFinal} onChange={(e) => setAvecPaiementFinal(e.target.checked)} />
-        {t("cmd.livrPaiementFinal")}
-      </label>
-      {avecPaiementFinal && (
+      {peutPayer && (
+        <label className="flex items-center gap-2 text-sm font-medium text-neutral-700 dark:text-neutral-300">
+          <input type="checkbox" checked={avecPaiementFinal} onChange={(e) => setAvecPaiementFinal(e.target.checked)} />
+          {t("cmd.livrPaiementFinal")}
+        </label>
+      )}
+      {peutPayer && avecPaiementFinal && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="block space-y-1">
             <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t("cmd.livrMontant")}</span>
@@ -87,6 +91,7 @@ function LivraisonForm({ commandeId, solde }) {
 // annulées comprises, mais seule l'active compte pour le statut/formulaire.
 export default function LivraisonSection({ commandeId, statutActuel, livraisons, solde }) {
   const { t } = useTranslation();
+  const peutLivrer = useCan()("livraisons.ecrire");
   const annulerMutation = useAnnulerLivraisonMutation(commandeId);
   const active = livraisons?.find((l) => !l.annuleAt);
   const historique = livraisons ?? [];
@@ -105,7 +110,9 @@ export default function LivraisonSection({ commandeId, statutActuel, livraisons,
                   </p>
                   {l.annuleAt && <AnnuleBadge />}
                 </div>
-                <p className="text-neutral-500 text-sm">{t("cmd.livrSoldeAuMoment", { montant: l.montantRestant })}</p>
+                {l.montantRestant !== undefined && (
+                  <p className="text-neutral-500 text-sm">{t("cmd.livrSoldeAuMoment", { montant: l.montantRestant })}</p>
+                )}
                 {l.commentaire && <p className="text-neutral-500 text-sm">{l.commentaire}</p>}
                 {l.annuleAt ? (
                   <p className="text-red-600 dark:text-red-400 text-xs">{t("cmd.livrMotif", { motif: l.annuleMotif })}</p>
@@ -126,7 +133,7 @@ export default function LivraisonSection({ commandeId, statutActuel, livraisons,
 
       {!active &&
         (statutActuel === "TERMINEE" ? (
-          <LivraisonForm commandeId={commandeId} solde={solde} />
+          !peutLivrer ? null : <LivraisonForm commandeId={commandeId} solde={solde} />
         ) : historique.length === 0 ? (
           <p className="text-sm text-neutral-500">
             {t("cmd.livrPossibleQuand")}

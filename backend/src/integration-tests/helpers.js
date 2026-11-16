@@ -40,14 +40,19 @@ let compteurIp = 1;
  */
 export function client(baseUrl) {
   let cookie = null;
-  const ip = `203.0.113.${compteurIp++}`;
-  async function requete(path, { method = "GET", body } = {}) {
+  // IP unique par PROCESSUS et par client : `node --test` exécute chaque fichier dans son propre
+  // process, et le limiteur de débit garde ses compteurs en base (fenêtre de 15 min). Un préfixe
+  // fixe faisait partager les mêmes IP à tous les fichiers (et à chaque relance locale), d'où des
+  // 429 sur la connexion dès que le nombre de fichiers augmentait.
+  const ip = `10.${(process.pid >> 8) & 255}.${process.pid & 255}.${(compteurIp++ % 254) + 1}`;
+  async function requete(path, { method = "GET", body, headers = {} } = {}) {
     const res = await fetch(`${baseUrl}${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
         "X-Forwarded-For": ip,
         ...(cookie ? { Cookie: cookie } : {}),
+        ...headers,
       },
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
@@ -59,14 +64,16 @@ export function client(baseUrl) {
     } catch {
       // Pas de corps JSON (204) — laissé à null.
     }
-    return { status: res.status, body: json };
+    return { status: res.status, body: json, headers: res.headers };
   }
   return {
-    get: (path) => requete(path),
-    post: (path, body) => requete(path, { method: "POST", body }),
-    patch: (path, body) => requete(path, { method: "PATCH", body }),
-    put: (path, body) => requete(path, { method: "PUT", body }),
-    delete: (path) => requete(path, { method: "DELETE" }),
+    // Cookie de session courant, pour les requêtes brutes (fichiers PDF) que ce client JSON ne sait pas lire.
+    cookie: () => cookie,
+    get: (path, headers) => requete(path, { headers }),
+    post: (path, body, headers) => requete(path, { method: "POST", body, headers }),
+    patch: (path, body, headers) => requete(path, { method: "PATCH", body, headers }),
+    put: (path, body, headers) => requete(path, { method: "PUT", body, headers }),
+    delete: (path, headers) => requete(path, { method: "DELETE", headers }),
   };
 }
 
@@ -141,7 +148,8 @@ export async function supprimerAtelier(atelierId) {
   // DemandeCommande AVANT commande/cliente : ses 3 FK (atelierId, clienteId,
   // commandeId) sont toutes en onDelete: Restrict.
   await prisma.demandeCommande.deleteMany({ where: { atelierId } });
-  await prisma.notification.deleteMany({ where: { commandeId: { in: commandeIds } } });
+  await prisma.affectationCommande.deleteMany({ where: { atelierId } });
+  await prisma.notification.deleteMany({ where: { atelierId } });
   await prisma.recu.deleteMany({ where: { commandeId: { in: commandeIds } } });
   await prisma.livraison.deleteMany({ where: { commandeId: { in: commandeIds } } });
   await prisma.paiement.deleteMany({ where: { commandeId: { in: commandeIds } } });
@@ -152,12 +160,22 @@ export async function supprimerAtelier(atelierId) {
   // par clarté plutôt que de compter sur le SetNull implicite.
   await prisma.cliente.updateMany({ where: { atelierId }, data: { userId: null } });
   await prisma.cliente.deleteMany({ where: { atelierId } });
+  // Achats (6.5) : mouvements de réception → lignes → achats, avant les articles, fournisseurs et dépenses.
+  await prisma.mouvementStock.deleteMany({ where: { ligneAchat: { achat: { atelierId } } } });
+  await prisma.ligneAchat.deleteMany({ where: { achat: { atelierId } } });
+  await prisma.achat.deleteMany({ where: { atelierId } });
+  // Lookbook (7.1) : photos puis images avant les modèles.
+  await prisma.photoModele.deleteMany({ where: { modele: { atelierId } } });
+  await prisma.imageAtelier.deleteMany({ where: { atelierId } });
   await prisma.modele.deleteMany({ where: { atelierId } });
+  await prisma.fournisseur.deleteMany({ where: { atelierId } });
   await prisma.depense.deleteMany({ where: { atelierId } });
   const articles = await prisma.articleStock.findMany({ where: { atelierId }, select: { id: true } });
   await prisma.mouvementStock.deleteMany({ where: { articleId: { in: articles.map((a) => a.id) } } });
   await prisma.articleStock.deleteMany({ where: { atelierId } });
   const abonnements = await prisma.abonnement.findMany({ where: { atelierId }, select: { id: true } });
+  await prisma.rappelAbonnement.deleteMany({ where: { atelierId } });
+  await prisma.factureAbonnement.deleteMany({ where: { atelierId } });
   await prisma.transaction.deleteMany({ where: { abonnementId: { in: abonnements.map((a) => a.id) } } });
   await prisma.abonnement.deleteMany({ where: { atelierId } });
   await prisma.user.deleteMany({ where: { atelierId } });

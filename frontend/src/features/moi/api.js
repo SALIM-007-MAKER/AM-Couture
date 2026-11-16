@@ -23,7 +23,13 @@ export const moiApi = {
     create: (data) => api.post("/moi/demandes", data),
   },
   recus: () => api.get("/moi/recus"),
+  supprimerCompte: (data) => api.post("/moi/suppression", data),
 };
+
+// Chemin direct (fichier JSON à télécharger) — même origine, le cookie de session part automatiquement.
+export function moiExportUrl() {
+  return "/api/moi/export";
+}
 
 // Chemin direct (flux PDF, pas du JSON) — même origine, le cookie de session
 // part automatiquement. Voir recuPdfUrl (features/recus/api.js, côté ADMIN),

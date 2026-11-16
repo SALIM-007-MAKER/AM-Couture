@@ -7,19 +7,18 @@
     "start": "node src/server.js",
     "build": "prisma generate",
     "test": "node --test src/**/__tests__/**/*.test.js",
-    "test:integration": "node --import ./src/integration-tests/preload.js --test src/integration-tests/**/*.test.js"
+    "test:integration": "node --import ./src/integration-tests/preload.js --test --test-concurrency=4 src/integration-tests/**/*.test.js"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
-    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
     "pdfkit": "^0.20.2",
     "pg": "^8.13.1",
-    "zod": "^3.25.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "prisma": "^7.10.0"

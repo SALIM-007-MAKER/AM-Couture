@@ -1,17 +1,14 @@
-import { Link } from "react-router-dom";
-import { Gift, Hourglass } from "lucide-react";
+import { Gift } from "lucide-react";
 import { useEtatAbonnementQuery } from "../features/abonnement/hooks.js";
 import { formatDateFr } from "../features/abonnement/constants.js";
 import Card from "./Card.jsx";
-import Button from "./Button.jsx";
 import { useTranslation } from "../i18n/index.js";
 
 /**
  * Bannière du Dashboard, pilotée par l'état d'abonnement serveur
  * (GET /api/abonnements/etat — voir features/abonnement) :
  *   ESSAI  -> compte à rebours de l'essai gratuit ;
- *   EXPIRE -> essai terminé / abonnement expiré + lien vers /abonnement ;
- *   ACTIF, EN_ATTENTE, AUCUN, chargement, erreur -> rien.
+ *   autres états -> rien (l'avertissement de fin d'essai ou d'abonnement est dans AccesBanner, global).
  * Complète PaywallBanner.jsx (qui bloque TOUTE page une fois l'accès coupé).
  *
  * Composants/tons déjà existants, aucun style inventé : essai actif -> même
@@ -23,23 +20,6 @@ export default function TrialBanner() {
   const { data: etat } = useEtatAbonnementQuery();
 
   if (!etat) return null;
-
-  if (etat.statut === "EXPIRE") {
-    return (
-      <Card
-        variant="outlined"
-        className="flex items-center justify-between gap-3 flex-wrap border-red-200 dark:border-red-900"
-      >
-        <span className="flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
-          <Hourglass className="size-4 shrink-0" aria-hidden="true" />
-          {t("trialBanner.expired")}
-        </span>
-        <Button as={Link} to="/abonnement" variant="secondary" size="sm">
-          {t("trialBanner.viewSubscriptions")}
-        </Button>
-      </Card>
-    );
-  }
 
   if (etat.statut !== "ESSAI" || !etat.essai) return null;
 

@@ -1,0 +1,25 @@
+// Traductions FR — fournisseurs de l'atelier. Namespace « fou ».
+export default {
+  fou: {
+    title: "Fournisseurs",
+    subtitle: "Les personnes et boutiques chez qui vous achetez tissus et fournitures.",
+    new: "Nouveau fournisseur",
+    editTitle: "Modifier le fournisseur",
+    search: "Rechercher (nom, contact, téléphone, email)…",
+    loading: "Chargement des fournisseurs…",
+    loadingOne: "Chargement du fournisseur…",
+    emptyAll: "Aucun fournisseur pour l'instant. Ajoutez celui chez qui vous achetez vos tissus.",
+    emptyFiltered: "Aucun fournisseur ne correspond.",
+    colName: "Nom",
+    colContact: "Contact",
+    colPhone: "Téléphone",
+    contact: "Personne à contacter",
+    phone: "Téléphone",
+    email: "Email",
+    address: "Adresse",
+    notes: "Notes",
+    confirmArchive: "Archiver ce fournisseur ? Il disparaît des listes mais rien n'est supprimé.",
+    confirmRestore: "Restaurer ce fournisseur ?",
+    archivedError: "Fournisseur archivé : restaurez-le avant de le modifier.",
+  },
+};

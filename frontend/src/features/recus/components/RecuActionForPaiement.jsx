@@ -1,7 +1,7 @@
 import { Receipt } from "lucide-react";
 import { useCreateRecuForPaiementMutation } from "../hooks.js";
 import { recuPdfUrl } from "../api.js";
-import { ApiError } from "../../../lib/apiClient.js";
+import { messageUtilisateur } from "../../../lib/errorMessage.js";
 import Button from "../../../components/Button.jsx";
 import { useTranslation } from "../../../i18n/index.js";
 
@@ -19,7 +19,7 @@ export default function RecuActionForPaiement({ commandeId, paiementId, recu }) 
     );
   }
 
-  const message = mutation.error instanceof ApiError ? mutation.error.message : null;
+  const message = mutation.error ? messageUtilisateur(mutation.error, t).message : null;
 
   return (
     <div className="text-right">

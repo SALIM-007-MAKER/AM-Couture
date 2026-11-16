@@ -27,6 +27,17 @@ const prixField = decimalField({
 });
 const optionalPrixField = z.preprocess(emptyToUndefined, prixField.optional());
 
+// Lookbook (7.1) : mots libres, 12 au plus, sans doublon (casse ignorée).
+export const MAX_TAGS = 12;
+const tagsField = z
+  .array(z.string().trim().min(1, "Tag vide.").max(30, "Tag trop long (30 caractères).").transform(normalizeText))
+  .max(MAX_TAGS, `${MAX_TAGS} tags au plus.`)
+  // Doublon (casse ignorée) : la première graphie saisie est conservée.
+  .transform((tags) => {
+    const vus = new Set();
+    return tags.filter((t) => !vus.has(t.toLowerCase()) && vus.add(t.toLowerCase()));
+  });
+
 // .strict() : rejette explicitement id / archivedAt / createdAt / updatedAt /
 // commandes — ces valeurs sont déterminées uniquement par le serveur, jamais
 // acceptées depuis le corps de la requête.
@@ -37,6 +48,7 @@ export const createModeleSchema = z
     description: optionalTrimmed(2000),
     prixIndicatif: optionalPrixField,
     photoUrl: optionalImageField(),
+    tags: tagsField.optional(),
   })
   .strict();
 
@@ -47,6 +59,8 @@ export const updateModeleSchema = z
     description: optionalTrimmed(2000),
     prixIndicatif: optionalPrixField,
     photoUrl: optionalImageField(),
+    publie: z.boolean().optional(),
+    tags: tagsField.optional(),
   })
   .strict()
   .refine((data) => Object.keys(data).length > 0, { message: "Aucune donnée à modifier." });
@@ -58,3 +72,18 @@ export const listModelesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
   pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
+
+/** Nombre maximal de photos par modèle dans le lookbook. */
+export const MAX_PHOTOS_MODELE = 8;
+
+// Une photo se téléverse TOUJOURS comme fichier (data URL validée : signature réelle, 2 Mo) — jamais comme URL externe.
+export const createPhotoModeleSchema = z
+  .object({
+    image: optionalImageField().refine((v) => typeof v === "string" && v.startsWith("data:image/"), { message: "Image requise (fichier)." }),
+    legende: optionalTrimmed(120),
+  })
+  .strict();
+
+export const ordrePhotosSchema = z
+  .object({ ids: z.array(z.string().trim().min(1)).min(1).max(MAX_PHOTOS_MODELE) })
+  .strict();

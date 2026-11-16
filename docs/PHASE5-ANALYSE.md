@@ -1,0 +1,237 @@
+# Phase 5 — Analyse du système d'abonnement existant
+
+Constat établi par lecture du code et du schéma le 15 novembre 2026, avant tout développement. Rien n'a été modifié.
+
+## 1. Ce qui existe
+
+| Élément | État | Où |
+|---|---|---|
+| Essai de 15 jours | **Fonctionne** : `Atelier.trialEndsAt = inscription + 15 j`, évalué à chaque requête (aucune tâche planifiée nécessaire). Ateliers antérieurs (`trialEndsAt` null) : jamais bloqués | `lib/atelierProvisioning.js`, `lib/trial.js` |
+| Plans | **Fonctionne** : `PlanAbonnement` (prix mensuel, fonctionnalités en texte libre, remises par durée), gérés par le SUPERADMIN. Prix figé à l'activation (`Abonnement.prix`) | `lib/abonnement.js`, `plans.routes.js` |
+| Activation | **Manuelle uniquement** par le SUPERADMIN, idempotente, avec historique (`HistoriqueAbonnement`) | `ateliersAbonnement.routes.js` |
+| États | `ACTIF`, `EN_ATTENTE`, `ESSAI`, `EXPIRE`, `AUCUN`, **dérivés** des dates (jamais stockés) : pas de dérive possible | `etatAbonnementAtelier` |
+| Blocage | Essai terminé sans abonnement actif → **402 sur toutes les routes métier**, lecture comprise. Contournement en impersonation | `requireAbonnementActif` |
+| Souscription par l'atelier | **N'existe pas** : `GET /api/abonnements/etat` est la seule route côté atelier, en lecture seule | `abonnements.routes.js` |
+| Paiement en ligne | Code **dormant et non monté** : client Wave (`lib/wave.js`), 3 fournisseurs (`lib/payments/`), route de webhook. Aucune route ne crée de `Transaction` | `webhooks.routes.js` (non montée) |
+| Tests | Essai/blocage et activation manuelle couverts (intégration). **Webhook, signature Wave et fournisseurs : aucun test** | |
+
+## 2. Écarts avec le brief
+
+| # | Brief | Écart constaté |
+|---|---|---|
+| 1 | Formules avec **limites** | Aucune limite chiffrée (clientes, commandes, comptes) : seule une liste de fonctionnalités en texte libre, non appliquée par le code |
+| 3 | Souscription par l'atelier | Absente (voir ci-dessus) |
+| 4 | Cycle de vie : **suspendus**, **renouvelés** | Pas d'état « suspendu » pour un abonnement (la suspension existe au niveau de l'atelier). Renouvellement : `activerAbonnement` repart de « maintenant » — **renouveler un abonnement encore actif ferait perdre les jours restants** |
+| 5-6 | Paiement, vérification serveur | Rien d'actif. Dans le code dormant : relecture authentifiée chez Wave + contrôle référence/montant (bon principe) |
+| 7 | Webhooks | Voir §3 : plusieurs écarts avec la documentation Wave |
+| 8 | Factures | **Absentes** (pas de modèle, pas de PDF d'abonnement) |
+| 9 | Rappels avant expiration | **Absents** (le cron ne traite que les rappels de commandes) |
+| 10 | Impayés | Aucune règle : pas de délai de grâce, pas de relance |
+| 11 | Limitation des accès | Blocage total, y compris la **lecture et l'export des données de l'atelier** : un atelier dont l'abonnement échoit ne peut plus récupérer ses propres clientes ni commandes |
+| 12 | Tableau de bord SUPERADMIN | Existe en partie (liste des ateliers, état d'abonnement, tendances sur 6 mois). **Pas de revenus par plan, pas de vue des renouvellements à venir ni des transactions** |
+| — | Remboursements, annulations | Rien (statuts `ANNULEE`/`EXPIREE` de transaction existent mais aucun flux) |
+
+## 3. Écarts du code Wave avec la documentation officielle
+
+Lue le 15/11/2026 sur docs.wave.com (pages Checkout et Webhooks).
+
+| Sujet | Documentation Wave | Code actuel |
+|---|---|---|
+| Signature des webhooks | `Wave-Signature: t=…,v1=…`, HMAC-SHA256 de `t` + corps brut, tolérance 5 min, plusieurs `v1` pendant une rotation | **Conforme** |
+| Identifiant d'événement | `id` unique par événement ; Wave peut **dupliquer, retarder ou désordonner** les événements | Non mémorisé : l'idempotence repose sur le statut de la transaction, **sans verrou** → deux webhooks simultanés peuvent passer tous deux le contrôle |
+| Événements | `checkout.session.completed`, `checkout.session.payment_failed` | Seul `completed` est traité ; l'échec de paiement est ignoré |
+| Expiration | Une session expire après 30 min **sans événement** `expired` | Une transaction restée `EN_ATTENTE` n'est jamais clôturée : il faut un rattrapage périodique qui relit la session |
+| Délai de réponse | Réponse attendue en moins de 5 s, traitement asynchrone recommandé | La relecture chez Wave est faite avant de répondre |
+| Remboursement | `POST /v1/checkout/sessions/:id/refund` existe | Non utilisé |
+| Bac à sable | Non documenté ; exemples en clés de production | Pas de test possible contre l'API réelle sans compte |
+
+## 4. Faisabilité des prestataires
+
+| Prestataire | Constat | Fiabilité de la source |
+|---|---|---|
+| Wave (Business API, Checkout) | API documentée, authentifiée par clé liée à un compte Wave Business. **Disponibilité au Niger non confirmée** : une page partenaire tierce cite le Niger parmi dix pays, la fiche officielle de l'application cite six autres pays. Compte Business et vérification (KYC) nécessaires, délais annoncés par des sources commerciales : 3 à 10 jours ouvrés | Documentation Wave : fiable ; liste des pays : **non vérifiée** |
+| NITA, Amana | **Aucune API publique trouvée.** Fonctionnement manuel : l'atelier paie hors plateforme, le SUPERADMIN confirme | Absence de résultat, pas preuve d'absence |
+| Airtel Money, Moov, Orange Money (Niger) | Opérateurs dominants à Niamey d'après des blogs d'intégrateurs ; aucune documentation d'API officielle trouvée ; agrégateurs possibles | Sources commerciales : indicatives |
+
+**Conclusion** : je ne peux pas garantir qu'un paiement en ligne soit utilisable au Niger. Avant d'écrire du code qui en dépend, il faut que **vous** obteniez la confirmation de Wave (pays, compte Business, frais). Le reste du système (souscription, cycle de vie, factures, rappels, tableau de bord) ne dépend pas de ce point et peut être construit autour d'un paiement **manuel vérifié** (déclaration de l'atelier, confirmation tracée du SUPERADMIN), avec Wave branchable ensuite.
+
+## 5. Limites de cette analyse
+
+- Les pages de documentation Wave ont été lues par un outil de lecture automatique ; les noms de champs ci-dessus sont à reconfirmer à l'implémentation.
+- Aucune API de prestataire n'a été appelée.
+- Les tarifs en base sont des valeurs temporaires de migration ; je n'ai pas lu les valeurs réelles de la base de production.
+
+## 6. Décisions du 15/11/2026 et plan
+
+| Décision | Choix |
+|---|---|
+| Paiement | **Manuel vérifié d'abord** : l'atelier déclare son paiement, le SUPERADMIN confirme, tout est tracé. Wave est préparé (conformité à la documentation, rattrapage, remboursement) mais **inactif** tant que Wave Business n'est pas confirmé au Niger |
+| Après l'échéance | **Grâce puis lecture seule** : accès complet pendant `joursGrace` jours (7 par défaut, réglable 0 à 90 par le SUPERADMIN) avec bandeau, puis consultation et export seulement. Rien n'est supprimé. Abonnement suspendu : lecture seule immédiate |
+| Limites par formule | Structure prévue (`PlanAbonnement.limites`, vide), **non appliquée** |
+
+| Sous-phase | Contenu |
+|---|---|
+| 5.1 | Modèle de données (transactions manuelles, factures, abonnement suspendu, jours de grâce), état d'accès, renouvellement sans perte de jours |
+| 5.2 | Souscription par l'atelier, déclaration de paiement, confirmation / rejet / remboursement par le SUPERADMIN, facture PDF |
+| 5.3 | Application de la lecture seule (écritures refusées, lectures et exports conservés) |
+| 5.4 | Rappels avant expiration et fin d'essai (courriel, une seule fois par échéance) |
+| 5.5 | Wave durci (inactif par défaut) : événements dédoublonnés, verrou, échec de paiement, rattrapage des sessions expirées, remboursement ; testé contre un faux serveur Wave |
+| 5.6 | Tableau de bord SUPERADMIN : revenus, renouvellements à venir, transactions |
+| 5.7 | Interface : page Abonnement de l'atelier, écrans de confirmation du SUPERADMIN |
+| 5.8 | Documentation et bilan |
+
+## 7. Réalisé en 5.1
+
+- Migration `20261117090000_abonnement_paiements_factures` : **additive**, rejouée sur une base contenant déjà un abonnement et une transaction (lignes inchangées, `atelierId` de la transaction déduit de son abonnement). Une seule transaction en attente par abonnement (index unique partiel) ; contraintes `CHECK` en `NOT VALID`.
+- `lib/abonnement.js` : état `SUSPENDU`, `modeAcces()` (complet, grâce, lecture seule), `dateDebutSouscription()` (un renouvellement anticipé commence à l'échéance en cours, aucun jour perdu).
+- 23 tests unitaires (`lib/__tests__/abonnement.test.js`), deux mutations détectées.
+
+## 8. Réalisé en 5.2 — souscription et paiements manuels vérifiés
+
+**Flux.** L'atelier choisit une formule et une durée proposées, puis déclare un paiement fait hors plateforme (opérateur, référence, note) : `POST /api/abonnements/souscrire`. Rien n'est activé. Le SUPERADMIN rapproche la référence de son relevé puis confirme, rejette ou rembourse (`/api/plateforme/transactions/:id/...`). La confirmation active l'abonnement et émet la facture.
+
+**Garanties (toutes testées en intégration, 22 tests, mutations détectées) :**
+- le prix vient du serveur ; un champ `montant` envoyé est refusé ; la durée doit être proposée par la formule ;
+- une déclaration n'accorde aucun accès ; un moyen `WAVE` ne peut pas être déclaré ni confirmé à la main ;
+- une seule déclaration en attente par atelier (règle applicative et index unique partiel) ;
+- confirmations répétées ou simultanées (5 en parallèle) : une seule activation, une seule facture, une seule entrée d'historique ; sans les verrous, le test échoue ;
+- renouvellement anticipé : le nouvel abonnement commence à l'échéance de celui en cours ;
+- rejet, annulation par l'atelier, remboursement : jamais de suppression, tout est daté, signé (`confirmePar`, `rembourseePar`), motivé, historisé et inscrit au journal de sécurité ;
+- isolation : un autre atelier reçoit 404 sur une transaction ou une facture qui n'est pas la sienne ;
+- suspension / réactivation d'un abonnement avec motif obligatoire ; suspendu = lecture seule immédiate.
+
+**Limites connues, à connaître avant usage :**
+- le rapprochement avec le relevé est **humain** : la plateforme ne vérifie aucun paiement auprès d'un opérateur (aucune API disponible) ; sa fiabilité repose sur le SUPERADMIN ;
+- le remboursement est **enregistré**, pas exécuté : l'argent est rendu hors plateforme ; remboursement total uniquement ;
+- le document émis s'intitule « Justificatif de paiement d'abonnement » et ne porte **aucune mention légale** (identifiant fiscal, registre de commerce, adresse du siège) : elles sont à renseigner dans `lib/facturePdf.js` (`EMETTEUR`) avant tout usage comptable ; je ne les connais pas et ne les ai pas inventées ;
+- rembourser un abonnement suivi d'un abonnement planifié laisse un trou entre les deux : les dates ne sont pas recalculées ;
+- pas encore de courriel envoyé à l'atelier lors d'une confirmation ou d'un rejet (prévu avec les rappels, 5.4) ;
+- la lecture seule n'est pas encore appliquée : `acces.mode` est calculé et exposé, mais le blocage reste l'ancien 402 jusqu'à la 5.3.
+
+## 9. Réalisé en 5.3 — grâce puis lecture seule
+
+**Règle appliquée par `requireAbonnementActif`** (toutes les routes métier de l'atelier) :
+
+| Situation | Accès |
+|---|---|
+| Essai en cours, atelier ancien sans échéance d'essai | complet, sans requête supplémentaire |
+| Abonnement actif | complet |
+| Fin d'essai ou d'abonnement depuis moins de `joursGrace` jours (7 par défaut, réglable) | **complet** (l'interface affichera un avertissement, 5.7) |
+| Au-delà de la grâce, ou abonnement suspendu | **lecture seule** : `GET` (consultation, exports CSV, PDF) accepté ; toute écriture refusée en **402** avec `details.lectureSeule: true` |
+| Impersonation SUPERADMIN | jamais restreint |
+
+**Ce qui reste possible en lecture seule** : consulter et exporter toutes les données ; l'état « lu » des notifications ; le compte (langue, mot de passe) ; la page Abonnement, la souscription et le téléchargement des factures. **Aucune donnée n'est supprimée ni masquée.**
+
+**Changements de comportement par rapport à avant (volontaires) :** un atelier dont l'essai a expiré recevait 402 sur toute requête, lecture comprise ; il peut désormais lire et exporter. Les tests qui attendaient ce blocage total ont été modifiés en conséquence (`trial-abonnement`, `abonnement-manuel`). Un abonnement suspendu pendant un essai encore en cours ne restreint pas l'accès (l'essai prime). Les ateliers sans échéance d'essai (antérieurs à la fonctionnalité) ne sont jamais restreints, même avec un ancien abonnement échu : comportement d'avant conservé.
+
+**Tests** : 10 tests d'intégration (`lecture-seule.test.js`) : grâce, matrice de 13 écritures refusées sans aucun effet en base, 21 lectures et exports acceptés, durée de grâce lue dans les réglages, rétablissement immédiat après confirmation d'un paiement. Trois mutations détectées (écritures autorisées, grâce ignorée, lectures bloquées). Côté interface, un 402 « lecture seule » n'ouvre plus la redirection vers la page Abonnement : le message du serveur s'affiche à l'endroit de la saisie (2 tests).
+
+**Limites :**
+- l'interface n'affiche pas encore de bandeau « lecture seule » ni ne désactive les boutons d'écriture (5.7) : l'utilisateur voit le message d'erreur du serveur quand il tente d'écrire ;
+- la ligne `joursGrace` est globale à la plateforme (pas de durée par atelier) ;
+- `GET /api/notifications` réconcilie des alertes calculées en base même en lecture seule (données dérivées, pas des données métier) ;
+- la relecture de l'état d'abonnement après la fin d'essai coûte deux requêtes de plus par requête authentifiée (abonnements et réglages), uniquement pour les ateliers dans cette situation.
+
+## 10. Réalisé en 5.4 — rappels et courriels
+
+**Tâche quotidienne** (`/api/cron/rappels-quotidiens`, 07 h UTC). Pour chaque atelier actif ayant un administrateur avec adresse :
+
+| Situation | Rappel (une seule fois par échéance) |
+|---|---|
+| Essai : 3 jours ou moins / 1 jour ou moins avant la fin | `ESSAI_J3`, `ESSAI_J1` |
+| Abonnement actif : 7, 3, 1 jours avant la fin **de la chaîne de renouvellements** | `ABO_J7`, `ABO_J3`, `ABO_J1` |
+| Essai ou abonnement terminé depuis moins de (grâce + 3) jours | `ESSAI_FIN`, `ABO_FIN` : annonce la date de fin de grâce, la lecture seule, et que rien n'est supprimé |
+
+Aucun rappel : atelier suspendu, abonnement suspendu, paiement déjà déclaré et en attente de vérification, atelier antérieur à l'essai gratuit, atelier sans adresse. Les échéances terminées depuis longtemps ne déclenchent rien : **au premier déploiement, aucun atelier abandonné ne reçoit de courriel**.
+
+**Garanties (testées).** La table `RappelAbonnement` (unique par atelier, type et échéance) est réservée **avant** l'envoi : tâche rejouée ou lancée trois fois en parallèle = un seul courriel. Si personne n'a pu être joint (panne du service de courriel), la réservation est retirée et le rappel part le lendemain. Une panne n'arrête pas la tâche ni les rappels de commandes.
+
+**Courriels de paiement** (après validation en base, sans jamais faire échouer la décision, y compris sans clé Resend) : déclaration → comptes SUPERADMIN ayant une adresse ; confirmation (avec numéro de facture), rejet (avec motif), remboursement → administrateurs de l'atelier. Rejouer une décision n'envoie rien.
+
+**Un défaut trouvé par les tests, corrigé.** Un renouvellement planifié qui démarrait quelques millisecondes après l'échéance en cours n'était pas reconnu comme prolongation : l'atelier aurait reçu un rappel d'expiration alors qu'il avait renouvelé. La continuité tolère maintenant un écart d'un jour (une activation manuelle peut démarrer le lendemain à minuit). Le défaut est apparu seulement quand la suite complète tournait en parallèle (écart d'horloge entre deux créations), pas en exécution isolée.
+
+**Limites :**
+- le rappel est calculé une fois par jour : un atelier qui renouvelle après le courriel du matin le reçoit quand même ;
+- les courriels dépendent de Resend : sans `RESEND_API_KEY` (ou avec l'expéditeur de test `onboarding@resend.dev`), rien ne part ou la délivrabilité est mauvaise — configurer un domaine vérifié reste à faire (voir `docs/SECURITE.md`) ;
+- seuls les administrateurs de l'atelier avec une adresse sont prévenus ; aucun SMS ni notification dans l'application avant la 5.7 ;
+- les textes sont en français uniquement (comme les autres courriels existants) ;
+- les nouveaux ateliers inscrits avant la mise en ligne de cette fonction et dont l'essai finit dans les 3 jours suivant le déploiement recevront un rappel.
+
+## 11. Réalisé en 5.5 — Wave durci, inactif par défaut
+
+**Activation.** Wave n'est proposé que si `WAVE_ENABLED=1`, `WAVE_API_KEY` et `WAVE_WEBHOOK_SECRET` sont tous définis. Sinon : `POST /api/abonnements/payer-wave` répond 503, `POST /api/webhooks/wave` répond 503 sans lire ni écrire quoi que ce soit, `GET /api/abonnements/etat` annonce `paiementsEnLigne.wave: false`. Rien n'est actif en production tant que vous n'avez pas défini ces variables.
+
+**Principes appliqués (tous testés contre un faux serveur Wave).**
+1. **Aucune confiance accordée au navigateur ni au contenu du webhook.** Le webhook (signature HMAC vérifiée, tolérance 5 minutes) n'est qu'un déclencheur. Le serveur relit la session chez Wave avec sa propre clé, puis compare session, référence, montant et devise à sa transaction. Au moindre écart (ex. montant payé différent) : **rien n'est activé**, la transaction reste en attente, l'anomalie est journalisée (`ABONNEMENT_WAVE_INCOHERENT`) pour traitement humain.
+2. **Aucune présomption en cas de doute.** Wave injoignable : le webhook répond 503, Wave réessaie (jusqu'à 3 jours) ; l'événement n'est pas consommé.
+3. **Chaque événement n'agit qu'une fois.** Table `EvenementPaiement` écrite dans la même transaction que l'effet ; l'effet est de plus idempotent (verrou par atelier puis par transaction). Cinq livraisons simultanées = une facture.
+4. **Rattrapage.** Wave n'envoie aucun événement à l'expiration d'une session (30 min) et ne garantit pas la livraison. La tâche quotidienne relit les sessions en attente depuis plus de 3 minutes ; l'atelier peut aussi demander la relecture (`POST /transactions/:id/verifier`). Une session jamais créée est abandonnée après 5 minutes. Un paiement Wave ne peut pas être confirmé à la main.
+5. **Remboursement.** Wave rembourse d'abord (opération idempotente chez eux) ; si Wave refuse ou ne répond pas, rien n'est enregistré (502). Rejouer ne rembourse pas deux fois.
+6. **Création de session en échec** : la transaction est clôturée, rien n'est activé, une nouvelle tentative est possible.
+
+**Tests.** 21 unitaires (signature : corps modifié, secret, rejeu, rotation, en-tête mal formé ; évaluation de session ; activation) et 24 d'intégration. Quatre mutations détectées : confiance au contenu du webhook sans relecture, montant non contrôlé, Wave toujours actif, signature non vérifiée.
+
+**Ce qui n'a PAS été vérifié, et ne peut pas l'être sans vous.**
+- **Aucun appel à l'API Wave réelle n'a été fait.** Le faux serveur applique ma lecture de docs.wave.com (14/11/2026) : noms de champs, statuts (`checkout_status`, `payment_status`), événements, en-tête de signature. Si la réalité diffère, les tests passent quand même. **Un essai réel avec un compte Wave Business est indispensable avant toute activation.**
+- **Wave ne confirme pas servir le Niger.** Il faut un compte Business valide et la confirmation de Wave.
+- La documentation Wave ne décrit pas de bac à sable : un essai réel engage de l'argent réel (prévoir un très petit montant).
+- Wave exige des URLs de retour en https : `PUBLIC_APP_URL` doit l'être.
+- L'ordre des opérations de remboursement (Wave puis base) laisse une fenêtre où Wave a remboursé mais la base n'est pas à jour si elle tombe entre les deux : rejouer l'action rattrape (Wave ne rembourse pas deux fois), mais la situation intermédiaire est possible.
+- Pas d'écran : l'interface de paiement Wave arrive en 5.7.
+
+**Modification d'un test existant.** « aucune route de paiement/souscription n'existe côté ADMIN » affirmait que `/api/webhooks/wave` répondait 404. Il répond désormais 503 tant que Wave n'est pas activé ; le test garde l'interdiction de toute route de simulation ou de confirmation par l'ADMIN.
+
+## 12. Réalisé en 5.6 — tableau de bord commercial (API)
+
+Trois routes réservées au SUPERADMIN, en lecture seule (`/api/plateforme/commerce/...`, détail dans `docs/API.md`). **Il n'y a pas encore d'écran** : l'interface arrive en 5.7.
+
+| Route | Contenu |
+|---|---|
+| `synthese` | ateliers par état et par mode d'accès, revenus du mois et du mois précédent, cumul, revenu mensuel récurrent, paiements à vérifier, anomalies Wave, conversion des essais, taux de renouvellement |
+| `revenus?mois=&atelierId=` | série mensuelle (encaissé, remboursé, net), totaux, ventilation par formule et par moyen de paiement |
+| `renouvellements?jours=` | ateliers à relancer : échéance dans l'horizon, récemment expirés, essais qui finissent, avec contact |
+
+**Définitions** (à lire avant d'interpréter un chiffre) :
+- **Encaissement** : transaction d'abonnement confirmée, datée du jour de la confirmation. **Remboursement** : daté du jour du remboursement. **Net** = encaissé − remboursé du mois (un paiement encaissé en octobre et remboursé en novembre pèse sur novembre).
+- **Revenu mensuel récurrent** : somme de prix ÷ durée des abonnements **actifs aujourd'hui**.
+- **Renouvelé** : un abonnement échu pendant les 90 derniers jours a été suivi d'un autre qui commence au plus un jour avant son échéance et au plus (jours de grâce) après.
+- **Converti** : atelier dont l'essai s'est terminé pendant les 90 derniers jours et qui a (ou a eu) un abonnement confirmé ou suspendu.
+- Les ateliers **suspendus** par la plateforme sont comptés à part, hors des états d'abonnement.
+
+**Ce que ces chiffres ne contiennent pas — à connaître :**
+- Les abonnements **activés à la main sans transaction** (paiement reçu hors plateforme, ou cadeau) ne sont **pas** comptés en revenus : ils sont signalés à part (`activationsSansPaiementEnregistre`) avec leur valeur. Si vous activez manuellement après avoir reçu de l'argent, ce revenu n'apparaît pas tant que la souscription ne passe pas par la déclaration de paiement.
+- Aucun chiffre n'est ventilé par pays, ni par devise : tout est en FCFA.
+- Les agrégats mensuels sont en UTC.
+- Les listes chargent tous les ateliers en mémoire : adapté à quelques centaines d'ateliers, à revoir (pagination, agrégation SQL) au-delà de quelques milliers.
+
+**Correction d'un indicateur existant.** `GET /api/ateliers/tendances` datait le revenu d'un paiement par `updatedAt`, qui change à chaque modification (un remboursement, par exemple). Il utilise maintenant la date de confirmation.
+
+**Tests.** 19 unitaires (dates fixes) et 16 d'intégration avec de vraies requêtes SQL (mois à cheval, remboursements, ventilations, droits d'accès, paramètres invalides). Deux mutations détectées (revenu mensuel récurrent comptant les abonnements suspendus, renouvellement sans limite de grâce). Un défaut de présentation corrigé en cours de route : les montants issus du SQL s'écrivaient « 27000.00 » alors que le reste de l'API écrit « 27000 ».
+
+## 13. Réalisé en 5.7 — interface
+
+**Côté atelier (PDG)**
+- **Bandeau d'accès**, dans tout l'espace de l'atelier : ambre pendant la période de grâce (avec la date de fin), rouge en lecture seule, rouge « suspendu par la plateforme ». Aucun bandeau pendant une impersonation SUPERADMIN. Le bandeau du tableau de bord ne double plus l'avertissement d'expiration.
+- **Page Abonnement** : bouton « Souscrire » sur chaque formule → formulaire de déclaration (moyen, opérateur, référence obligatoire sauf espèces, précision) avec les **instructions de paiement** saisies par la plateforme ; une seule déclaration à la fois ; carte « paiement en attente » avec retrait ; **historique des paiements** avec justificatif PDF.
+- **Clé d'idempotence** : nouvelle à chaque modification de la saisie et après chaque succès, conservée sur une réémission après coupure réseau.
+- **Wave** : bouton et retour de paiement prêts, **visibles seulement si Wave est activé** côté serveur. Le retour de Wave (`?paiement=retour&transaction=…`) demande au serveur de relire le paiement chez Wave ; « confirmé » n'est affiché que si Wave l'a dit.
+- Une saisie refusée en lecture seule affiche le message du serveur à l'endroit de la saisie (plus de redirection).
+
+**Côté SUPERADMIN**
+- **Paiements d'abonnement** (`/paiements-abonnement`) : file des paiements à vérifier (filtre par statut), confirmation en deux temps (rapprochement avec le relevé), rejet et remboursement avec motif obligatoire, lien vers le justificatif. Un paiement Wave n'a pas de bouton de confirmation.
+- **Tableau de bord commercial** (`/commerce`) : ateliers par état et par accès, revenus (mois, précédent, cumul, revenu mensuel récurrent), paiements à vérifier, anomalies Wave, conversion et renouvellement, revenus par mois avec ventilation, renouvellements à suivre (horizon 7/30/60 jours) avec contact, **réglages** (jours de grâce, instructions de paiement).
+- **Fiche atelier** : suspendre (motif obligatoire) et réactiver un abonnement.
+
+**Backend ajouté.** Champ `instructionsPaiement` (migration additive `20261120090000`), lu et écrit par `/api/plateforme/parametres-abonnement`, exposé aux ateliers par `/api/abonnements/etat`. Test d'intégration ajouté.
+
+**Défaut trouvé par les tests de bout en bout.** Après une déclaration réussie, le message de confirmation n'apparaissait pas : le hook renvoyait la promesse de relecture de l'état, que TanStack Query attend avant d'appeler les rappels de `mutate()` ; or la relecture retirait le formulaire de l'écran, qui ne recevait jamais son `onSuccess`. Corrigé (la relecture n'est plus attendue). Aucun test unitaire n'aurait pu le voir.
+
+**Tests.** 11 unitaires de logique pure (validation, corps de requête sans montant, bandeau d'accès, retour de Wave) et 5 de formatage ; **8 parcours de bout en bout dans un navigateur réel** (grâce, lecture seule, souscription, confirmation par le SUPERADMIN, accès rétabli, justificatif PDF, isolation du justificatif, tableau de bord, réglages). Pas de tests de composants React (pas d'outillage installé).
+
+**Limites :**
+- le parcours Wave **n'est pas testé dans un navigateur** (Wave est inactif dans le jeu de données) ; sa logique serveur l'est contre le faux serveur Wave ;
+- interface testée en **français** dans le navigateur ; l'anglais est couvert par le test de parité des traductions (aucune clé manquante) mais pas par un parcours ;
+- pas de vérification visuelle sur mobile ni de test d'accessibilité automatisé ;
+- les textes anglais ont été écrits sans relecture par un locuteur natif ;
+- les tableaux du tableau de bord commercial n'ont ni graphique ni export ; les barres sont de simples éléments HTML ;
+- aucune notification dans l'application (cloche) pour un paiement à vérifier : le SUPERADMIN le voit dans la page Paiements et par courriel s'il a une adresse.

@@ -1,0 +1,25 @@
+// English translations — workshop suppliers. Namespace "fou".
+export default {
+  fou: {
+    title: "Suppliers",
+    subtitle: "The people and shops you buy fabrics and supplies from.",
+    new: "New supplier",
+    editTitle: "Edit supplier",
+    search: "Search (name, contact, phone, email)…",
+    loading: "Loading suppliers…",
+    loadingOne: "Loading supplier…",
+    emptyAll: "No suppliers yet. Add the one you buy your fabrics from.",
+    emptyFiltered: "No supplier matches.",
+    colName: "Name",
+    colContact: "Contact",
+    colPhone: "Phone",
+    contact: "Contact person",
+    phone: "Phone",
+    email: "Email",
+    address: "Address",
+    notes: "Notes",
+    confirmArchive: "Archive this supplier? It disappears from lists but nothing is deleted.",
+    confirmRestore: "Restore this supplier?",
+    archivedError: "Archived supplier: restore it before editing.",
+  },
+};

@@ -1,10 +1,14 @@
+import { log, messageErreur } from "../lib/logger.js";
 import { Router } from "express";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
+import { traduire } from "../lib/messagesServeur.js";
 import { prisma } from "../lib/prisma.js";
+import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
-import { requireAuth, requireAtelier, requireAbonnementActif } from "../middlewares/auth.middleware.js";
+import { requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule, requirePermission } from "../middlewares/auth.middleware.js";
+import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
 import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import {
@@ -15,15 +19,22 @@ import {
 import mesuresRouter from "./mesures.routes.js";
 import { buildCsv, envoyerCsv } from "../lib/csv.js";
 import { creerToken } from "../lib/tokenAction.js";
+import { isUniqueConstraintViolation } from "../lib/prismaErrors.js";
+import { verrouillerCle } from "../lib/verrous.js";
 import { envoyerEmail } from "../lib/resend.js";
+import { origineApplication } from "../lib/appUrl.js";
 import { emailInvitationClientTemplate } from "../lib/emailTemplates.js";
+import { anonymiserCliente } from "../lib/donneesCliente.js";
+import { journaliserSecurite } from "../lib/securityLog.js";
 
 const router = Router();
 
 // Toutes les routes Clientes (et Mesures, montées ci-dessous) exigent une
 // session valide ET un compte ADMIN rattaché à un atelier (Phase 8 —
 // multi-tenant, voir auth.middleware.js).
-router.use(requireAuth, requireAtelier, requireAbonnementActif);
+// Membres de l'atelier (PDG ou employé) ; l'employé doit en plus avoir la permission « clientes.lire » (GET) ou
+// « clientes.ecrire » (autres méthodes), contrôlée avant toute route.
+router.use(requireAuth, requireMembreAtelier, requireAbonnementActif, droitsParModule("clientes"), masquerFinancesSiNonAutorise);
 
 // Rétro-portage du garde-fou anti-octet-nul/caractères de contrôle, déjà en
 // place sur Commandes/Paiements/Livraisons/Dépenses/Reçus depuis le module 5
@@ -41,8 +52,8 @@ router.use("/:id/mesures", mesuresRouter);
  * doublon même si l'ancienne fiche a été archivée (le bon geste est alors de
  * la restaurer, pas d'en recréer une nouvelle).
  */
-async function assertPhoneAvailable(atelierId, telephone, excludeId) {
-  const existing = await prisma.cliente.findFirst({
+async function assertPhoneAvailable(client, atelierId, telephone, excludeId) {
+  const existing = await client.cliente.findFirst({
     where: {
       atelierId,
       telephone,
@@ -61,24 +72,37 @@ async function assertPhoneAvailable(atelierId, telephone, excludeId) {
 }
 
 // POST /api/clientes — création
-router.post("/", async (req, res) => {
+router.post("/", idempotence, async (req, res) => {
   const parsed = createClienteSchema.safeParse(req.body);
   if (!parsed.success) {
     throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   }
   const data = parsed.data;
 
-  await assertPhoneAvailable(req.user.atelierId, data.telephone);
-
-  const cliente = await prisma.cliente.create({ data: { ...data, atelierId: req.user.atelierId } });
+  // Vérification ET création dans une même transaction, sous un verrou consultatif sur la clé
+  // « atelier + téléphone » : aucune contrainte UNIQUE n'existe en base, donc sans ce verrou deux
+  // créations simultanées passaient toutes les deux la vérification (anomalie 5 : 2 clientes sur 8).
+  const cliente = await prisma.$transaction(
+    async (tx) => {
+      await verrouillerCle(tx, `cliente:${req.user.atelierId}:${data.telephone}`);
+      await assertPhoneAvailable(tx, req.user.atelierId, data.telephone);
+      return tx.cliente.create({ data: { ...data, atelierId: req.user.atelierId } });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
   res.status(201).json(cliente);
 });
 
 // Filtre partagé entre GET / (paginé) et GET /export (tout en un CSV) — une
 // seule définition, jamais deux logiques de recherche qui pourraient dériver
 // l'une de l'autre au fil du temps.
-function buildClientesWhere(atelierId, { q, archived }) {
+function buildClientesWhere(atelierId, { q, archived, effacement }) {
   const where = { atelierId };
+  // « effacement=true » : fiches dont la cliente a demandé l'effacement de ses données et qui ne sont pas encore anonymisées.
+  if (effacement === "true") {
+    where.suppressionDemandeeLe = { not: null };
+    where.anonymiseeLe = null;
+  }
   // Par défaut : uniquement les clientes actives. "archived=true" isole les
   // archivées, "archived=all" retire le filtre pour tout voir.
   if (archived === "false") where.archivedAt = null;
@@ -108,8 +132,8 @@ router.get("/", async (req, res) => {
   if (!parsed.success) {
     throw new HttpError(400, "Paramètres de recherche invalides.", formatZodError(parsed.error));
   }
-  const { q, archived, page, pageSize } = parsed.data;
-  const where = buildClientesWhere(req.user.atelierId, { q, archived });
+  const { q, archived, effacement, page, pageSize } = parsed.data;
+  const where = buildClientesWhere(req.user.atelierId, { q, archived, effacement });
 
   const [rows, total] = await Promise.all([
     prisma.cliente.findMany({
@@ -194,7 +218,7 @@ const dec = (v) => (v == null ? D0 : new Prisma.Decimal(v));
 // le solde d'une commande individuelle (computeSolde) ne le fait pas non
 // plus — un statut de commande et un total financier restent deux
 // informations distinctes ici, jamais mélangées.
-router.get("/:id/totaux", async (req, res) => {
+router.get("/:id/totaux", requirePermission("finances.voir"), async (req, res) => {
   const { id } = req.params;
   const cliente = await prisma.cliente.findFirst({
     where: { id, atelierId: req.user.atelierId },
@@ -229,19 +253,26 @@ router.patch("/:id", async (req, res) => {
   const data = parsed.data;
   const { id } = req.params;
 
-  if (data.telephone) {
-    await assertPhoneAvailable(req.user.atelierId, data.telephone, id);
-  }
-
   // updateMany avec condition sur archivedAt : évite une lecture-puis-écriture
   // non atomique (double-clic / retry concurrent sur la même fiche).
   // atelierId dans le where : une commande d'un autre atelier avec le même
   // id (impossible en pratique, cuid, mais gardé par défense en profondeur)
   // ne serait de toute façon jamais modifiée.
-  const result = await prisma.cliente.updateMany({
-    where: { id, atelierId: req.user.atelierId, archivedAt: null },
-    data,
-  });
+  // Même verrou que la création : un changement de téléphone ne peut pas entrer en collision avec une
+  // création ou une autre modification simultanée vers le même numéro.
+  const result = await prisma.$transaction(
+    async (tx) => {
+      if (data.telephone) {
+        await verrouillerCle(tx, `cliente:${req.user.atelierId}:${data.telephone}`);
+        await assertPhoneAvailable(tx, req.user.atelierId, data.telephone, id);
+      }
+      return tx.cliente.updateMany({
+        where: { id, atelierId: req.user.atelierId, archivedAt: null },
+        data,
+      });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
 
   if (result.count === 0) {
     const existing = await prisma.cliente.findFirst({
@@ -277,11 +308,23 @@ router.post("/:id/archiver", async (req, res) => {
   res.json(cliente);
 });
 
+// POST /api/clientes/:id/anonymiser — droit à l'effacement (7.4). PDG uniquement (irréversible, non délégable). Remplace
+// l'identité par des valeurs neutres, supprime mesures et fil d'activité, ferme le compte de connexion ; commandes et
+// paiements restent (obligation comptable). Refusé tant qu'une commande est en cours.
+router.post("/:id/anonymiser", async (req, res) => {
+  if (req.user.role !== "ADMIN") throw new HttpError(403, "Réservé au responsable de l'atelier.");
+  const conflit = (message) => new HttpError(409, message);
+  const cliente = await anonymiserCliente(prisma, { clienteId: req.params.id, atelierId: req.user.atelierId }, conflit);
+  if (!cliente) throw new HttpError(404, "Client introuvable.");
+  await journaliserSecurite("CLIENTE_ANONYMISEE", { req, userId: req.user.id, atelierId: req.user.atelierId, details: { clienteId: cliente.id } });
+  res.json(cliente);
+});
+
 // POST /api/clientes/:id/restaurer — réactivation d'une fiche archivée
 router.post("/:id/restaurer", async (req, res) => {
   const { id } = req.params;
   const result = await prisma.cliente.updateMany({
-    where: { id, atelierId: req.user.atelierId, archivedAt: { not: null } },
+    where: { id, atelierId: req.user.atelierId, archivedAt: { not: null }, anonymiseeLe: null },
     data: { archivedAt: null },
   });
 
@@ -291,6 +334,8 @@ router.post("/:id/restaurer", async (req, res) => {
       select: { archivedAt: true },
     });
     if (!existing) throw new HttpError(404, "Client introuvable.");
+    const anonyme = await prisma.cliente.findFirst({ where: { id, anonymiseeLe: { not: null } }, select: { id: true } });
+    if (anonyme) throw new HttpError(409, "Cette fiche a été anonymisée : elle ne peut pas être restaurée.");
     throw new HttpError(409, "Client déjà actif.");
   }
 
@@ -315,17 +360,16 @@ router.post("/:id/restaurer", async (req, res) => {
 router.post("/:id/inviter", async (req, res) => {
   const cliente = await prisma.cliente.findFirst({ where: { id: req.params.id, atelierId: req.user.atelierId } });
   if (!cliente) throw new HttpError(404, "Client introuvable.");
-  if (cliente.userId) {
-    throw new HttpError(409, "Ce client a déjà été invité ou possède déjà un compte.");
-  }
+  if (cliente.anonymiseeLe) throw new HttpError(409, "Cette fiche a été anonymisée : elle ne peut pas être invitée.");
 
+  // Cette lecture ne sert qu'à charger les données de l'invitation. Les gardes « déjà invitée » et
+  // « identifiant déjà pris » sont appliquées DANS la transaction ci-dessous (verrou de ligne sur la
+  // cliente + contrainte UNIQUE), jamais par une vérification préalable (anomalie 2).
   const identifiant = cliente.telephone;
-  const existant = await prisma.user.findUnique({ where: { identifiant } });
-  if (existant) {
-    throw new HttpError(409, "Un compte existe déjà avec ce numéro de téléphone.", {
+  const conflitTelephone = () =>
+    new HttpError(409, "Un compte existe déjà avec ce numéro de téléphone.", {
       telephone: ["Un compte existe déjà avec ce numéro de téléphone."],
     });
-  }
 
   // Reporté sur le compte de connexion UNIQUEMENT si disponible : User.email
   // est unique (voir schema.prisma), or Cliente.email ne l'est pas — deux
@@ -333,34 +377,58 @@ router.post("/:id/inviter", async (req, res) => {
   // compte connecté, "mot de passe oublié" (auth.routes.js) ne peut envoyer
   // aucun email pour ce compte, faute d'email enregistré dessus — mieux
   // qu'un email en doublon qui ferait échouer toute l'invitation.
-  let emailPourCompte;
-  if (cliente.email) {
-    const emailDejaUtilise = await prisma.user.findUnique({ where: { email: cliente.email } });
-    if (!emailDejaUtilise) emailPourCompte = cliente.email;
-  }
+  // Concrètement : on tente la création AVEC l'email ; si la contrainte unique de l'email est violée
+  // (même par une invitation simultanée), on recommence SANS email — jamais d'échec de l'invitation.
 
   // Coût bcrypt normal malgré l'inutilisabilité : ce hash ne doit jamais
   // être plus facile à retrouver par force brute qu'un vrai mot de passe.
   const passwordHashTemporaire = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 12);
 
-  const { token } = await prisma.$transaction(async (tx) => {
-    const user = await tx.user.create({
-      data: {
-        identifiant,
-        passwordHash: passwordHashTemporaire,
-        role: "USER",
-        atelierId: cliente.atelierId,
-        prenom: cliente.prenom,
-        nom: cliente.nom,
-        email: emailPourCompte,
-      },
-    });
-    await tx.cliente.update({ where: { id: cliente.id }, data: { userId: user.id } });
-    const token = await creerToken({ userId: user.id, type: "INVITATION_CLIENT", dureeMs: 7 * 24 * 60 * 60 * 1000 }, tx);
-    return { token };
-  });
+  const creerCompte = (avecEmail) =>
+    prisma.$transaction(
+      async (tx) => {
+        // Verrou de ligne sur la cliente : deux invitations simultanées de la même cliente se
+        // sérialisent ; la seconde voit userId renseigné et refuse avec le message métier.
+        const lignes = await tx.$queryRaw`SELECT "userId" FROM "Cliente" WHERE id = ${cliente.id} AND "atelierId" = ${cliente.atelierId} FOR UPDATE`;
+        if (lignes.length === 0) throw new HttpError(404, "Client introuvable.");
+        if (lignes[0].userId) throw new HttpError(409, "Ce client a déjà été invité ou possède déjà un compte.");
 
-  const origin = `${req.protocol}://${req.get("host")}`;
+        const user = await tx.user.create({
+          data: {
+            identifiant,
+            passwordHash: passwordHashTemporaire,
+            role: "USER",
+            atelierId: cliente.atelierId,
+            prenom: cliente.prenom,
+            nom: cliente.nom,
+            email: avecEmail ? cliente.email : undefined,
+          },
+        });
+        await tx.cliente.update({ where: { id: cliente.id }, data: { userId: user.id } });
+        const token = await creerToken({ userId: user.id, type: "INVITATION_CLIENT", dureeMs: 7 * 24 * 60 * 60 * 1000 }, tx);
+        return { token };
+      },
+      { maxWait: 10_000, timeout: 15_000 },
+    );
+
+  let token;
+  try {
+    ({ token } = await creerCompte(Boolean(cliente.email)));
+  } catch (err) {
+    if (isUniqueConstraintViolation(err, "identifiant")) throw conflitTelephone();
+    if (cliente.email && isUniqueConstraintViolation(err, "email")) {
+      try {
+        ({ token } = await creerCompte(false));
+      } catch (err2) {
+        if (isUniqueConstraintViolation(err2, "identifiant")) throw conflitTelephone();
+        throw err2;
+      }
+    } else {
+      throw err;
+    }
+  }
+
+  const origin = origineApplication(req);
   const lienActivation = `${origin}/client/activer?token=${token}`;
 
   // Best effort, jamais bloquant (voir même pattern pour l'email de
@@ -376,11 +444,11 @@ router.post("/:id/inviter", async (req, res) => {
     try {
       await envoyerEmail({
         to: cliente.email,
-        subject: "Créez votre compte client — Gestion d'Atelier",
-        html: emailInvitationClientTemplate({ prenom: cliente.prenom, identifiant, lienActivation }),
+        subject: traduire(req.user.langue, "email.invitation.sujet"),
+        html: emailInvitationClientTemplate({ prenom: cliente.prenom, identifiant, lienActivation, langue: req.user.langue }),
       });
     } catch (err) {
-      console.error(`[clientes:inviter] Échec de l'envoi de l'invitation à ${cliente.email} :`, err.message);
+      log.error("erreur", { categorie: "email", operation: "invitation_cliente", clienteId: cliente.id, message: messageErreur(err) });
     }
   }
 

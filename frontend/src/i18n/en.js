@@ -7,6 +7,16 @@ import clientes from "./parts/clientes.en.js";
 import superadmin from "./parts/superadmin.en.js";
 import abonnement from "./parts/abonnement.en.js";
 import superadminAbo from "./parts/superadminAbo.en.js";
+import paiementsAbo from "./parts/paiementsAbo.en.js";
+import employes from "./parts/employes.en.js";
+import production from "./parts/production.en.js";
+import fournisseurs from "./parts/fournisseurs.en.js";
+import achats from "./parts/achats.en.js";
+import lookbook from "./parts/lookbook.en.js";
+import vitrine from "./parts/vitrine.en.js";
+import demandesVitrine from "./parts/demandesVitrine.en.js";
+import donnees from "./parts/donnees.en.js";
+import rapportsAvances from "./parts/rapportsAvances.en.js";
 
 export default {
   ...shared,
@@ -15,6 +25,16 @@ export default {
   ...superadmin,
   ...abonnement,
   ...superadminAbo,
+  ...paiementsAbo,
+  ...employes,
+  ...production,
+  ...fournisseurs,
+  ...achats,
+  ...lookbook,
+  ...vitrine,
+  ...demandesVitrine,
+  ...donnees,
+  ...rapportsAvances,
   common: {
     save: "Save",
     cancel: "Cancel",
@@ -56,6 +76,11 @@ export default {
     settings: "Settings",
     myAccount: "My account",
     subscription: "Subscription",
+    employees: "Employees",
+    production: "Production",
+    suppliers: "Suppliers",
+    purchases: "Purchases",
+    storefront: "Storefront",
     finances: "Finances",
     notifications: "Notifications",
     unreadNotifications: "{{count}} unread notification(s)",

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clientesApi } from "./api.js";
+import { ecrireOuMettreEnFile } from "../../lib/fileSynchro.js";
 
 export function useClientesQuery(params) {
   return useQuery({
@@ -22,7 +23,9 @@ export function useClienteQuery(id) {
 export function useCreateClienteMutation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data) => clientesApi.create(data),
+    // Hors connexion, la création est gardée sur l'appareil puis envoyée au retour du serveur (7.6) : la réponse vaut alors { enAttente: true }.
+    mutationFn: (data) =>
+      ecrireOuMettreEnFile({ type: "cliente.creer", chemin: "/clientes", corps: data, libelle: `Nouvelle cliente : ${data.prenom} ${data.nom}` }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes", "list"] });
     },
@@ -51,6 +54,19 @@ export function useArchiveClienteMutation(id) {
   });
 }
 
+// Droit à l'effacement (PDG) : anonymise la fiche ; les mesures, le fil d'activité et le compte disparaissent, donc on
+// rafraîchit aussi leurs listes.
+export function useAnonymiserClienteMutation(id) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => clientesApi.anonymiser(id),
+    onSuccess: (cliente) => {
+      queryClient.setQueryData(["clientes", "detail", id], cliente);
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+    },
+  });
+}
+
 export function useRestoreClienteMutation(id) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -64,11 +80,12 @@ export function useRestoreClienteMutation(id) {
 
 // Totaux agrégés (toutes les commandes du client, pas seulement la page
 // affichée) — voir ClienteDetailPage.jsx, bloc "Total commandes/payé/restant".
-export function useClienteTotauxQuery(clienteId) {
+// `actif: false` : pas de requête (le serveur répondrait 403 à un employé sans « finances.voir »).
+export function useClienteTotauxQuery(clienteId, { actif = true } = {}) {
   return useQuery({
     queryKey: ["clientes", clienteId, "totaux"],
     queryFn: () => clientesApi.totaux(clienteId),
-    enabled: Boolean(clienteId),
+    enabled: Boolean(clienteId) && actif,
   });
 }
 
@@ -112,7 +129,8 @@ export function useInviterClienteMutation(id) {
 export function useCreateMesureMutation(clienteId) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data) => clientesApi.mesures.create(clienteId, data),
+    mutationFn: (data) =>
+      ecrireOuMettreEnFile({ type: "mesure.creer", chemin: `/clientes/${clienteId}/mesures`, corps: data, libelle: "Nouvelle prise de mesures" }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes", clienteId, "mesures"] });
     },

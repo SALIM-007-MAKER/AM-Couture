@@ -1,3 +1,4 @@
+import { useCan } from "../../hooks/usePermissions.js";
 import { Link, useParams } from "react-router-dom";
 import { User, Pencil, Ruler, Plus, ClipboardList } from "lucide-react";
 import {
@@ -19,6 +20,7 @@ import MesuresHistory from "./components/MesuresHistory.jsx";
 import ClienteCommandesHistory from "./components/ClienteCommandesHistory.jsx";
 import RappelButton from "./components/RappelButton.jsx";
 import InviterClientButton from "./components/InviterClientButton.jsx";
+import AnonymiserControl from "./components/AnonymiserControl.jsx";
 
 export default function ClienteDetailPage() {
   const { t } = useTranslation();
@@ -49,7 +51,10 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
   // fiche (même logique que le logo dans AppLayout.jsx) — l'historique
   // détaillé juste en dessous (ClienteCommandesHistory) reste la source de
   // vérité même si ce bloc n'a pas encore chargé.
-  const totauxQuery = useClienteTotauxQuery(id);
+  const can = useCan();
+  const totauxQuery = useClienteTotauxQuery(id, { actif: can("finances.voir") });
+  // Droit à l'effacement : réservé au PDG (irréversible, non délégable).
+  const peutAnonymiser = can("@admin");
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -112,9 +117,11 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
             !cliente.archivedAt && (
               <div className="flex flex-wrap gap-2 justify-end">
                 {totauxQuery.data && <RappelButton cliente={cliente} totalRestant={totauxQuery.data.totalRestant} />}
-                <Button as={Link} to={`/commandes/nouvelle?clienteId=${id}`} variant="secondary" size="sm" icon={Plus}>
-                  {t("cli.detail.newOrder")}
-                </Button>
+                {can("commandes.ecrire") && (
+                  <Button as={Link} to={`/commandes/nouvelle?clienteId=${id}`} variant="secondary" size="sm" icon={Plus}>
+                    {t("cli.detail.newOrder")}
+                  </Button>
+                )}
               </div>
             )
           }
@@ -145,6 +152,8 @@ function ClienteDetailContent({ id, cliente, archiveMutation, restoreMutation })
         )}
         <ClienteCommandesHistory clienteId={id} />
       </div>
+
+      {peutAnonymiser && <AnonymiserControl cliente={cliente} />}
 
       <div className="space-y-2">
         <SectionTitle

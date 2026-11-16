@@ -1,5 +1,7 @@
+import { log, messageErreur } from "../lib/logger.js";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import { traduire } from "../lib/messagesServeur.js";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
@@ -13,6 +15,8 @@ import { creerToken, consommerToken } from "../lib/tokenAction.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { emailVerificationTemplate, emailReinitialisationTemplate } from "../lib/emailTemplates.js";
 import { rateLimitPersistant } from "../lib/rateLimiter.js";
+import { origineApplication } from "../lib/appUrl.js";
+import { journaliserSecurite } from "../lib/securityLog.js";
 
 const router = Router();
 
@@ -84,7 +88,15 @@ router.post("/login", loginLimiter, async (req, res) => {
   // Message volontairement identique dans les deux cas (identifiant inconnu
   // ou mot de passe faux) : ne jamais révéler quel champ est incorrect.
   if (!user || !valid) {
+    await journaliserSecurite("LOGIN_ECHEC", { req, userId: user?.id });
     throw new HttpError(401, "Identifiant ou mot de passe incorrect.");
+  }
+
+  // Compte désactivé (employé retiré par le PDG) : refusé APRÈS la vérification du mot de passe, pour ne pas révéler
+  // l'existence ou l'état d'un compte à qui ne connaît pas son mot de passe.
+  if (!user.actif) {
+    await journaliserSecurite("LOGIN_COMPTE_DESACTIVE", { req, userId: user.id, atelierId: user.atelierId });
+    throw new HttpError(403, "Ce compte a été désactivé. Contactez le responsable de l'atelier.");
   }
 
   // Fil d'activité SUPERADMIN (voir GET /api/ateliers/:id/activite) — un
@@ -106,7 +118,15 @@ router.post("/login", loginLimiter, async (req, res) => {
 
   const token = signAuthToken({ ...user, clienteId });
   setAuthCookie(res, token);
-  res.json({ id: user.id, identifiant: user.identifiant, role: user.role, atelierId: user.atelierId });
+  await journaliserSecurite("LOGIN_OK", { req, userId: user.id, atelierId: user.atelierId });
+  res.json({
+    id: user.id,
+    identifiant: user.identifiant,
+    role: user.role,
+    atelierId: user.atelierId,
+    // Employés : l'interface en a besoin dès la connexion (le serveur revérifie toujours chaque droit).
+    ...(user.role === "EMPLOYE" ? { poste: user.poste, permissions: user.permissions } : {}),
+  });
 });
 
 // Rate limiting sur l'inscription : plus strict que le login (10/15min) —
@@ -200,17 +220,18 @@ router.post("/inscription-atelier", inscriptionLimiter, rejectIfDejaConnecte, as
   // jamais l'action principale" (le .catch() reste local, jamais propagé).
   try {
     const verifToken = await creerToken({ userId: admin.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
-    const origin = `${req.protocol}://${req.get("host")}`;
+    const origin = origineApplication(req);
     await envoyerEmail({
       to: admin.email,
-      subject: "Confirmez votre email — Gestion d'Atelier",
+      subject: traduire(admin.langue, "email.verification.sujet"),
       html: emailVerificationTemplate({
+        langue: admin.langue,
         prenom: admin.prenom,
         lienVerification: `${origin}/verifier-email?token=${verifToken}`,
       }),
     });
   } catch (err) {
-    console.error(`[inscription-atelier] Échec de l'envoi de l'email de vérification à ${admin.email} :`, err.message);
+    log.error("erreur", { categorie: "email", operation: "verification_inscription", userId: admin.id, message: messageErreur(err) });
   }
 
   const token = signAuthToken(admin);
@@ -244,12 +265,13 @@ router.post("/renvoyer-verification-email", requireAuth, renvoyerVerificationLim
     throw new HttpError(400, "Cet email est déjà vérifié.");
   }
   const verifToken = await creerToken({ userId: user.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
-  const origin = `${req.protocol}://${req.get("host")}`;
+  const origin = origineApplication(req);
   try {
     await envoyerEmail({
       to: user.email,
-      subject: "Confirmez votre email — Gestion d'Atelier",
+      subject: traduire(user.langue, "email.verification.sujet"),
       html: emailVerificationTemplate({
+        langue: user.langue,
         prenom: user.prenom,
         lienVerification: `${origin}/verifier-email?token=${verifToken}`,
       }),
@@ -286,16 +308,17 @@ router.post("/mot-de-passe-oublie", motDePasseOublieLimiter, async (req, res) =>
   if (user?.email) {
     try {
       const resetToken = await creerToken({ userId: user.id, type: "REINITIALISATION_MOT_DE_PASSE", dureeMs: 60 * 60 * 1000 });
-      const origin = `${req.protocol}://${req.get("host")}`;
+      const origin = origineApplication(req);
       await envoyerEmail({
         to: user.email,
-        subject: "Réinitialisation de votre mot de passe — Gestion d'Atelier",
+        subject: traduire(user.langue, "email.reinitialisation.sujet"),
         html: emailReinitialisationTemplate({
+          langue: user.langue,
           lienReinitialisation: `${origin}/reinitialiser-mot-de-passe?token=${resetToken}`,
         }),
       });
     } catch (err) {
-      console.error(`[mot-de-passe-oublie] Échec de l'envoi à ${user.email} :`, err.message);
+      log.error("erreur", { categorie: "email", operation: "mot_de_passe_oublie", userId: user.id, message: messageErreur(err) });
     }
   }
 
@@ -318,6 +341,7 @@ router.post("/reinitialiser-mot-de-passe-token", async (req, res) => {
   // cookie ici : ce flux ne connecte jamais (voir décision d'origine),
   // la personne se reconnecte ensuite normalement via /login.
   await prisma.user.update({ where: { id: user.id }, data: { passwordHash, sessionVersion: { increment: 1 } } });
+  await journaliserSecurite("MOT_DE_PASSE_REINITIALISE", { req, userId: user.id, atelierId: user.atelierId });
   res.status(204).end();
 });
 
@@ -370,6 +394,7 @@ router.post("/quitter-impersonation", requireAuth, async (req, res) => {
   }
   const token = signAuthToken(superadmin);
   setAuthCookie(res, token);
+  await journaliserSecurite("IMPERSONATION_FIN", { req, userId: superadmin.id, atelierId: req.user.atelierId });
   res.json({ id: superadmin.id, identifiant: superadmin.identifiant, role: superadmin.role, atelierId: superadmin.atelierId });
 });
 
@@ -403,6 +428,9 @@ router.get("/me", requireAuth, async (req, res) => {
     email: user.email,
     emailVerifieLe: user.emailVerifieLe,
     impersonation,
+    // Employés : poste et permissions (relues en base), pour adapter l'interface. Le serveur ne s'y fie JAMAIS :
+    // chaque route revérifie les permissions.
+    ...(user.role === "EMPLOYE" ? { poste: user.poste, permissions: user.permissions } : {}),
   });
 });
 
