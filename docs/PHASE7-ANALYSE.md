@@ -107,3 +107,19 @@ Existe (logo, coordonnées, reçu). Ajouts raisonnables : **couleur principale**
 ## 6. Décisions du 16/11/2026
 
 Les quatre options recommandées ont été retenues : **adaptateur de stockage d'images** (adaptateur base de données pour le développement et les tests, adaptateur objet à brancher et vérifier avec le fournisseur choisi) ; **hors ligne** = lecture + écritures sûres (jamais de paiement) ; **demandes publiques sans compte** avec consentement ; la phase 6 est mise en pause (6.6 fusionnée, **6.7 rapports et 6.8 bilan restent à faire**) pour avancer sur la phase 7.
+
+## 7. Réalisé en 7.1 — stockage d'images et lookbook
+
+**Fonctionnement** : le lookbook est la fiche **Modèle** étendue (pas de module en double). Section « Lookbook » de la fiche : jusqu'à 8 photos par modèle (la première est la couverture), ajout depuis l'appareil (redimensionné côté navigateur, 2 Mo au plus côté serveur), réordonnancement, suppression, tags (12 au plus), bouton **Publier / Retirer**. Rien n'est publié par défaut ; publier exige au moins une photo ; retirer la dernière photo, ou archiver le modèle, le dépublie. « Publié » ne rend encore **rien public** : la diffusion arrive avec la vitrine (7.2).
+
+**Stockage derrière une interface** (`lib/stockageImages.js`, décision du 16/11) : `enregistrer`, `lire`, `supprimer`, toujours bornés à l'atelier. L'adaptateur fourni est la **base de données** (table `ImageAtelier`, octets réels, plus de base64 en texte). L'**adaptateur objet (S3, R2, Vercel Blob) n'est pas écrit** : aucun compte ni clé disponibles pour le vérifier ; le brancher ne demande que d'implémenter ces trois fonctions et de changer `stockage`. Photo historique `Modele.photoUrl` (base64) conservée telle quelle ; pas de migration automatique des anciennes images.
+
+**Sécurité** : le fichier doit être une vraie image (octets magiques vérifiés, pas seulement l'en-tête déclaré), jamais une URL externe ; route `GET /api/images/:id` réservée aux membres de l'atelier avec `modeles.lire`, 404 pour l'image d'un autre atelier, `X-Content-Type-Options: nosniff`, cache privé. Verrou de ligne sur le modèle : 12 ajouts simultanés donnent 8 photos aux positions distinctes et aucune image orpheline.
+
+**Base de données** (migration additive `20261126090000_lookbook`) : `Modele.publie`, `Modele.tags` ; tables `ImageAtelier` et `PhotoModele`. Retour arrière : supprimer les deux tables et les deux colonnes.
+
+**API** : 4 routes ajoutées (185 documentées) + `publie` et `tags` sur `PATCH /api/modeles/:id`.
+
+**Tests** : 10 d'intégration (publication refusée sans photo, octets exacts servis avec le bon type, faux fichier / trop lourd / URL externe refusés, limite de 8 sous concurrence, ordre, tags normalisés, dépublication automatique, archivage, isolation, droits) ; 2 mutations détectées (image lue sans filtre d'atelier, limite de photos) ; 4 E2E (photos réelles, couverture, ordre, tags, publication, retrait). Suites complètes : 333 unitaires backend, 374 intégration, 97 frontend, 59 E2E.
+
+**Limites** : les octets sont dans PostgreSQL tant qu'un adaptateur objet n'est pas branché (peu coûteux pour des galeries de 8 photos redimensionnées, à surveiller au-delà de quelques centaines d'ateliers actifs) ; pas de miniatures serveur (le navigateur réduit avant l'envoi) ; pas de légende modifiable dans l'interface (l'API l'accepte à l'ajout).

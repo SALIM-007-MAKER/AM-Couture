@@ -8,6 +8,7 @@ import ArchiveRestoreControl from "../../components/ArchiveRestoreControl.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
+import LookbookSection from "./components/LookbookSection.jsx";
 import { useTranslation } from "../../i18n/index.js";
 
 export default function ModeleDetailPage() {
@@ -73,6 +74,9 @@ export default function ModeleDetailPage() {
           </div>
         )}
       </Card>
+
+      {/* key : l'état local des tags repart des données à jour après chaque enregistrement. */}
+      <LookbookSection key={`${modele.id}-${(modele.tags ?? []).join("|")}`} modele={modele} />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import employes from "./parts/employes.fr.js";
 import production from "./parts/production.fr.js";
 import fournisseurs from "./parts/fournisseurs.fr.js";
 import achats from "./parts/achats.fr.js";
+import lookbook from "./parts/lookbook.fr.js";
 
 export default {
   ...shared,
@@ -26,6 +27,7 @@ export default {
   ...production,
   ...fournisseurs,
   ...achats,
+  ...lookbook,
   common: {
     save: "Enregistrer",
     cancel: "Annuler",

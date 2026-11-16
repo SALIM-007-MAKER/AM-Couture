@@ -164,6 +164,9 @@ export async function supprimerAtelier(atelierId) {
   await prisma.mouvementStock.deleteMany({ where: { ligneAchat: { achat: { atelierId } } } });
   await prisma.ligneAchat.deleteMany({ where: { achat: { atelierId } } });
   await prisma.achat.deleteMany({ where: { atelierId } });
+  // Lookbook (7.1) : photos puis images avant les modèles.
+  await prisma.photoModele.deleteMany({ where: { modele: { atelierId } } });
+  await prisma.imageAtelier.deleteMany({ where: { atelierId } });
   await prisma.modele.deleteMany({ where: { atelierId } });
   await prisma.fournisseur.deleteMany({ where: { atelierId } });
   await prisma.depense.deleteMany({ where: { atelierId } });
