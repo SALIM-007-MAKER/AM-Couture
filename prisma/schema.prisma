@@ -279,6 +279,7 @@ model Atelier {
   articlesStock        ArticleStock[]
   fournisseurs         Fournisseur[]
   achats               Achat[]
+  images               ImageAtelier[]
   notifications        Notification[]
   abonnements          Abonnement[]
   historiqueAbonnement HistoriqueAbonnement[]
@@ -367,10 +368,15 @@ model Modele {
   description   String?
   prixIndicatif Decimal?          @db.Decimal(10, 2)
   photoUrl      String?
+  // Lookbook (7.1) : publié = destiné à être montré aux clientes (vitrine, 7.2). Faux par défaut : rien n'est public sans
+  // geste explicite du PDG. `tags` : mots libres (occasion, tissu…), 12 au plus.
+  publie        Boolean           @default(false)
+  tags          String[]          @default([])
   archivedAt    DateTime?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 
+  photos           PhotoModele[]
   commandes        Commande[]
   demandesCommande DemandeCommande[]
 
@@ -1160,4 +1166,37 @@ model LigneAchat {
 
   @@unique([achatId, articleId])
   @@index([articleId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Images du lookbook (Phase 7.1). Stockage derrière l'interface lib/stockageImages.js : cette table est l'adaptateur
+// « base de données » (développement, tests, petits ateliers). Un adaptateur objet (S3, R2, Blob) remplacera `contenu`
+// par une référence externe sans changer le reste. Une image appartient toujours à UN atelier.
+// ─────────────────────────────────────────────────────────────────────────
+model ImageAtelier {
+  id        String   @id @default(cuid())
+  atelierId String
+  atelier   Atelier  @relation(fields: [atelierId], references: [id], onDelete: Restrict)
+  mime      String
+  taille    Int
+  contenu   Bytes
+  createdAt DateTime @default(now())
+
+  photos PhotoModele[]
+
+  @@index([atelierId])
+}
+
+/// Une photo d'un modèle dans le lookbook ; `ordre` = position d'affichage (0 = photo de couverture).
+model PhotoModele {
+  id        String       @id @default(cuid())
+  modeleId  String
+  modele    Modele       @relation(fields: [modeleId], references: [id], onDelete: Restrict)
+  imageId   String
+  image     ImageAtelier @relation(fields: [imageId], references: [id], onDelete: Restrict)
+  ordre     Int
+  legende   String?
+  createdAt DateTime     @default(now())
+
+  @@index([modeleId, ordre])
 }
