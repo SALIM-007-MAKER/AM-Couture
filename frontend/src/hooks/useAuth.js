@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../lib/apiClient.js";
 import { cheminAccueilEmploye } from "../features/employes/permissions.js";
 import { effacerInstantane } from "../lib/instantaneStockage.js";
+import { viderFile } from "../lib/fileSynchro.js";
 
 const ME_KEY = ["auth", "me"];
 
@@ -146,6 +147,7 @@ export function useLogoutMutation() {
       // se déconnecter, on ne le laisse pas bloqué sur un écran protégé.
       // Plus aucune donnée de l'utilisateur ne doit rester ni en mémoire, ni sur l'appareil (instantané hors ligne).
       effacerInstantane();
+      viderFile(); // les écritures encore en attente sont perdues : le bandeau le dit avant la déconnexion
       // D'abord « non connecté » (les écrans protégés se démontent), puis on retire les données de la mémoire. Vider le
       // cache avant laissait des écrans encore affichés relire des données disparues (page blanche).
       queryClient.setQueryData(ME_KEY, null);

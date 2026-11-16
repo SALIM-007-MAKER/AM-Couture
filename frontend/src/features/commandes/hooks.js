@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { commandesApi } from "./api.js";
+import { ecrireOuMettreEnFile } from "../../lib/fileSynchro.js";
 
 export function useCommandesQuery(params, { enabled = true } = {}) {
   return useQuery({
@@ -51,7 +52,14 @@ export function useUpdateCommandeMutation(id) {
 export function useChangeStatutMutation(id) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (statut) => commandesApi.changeStatut(id, statut),
+    // `statutAttendu` : le statut que l'utilisateur voit. Le serveur refuse si la commande a changé entre-temps (7.6).
+    mutationFn: ({ statut, statutAttendu }) =>
+      ecrireOuMettreEnFile({
+        type: "commande.statut",
+        chemin: `/commandes/${id}/statut`,
+        corps: { statut, statutAttendu },
+        libelle: `Commande : passer à ${statut}`,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["commandes", "detail", id] });
       queryClient.invalidateQueries({ queryKey: ["commandes", "list"] });

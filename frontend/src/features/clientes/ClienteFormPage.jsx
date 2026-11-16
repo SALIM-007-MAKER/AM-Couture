@@ -80,7 +80,8 @@ function ClienteForm({ mode, initial }) {
       notes: form.notes || undefined,
     };
     mutation.mutate(payload, {
-      onSuccess: (cliente) => navigate(`/clientes/${cliente.id}`),
+      // Mise en file hors connexion : pas encore de fiche, retour à la liste (le bandeau indique l'attente).
+      onSuccess: (cliente) => navigate(cliente.enAttente ? "/clientes" : `/clientes/${cliente.id}`),
     });
   }
 
