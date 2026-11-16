@@ -25,6 +25,7 @@ import {
   Hammer,
   Store,
   ShoppingCart,
+  Globe,
 } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { peutAcceder, filtrerNavigation } from "../features/employes/permissions.js";
@@ -83,6 +84,7 @@ const NAV_GROUPS = [
     labelKey: "nav.groupSettings",
     items: [
       { labelKey: "nav.employees", to: "/employes", icon: UserCog },
+      { labelKey: "nav.storefront", to: "/vitrine", icon: Globe },
       { labelKey: "nav.settings", to: "/parametres", icon: Settings },
       { labelKey: "nav.myAccount", to: "/compte", icon: UserCircle },
       { labelKey: "nav.subscription", to: "/abonnement", icon: CreditCard },
@@ -127,6 +129,7 @@ const MOBILE_DRAWER_GROUPS = [
       { labelKey: "nav.calendar", to: "/calendrier", icon: Calendar },
       { labelKey: "nav.notifications", to: "/notifications", icon: Bell },
       { labelKey: "nav.employees", to: "/employes", icon: UserCog },
+      { labelKey: "nav.storefront", to: "/vitrine", icon: Globe },
       { labelKey: "nav.settings", to: "/parametres", icon: Settings },
       { labelKey: "nav.myAccount", to: "/compte", icon: UserCircle },
       { labelKey: "nav.subscription", to: "/abonnement", icon: CreditCard },

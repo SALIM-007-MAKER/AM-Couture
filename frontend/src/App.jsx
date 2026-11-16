@@ -19,6 +19,8 @@ const AtelierDetailPage = lazy(() => import("./pages/superadmin/AtelierDetailPag
 const SuperadminDashboardPage = lazy(() => import("./pages/superadmin/SuperadminDashboardPage.jsx"));
 const GestionAbonnementsPage = lazy(() => import("./pages/superadmin/GestionAbonnementsPage.jsx"));
 const ProductionPage = lazy(() => import("./features/production/ProductionPage.jsx"));
+const VitrinePubliquePage = lazy(() => import("./features/vitrine/VitrinePubliquePage.jsx"));
+const VitrineReglagesPage = lazy(() => import("./features/vitrine/VitrineReglagesPage.jsx"));
 const EmployesPage = lazy(() => import("./features/employes/EmployesPage.jsx"));
 const EmployeFormPage = lazy(() => import("./features/employes/EmployeFormPage.jsx"));
 const GestionPlansPage = lazy(() => import("./pages/superadmin/GestionPlansPage.jsx"));
@@ -104,6 +106,9 @@ export default function App() {
           — même raisonnement que les deux routes ci-dessus : le jeton dans
           l'URL authentifie l'action à lui seul. */}
       <Route path="/client/activer" element={<ActiverCompteClientPage />} />
+
+      {/* Vitrine publique d'un atelier : sans compte, jamais sous ProtectedRoute (voir vitrinePublique.routes.js). */}
+      <Route path="/a/:slug" element={<VitrinePubliquePage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<RequireAtelier />}>
@@ -215,6 +220,7 @@ export default function App() {
             </Route>
             <Route path="/compte" element={<ComptePage />} />
             <Route element={<RequirePermission permission="@admin" />}>
+              <Route path="/vitrine" element={<VitrineReglagesPage />} />
               <Route path="/employes" element={<EmployesPage />} />
               <Route path="/employes/nouveau" element={<EmployeFormPage />} />
               <Route path="/employes/:id" element={<EmployeFormPage />} />

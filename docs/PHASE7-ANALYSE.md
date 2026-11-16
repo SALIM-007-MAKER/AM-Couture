@@ -123,3 +123,29 @@ Les quatre options recommandées ont été retenues : **adaptateur de stockage d
 **Tests** : 10 d'intégration (publication refusée sans photo, octets exacts servis avec le bon type, faux fichier / trop lourd / URL externe refusés, limite de 8 sous concurrence, ordre, tags normalisés, dépublication automatique, archivage, isolation, droits) ; 2 mutations détectées (image lue sans filtre d'atelier, limite de photos) ; 4 E2E (photos réelles, couverture, ordre, tags, publication, retrait). Suites complètes : 333 unitaires backend, 374 intégration, 97 frontend, 59 E2E.
 
 **Limites** : les octets sont dans PostgreSQL tant qu'un adaptateur objet n'est pas branché (peu coûteux pour des galeries de 8 photos redimensionnées, à surveiller au-delà de quelques centaines d'ateliers actifs) ; pas de miniatures serveur (le navigateur réduit avant l'envoi) ; pas de légende modifiable dans l'interface (l'API l'accepte à l'ajout).
+
+## 8. Réalisé en 7.2 — vitrine publique
+
+**Fonctionnement** : chaque atelier peut ouvrir une page publique `/a/<identifiant>` (sans compte, adaptée au mobile) : bandeau à la couleur de l'atelier, logo, slogan, présentation, coordonnées **si le PDG les montre**, catalogue des modèles **publiés** du lookbook (recherche, catégorie, tags, pagination, fiche avec toutes les photos), bouton WhatsApp « Demander ce modèle » (lien `wa.me` pré-rempli, sans API payante). Réglages dans **Vitrine** (PDG seulement, non délégable) : activer, identifiant, présentation, couleur, coordonnées visibles, lien à copier.
+
+**Intérêt commercial** : une adresse à mettre en bio WhatsApp/Instagram, qui remplace l'envoi de photos une à une ; point d'entrée de la 7.3 (demandes en ligne).
+
+**Vie privée et sécurité (le point central)**
+- **Rien n'est public sans geste explicite** : vitrine désactivée par défaut, modèles non publiés par défaut, coordonnées masquées par défaut.
+- **Liste blanche stricte** : les réponses publiques sont construites champ par champ ; un test fixe l'ensemble **exact** des clés (ajouter une clé le fait échouer) et vérifie qu'aucune donnée privée ne sort (clientes, commandes, prix de vente ou indicatif, stock, fournisseurs, dépenses, identifiants d'atelier, modèles non publiés ou archivés). **Aucun prix n'est montré** : décision par défaut, à rouvrir si les ateliers veulent afficher un « à partir de ».
+- **Pas d'énumération** : vitrine désactivée, atelier suspendu ou adresse inconnue donnent exactement la même réponse 404.
+- **Images** : une photo n'est servie que si elle appartient à un modèle publié, non archivé, d'une vitrine active, et seulement via l'adresse de **cette** vitrine ; l'URL privée `/api/images/:id` reste fermée aux visiteurs. Dépublier ou désactiver coupe l'accès immédiatement (cache public court : 60 s pour le catalogue, 5 min pour les images).
+- **Abus** : 120 requêtes par minute et par IP sur le catalogue (429 au-delà, limiteur persistant existant).
+- **Identifiant** : 3 à 40 caractères minuscules, chiffres, tirets ; mots réservés refusés ; unique sur toute la plateforme (comparé sans casse).
+- **Couleur de marque** : `#RRGGBB` uniquement, refusée si un texte blanc n'y est pas lisible (contraste WCAG AA ≥ 4,5 calculé côté serveur) ; jamais de CSS libre.
+
+**Base de données** (migration additive `20261127090000_vitrine`) : `Atelier.slug` (unique), `vitrineActive`, `vitrineDescription`, `couleurPrincipale`, `vitrineContact`. Retour arrière : supprimer les cinq colonnes.
+
+**API** : 5 routes (`/api/vitrine` ×2, `/api/public/vitrines/:slug` ×3), 190 routes documentées.
+
+**Tests** : 3 unitaires (contraste) ; 18 d'intégration (réglages réservés au PDG même face à un employé tout-puissant, validations, unicité, même 404, **liste blanche exacte des clés**, recherche de 20 chaînes privées dans la réponse, coordonnées, filtres, images, dépublication immédiate, atelier suspendu, isolation, limiteur) ; 4 mutations détectées (archivés exposés, coordonnées toujours montrées, photo non publiée servie, clé supplémentaire exposée) ; 4 E2E (réglage avec couleur refusée puis acceptée, visiteur sans compte, brouillon et prix absents, image réellement affichée, vitrine fermée). Suites complètes : 336 unitaires backend, 392 intégration, 97 frontend, 63 E2E. Un test E2E instable a été corrigé (message de succès perdu au remontage du formulaire) puis exécuté 4 fois de suite sans échec.
+
+**Limites**
+- **Aperçu de lien (Open Graph) non personnalisé** : l'application est une page unique ; les aperçus WhatsApp/Facebook d'un lien de vitrine montrent le titre générique. Le corriger demande une route serveur qui injecte les balises dans la page (réécriture Vercel à vérifier en déploiement, non testable ici).
+- Pas de nom de domaine personnalisé par atelier, pas de statistiques de visites, pas de prix affichés, pas de référencement garanti (pas de plan de site).
+- Modifier l'identifiant invalide l'ancien lien.
