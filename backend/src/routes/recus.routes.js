@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { langueDemandee } from "../lib/messagesServeur.js";
 import { prisma } from "../lib/prisma.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
@@ -84,7 +85,7 @@ recusCommandeRouter.post("/", async (req, res) => {
         clienteId: commande.clienteId,
         commandeId,
         type: "RECU_EMIS",
-        message: `Un reçu est disponible pour votre commande ${commande.numero}.`,
+        params: { numero: commande.numero },
       });
       return nouveauRecu;
     },
@@ -203,7 +204,7 @@ router.get("/:id/pdf", async (req, res) => {
   // déjà vérifié par le where ci-dessus.
   const atelier = await prisma.atelier.findUnique({ where: { id: req.user.atelierId } });
 
-  streamRecuPdf(res, { recu, atelier });
+  streamRecuPdf(res, { recu, atelier, langue: langueDemandee(req) });
 });
 
 // Volontairement aucune route PATCH ni DELETE : un reçu est un document

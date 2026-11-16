@@ -1,3 +1,5 @@
+import { codeNotification, messageNotification } from "./messagesServeur.js";
+
 // Fil d'activité du client final (§ notifications atelier <-> client) — voir
 // le commentaire complet du modèle NotificationClient, schema.prisma :
 // contrairement à Notification (ADMIN, recalculée), ce sont des ÉVÉNEMENTS
@@ -10,9 +12,21 @@
 // une commande créée sans que son événement n'existe serait un vrai trou
 // silencieux dans le fil d'activité du client, pas un simple email en
 // moins.
-export function creerNotificationClient(client, { clienteId, commandeId, type, message }) {
+//
+// 7.7 : l'événement enregistre un CODE et des PARAMÈTRES (`params`), le message est composé à la lecture dans la langue de
+// la cliente (lib/messagesServeur.js). Le texte français est aussi conservé dans `message` (secours, export, lignes
+// antérieures). `message` seul reste accepté pour un texte libre sans traduction.
+export function creerNotificationClient(client, { clienteId, commandeId, type, params, message }) {
+  const code = params ? codeNotification(type, params) : null;
   return client.notificationClient.create({
-    data: { clienteId, commandeId: commandeId ?? null, type, message },
+    data: {
+      clienteId,
+      commandeId: commandeId ?? null,
+      type,
+      message: code ? messageNotification(code, params, "fr") : message,
+      code,
+      params: params ?? undefined,
+    },
   });
 }
 

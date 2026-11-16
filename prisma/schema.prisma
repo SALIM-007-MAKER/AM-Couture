@@ -680,6 +680,9 @@ model NotificationClient {
   commande   Commande?              @relation(fields: [commandeId], references: [id], onDelete: SetNull)
   type       TypeNotificationClient
   message    String
+  // 7.7 : code et paramètres du message, composé à la lecture dans la langue de la cliente. NULL pour les lignes antérieures.
+  code       String?
+  params     Json?
   lu         Boolean                @default(false)
   createdAt  DateTime               @default(now())
 

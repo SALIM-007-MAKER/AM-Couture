@@ -1,6 +1,7 @@
 import { log, messageErreur } from "../lib/logger.js";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import { traduire } from "../lib/messagesServeur.js";
 import { prisma } from "../lib/prisma.js";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { requireAuth } from "../middlewares/auth.middleware.js";
@@ -222,8 +223,9 @@ router.post("/inscription-atelier", inscriptionLimiter, rejectIfDejaConnecte, as
     const origin = origineApplication(req);
     await envoyerEmail({
       to: admin.email,
-      subject: "Confirmez votre email — Gestion d'Atelier",
+      subject: traduire(admin.langue, "email.verification.sujet"),
       html: emailVerificationTemplate({
+        langue: admin.langue,
         prenom: admin.prenom,
         lienVerification: `${origin}/verifier-email?token=${verifToken}`,
       }),
@@ -267,8 +269,9 @@ router.post("/renvoyer-verification-email", requireAuth, renvoyerVerificationLim
   try {
     await envoyerEmail({
       to: user.email,
-      subject: "Confirmez votre email — Gestion d'Atelier",
+      subject: traduire(user.langue, "email.verification.sujet"),
       html: emailVerificationTemplate({
+        langue: user.langue,
         prenom: user.prenom,
         lienVerification: `${origin}/verifier-email?token=${verifToken}`,
       }),
@@ -308,8 +311,9 @@ router.post("/mot-de-passe-oublie", motDePasseOublieLimiter, async (req, res) =>
       const origin = origineApplication(req);
       await envoyerEmail({
         to: user.email,
-        subject: "Réinitialisation de votre mot de passe — Gestion d'Atelier",
+        subject: traduire(user.langue, "email.reinitialisation.sujet"),
         html: emailReinitialisationTemplate({
+          langue: user.langue,
           lienReinitialisation: `${origin}/reinitialiser-mot-de-passe?token=${resetToken}`,
         }),
       });

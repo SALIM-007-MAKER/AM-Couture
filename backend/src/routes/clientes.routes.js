@@ -2,6 +2,7 @@ import { log, messageErreur } from "../lib/logger.js";
 import { Router } from "express";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
+import { traduire } from "../lib/messagesServeur.js";
 import { prisma } from "../lib/prisma.js";
 import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
@@ -443,8 +444,8 @@ router.post("/:id/inviter", async (req, res) => {
     try {
       await envoyerEmail({
         to: cliente.email,
-        subject: "Créez votre compte client — Gestion d'Atelier",
-        html: emailInvitationClientTemplate({ prenom: cliente.prenom, identifiant, lienActivation }),
+        subject: traduire(req.user.langue, "email.invitation.sujet"),
+        html: emailInvitationClientTemplate({ prenom: cliente.prenom, identifiant, lienActivation, langue: req.user.langue }),
       });
     } catch (err) {
       log.error("erreur", { categorie: "email", operation: "invitation_cliente", clienteId: cliente.id, message: messageErreur(err) });

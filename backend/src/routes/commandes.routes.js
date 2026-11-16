@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../lib/prisma.js";
+import { langueDemandee } from "../lib/messagesServeur.js";
 import { idempotence } from "../lib/idempotence.js";
 import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
@@ -19,7 +20,7 @@ import { computeSolde, statutPaiement } from "../lib/money.js";
 import { streamFicheCommandePdf } from "../lib/recuPdf.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { buildCsv, envoyerCsv } from "../lib/csv.js";
-import { creerNotificationClient, STATUT_COMMANDE_LABELS } from "../lib/notificationsClient.js";
+import { creerNotificationClient } from "../lib/notificationsClient.js";
 import {
   createCommandeSchema,
   updateCommandeSchema,
@@ -120,7 +121,7 @@ router.post("/", requirePermission("commandes.ecrire"), idempotence, async (req,
         clienteId: commande.clienteId,
         commandeId: commande.id,
         type: "COMMANDE_CREEE",
-        message: `Votre commande ${numero} a été enregistrée.`,
+        params: { numero },
       });
 
       let paiement = null;
@@ -132,7 +133,7 @@ router.post("/", requirePermission("commandes.ecrire"), idempotence, async (req,
           clienteId: commande.clienteId,
           commandeId: commande.id,
           type: "PAIEMENT_ENREGISTRE",
-          message: `Paiement de ${paiement.montant} enregistré sur votre commande ${numero}.`,
+          params: { montant: paiement.montant, numero },
         });
       }
       return { commande, paiement };
@@ -375,7 +376,7 @@ router.get("/:id/fiche-pdf", requirePermission("commandes.lire"), async (req, re
   // 8 (multi-tenant), voir requireAtelier : req.user.atelierId == commande.atelierId ici.
   const atelier = await prisma.atelier.findUnique({ where: { id: req.user.atelierId } });
 
-  streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde, avecMontants: peutVoirFinances(req.user) });
+  streamFicheCommandePdf(res, { commande, atelier, totalPaye, solde, avecMontants: peutVoirFinances(req.user), langue: langueDemandee(req) });
 });
 
 // PATCH /api/commandes/:id — modification partielle des champs non financiers/non système
@@ -526,10 +527,7 @@ router.post("/:id/statut", requireUnePermission("commandes.statut", "commandes.e
         clienteId: current.clienteId,
         commandeId: id,
         type: nextStatut === "ANNULEE" ? "COMMANDE_ANNULEE" : "COMMANDE_STATUT_CHANGE",
-        message:
-          nextStatut === "ANNULEE"
-            ? `Votre commande ${current.numero} a été annulée.`
-            : `Votre commande ${current.numero} est maintenant : ${STATUT_COMMANDE_LABELS[nextStatut] ?? nextStatut}.`,
+        params: { numero: current.numero, statut: nextStatut },
       });
 
       return tx.commande.findUnique({ where: { id } });

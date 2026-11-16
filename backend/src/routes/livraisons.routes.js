@@ -112,7 +112,7 @@ router.post("/", idempotence, async (req, res) => {
             clienteId: commande.clienteId,
             commandeId,
             type: "PAIEMENT_ENREGISTRE",
-            message: `Paiement de ${paiement.montant} enregistré sur votre commande ${commande.numero}.`,
+            params: { montant: paiement.montant, numero: commande.numero },
           });
         }
 
@@ -133,7 +133,7 @@ router.post("/", idempotence, async (req, res) => {
           clienteId: commande.clienteId,
           commandeId,
           type: "LIVRAISON_ENREGISTREE",
-          message: `Votre commande ${commande.numero} a été livrée.`,
+          params: { numero: commande.numero },
         });
 
         return {
