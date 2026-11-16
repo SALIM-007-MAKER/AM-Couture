@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 190 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 192 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -261,11 +261,12 @@ Réglages réservés au PDG ; lecture publique **sans compte**, limitée à 120 
 
 | Route | Accès | Corps / paramètres |
 |---|---|---|
-| `GET /api/vitrine` | PDG | `{ slug, vitrineActive, vitrineDescription, couleurPrincipale, vitrineContact, modelesPublies }`. |
-| `PATCH /api/vitrine` | PDG | `slug?` (3–40, minuscules, chiffres, tirets ; mots réservés refusés ; unique sur la plateforme, 409 sinon), `vitrineActive?` (exige un identifiant), `vitrineDescription?` (1 500 caractères, `null` pour effacer), `couleurPrincipale?` (`#RRGGBB`, refusée si un texte blanc n'y est pas lisible : contraste WCAG ≥ 4,5), `vitrineContact?` (montrer téléphone, adresse, ville). |
+| `GET /api/vitrine` | PDG | `{ slug, vitrineActive, vitrineDescription, couleurPrincipale, vitrineContact, demandesEnLigne, modelesPublies }`. |
+| `PATCH /api/vitrine` | PDG | `slug?` (3–40, minuscules, chiffres, tirets ; mots réservés refusés ; unique sur la plateforme, 409 sinon), `vitrineActive?` (exige un identifiant), `vitrineDescription?` (1 500 caractères, `null` pour effacer), `couleurPrincipale?` (`#RRGGBB`, refusée si un texte blanc n'y est pas lisible : contraste WCAG ≥ 4,5), `vitrineContact?` (montrer téléphone, adresse, ville), `demandesEnLigne?` (recevoir les demandes des visiteurs ; exige la vitrine active). |
 | `GET /api/public/vitrines/:slug` | Public | `?q=`, `categorie=`, `tag=`, `page`, `pageSize` (≤ 50). `{ atelier: { nom, slogan, description, couleur, logo, contact }, modeles: [{ id, nom, categorie, description, tags, photos: [{ url, legende }] }], meta }`. `contact` vaut `null` tant que le PDG ne l'a pas choisi. Cache public 60 s. |
 | `GET /api/public/vitrines/:slug/logo` | Public | Logo de l'atelier comme image. |
 | `GET /api/public/vitrines/:slug/images/:imageId` | Public | Photo d'un modèle **publié** de cette vitrine seulement ; 404 sinon (brouillon, archivé, autre atelier). Cache public 5 min. |
+| `POST /api/public/vitrines/:slug/demandes` | Public (5 par heure et par IP) | Demande de commande d'un visiteur **sans compte**, si le PDG a activé les demandes en ligne (sinon le même 404 qu'une vitrine inconnue) : `{ prenom, nom, telephone, consentement: true }` + `modeleId?` (modèle publié de la vitrine), `description?` (1 000 caractères), `siteWeb` (piège à robots : doit rester vide, sinon la demande est ignorée sans erreur). Réponse `201 { ok: true }` — jamais d'identifiant. Consentement exactement `true` (400 sinon). Même personne et même modèle déjà en attente : pas de doublon ; 3 demandes par numéro et par jour et 50 demandes en attente par atelier au plus (429). Ne crée ni commande ni fiche cliente. Conservation : voir docs/PHASE7-ANALYSE.md §9. |
 
 ## 10. Tableau de bord, rapports et notifications
 
@@ -313,6 +314,7 @@ Une cliente propose une commande (côté Cliente) ; l'atelier la traite. L'accep
 | `GET /api/demandes` | Atelier | `?statut=EN_ATTENTE\|ACCEPTEE\|REFUSEE`, pagination. |
 | `GET /api/demandes/:id` | Atelier | Une demande. |
 | `POST /api/demandes/:id/accepter` | Atelier | `{ commandeId }` — la commande doit appartenir au même atelier **et** à la même cliente. 409 si la demande n'est plus en attente. |
+| `POST /api/demandes/:id/cliente` | Atelier (`demandes.ecrire` + `clientes.ecrire`) | Rattache une demande de la vitrine à une fiche cliente : crée la fiche depuis les coordonnées du visiteur, ou réutilise la fiche portant le même téléphone (`clienteExistante`) ; 409 si cette fiche est archivée. Efface les coordonnées de la demande. Répétable (`dejaTraite`). `accepter` exige ensuite cette fiche (409 `clienteRequise` avant). |
 | `POST /api/demandes/:id/refuser` | Atelier | `{ motifRefus? }` |
 
 ## 13. Espace cliente finale (`/api/moi`) — Cliente
