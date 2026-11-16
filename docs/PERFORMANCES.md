@@ -95,3 +95,27 @@ Aucune requête ne dépasse 70 ms, y compris sur 48 000 commandes et 83 000 paie
 - **Un seul utilisateur à la fois** : pas de test de charge concurrente (les tests de concurrence d'intégration couvrent la justesse, pas le débit).
 - **Données synthétiques**, générées de façon déterministe : la répartition réelle des statuts et des dates sera différente.
 - **À faire au premier déploiement** : relever sur Vercel + Neon le temps de `GET /api/commandes` et le nombre de requêtes par appel (journal d'accès, champ `dureeMs`, voir `docs/JOURNALISATION.md`), puis comparer à ce tableau.
+
+## 6. Phase 7 — vitrine publique, lookbook, demandes en ligne (7.8)
+
+Même méthode que ci-dessus (§1), avec en plus sur le gros atelier : **3 000 modèles dont 2 000 publiés, 4 000 photos (200 images de 2 Ko), 2 000 demandes en ligne** (`scripts/perf/mesure.mjs`, créés en SQL sur la base jetable ; relancer `seed-volume.sql` avant chaque mesure, sinon les identifiants fixes entrent en conflit). Médiane de 3 appels, base locale.
+
+| Route | ms | Requêtes SQL |
+|---|---|---|
+| Vitrine publique — page 1 | 22 | 5 |
+| Vitrine publique — page 80 | 15 | 5 |
+| Vitrine publique — recherche texte | 10 | 5 |
+| Vitrine publique — filtre par tag | 8 | 5 |
+| Vitrine publique — image | 4 | 3 |
+| Lookbook — liste des modèles (atelier) | 7 | 4 |
+| Demandes en ligne — liste (atelier) | 7 | 7 |
+
+**Constat : rien à corriger.** Aucune requête ne dépasse 3 ms, pas de N+1 (5 requêtes que la page renvoie 1 ou 20 modèles). Les 5 requêtes d'une page publique : **1 écriture** (le limiteur de débit persistant, une par consultation non servie par un cache), l'atelier, le comptage, les modèles, les photos. Aucun index ajouté : à ce volume le plan existant suffit, et l'expérience de la phase 4 (§4) montre qu'un index mal choisi peut dégrader le cas courant.
+
+**Cache HTTP des routes publiques** (vérifié, test `cache-public.test.js`) : la page de vitrine est servie avec `Cache-Control: public, max-age=60, stale-while-revalidate=300` et un `ETag` ; une requête conditionnelle reçoit **304 sans corps** tant que le contenu n'a pas changé, et un contenu modifié change l'`ETag`. Les images sont en `public, max-age=300` avec `ETag`. Toutes les routes privées restent en `no-store`/`private` (testé sur 5 routes) ; une vitrine désactivée répond 404 non cachable.
+
+**Limites**
+- **Mesure locale** (pas de latence Neon, pas de démarrage à froid) : les comptes de requêtes sont fiables, les millisecondes absolues ne le sont pas. À relever au premier déploiement.
+- **Recherche texte de la vitrine** (`ILIKE '%…%'`) : parcours de l'atelier, 10 ms pour 2 000 modèles publiés. Au-delà de quelques dizaines de milliers de modèles par atelier (irréaliste pour un atelier de couture), il faudrait un index trigramme (extension + migration).
+- **Images en base** (octets dans PostgreSQL) : seul l'adaptateur « base » existe. 4 000 photos de 2 Ko ne sont pas représentatives de vraies photos (200 Ko à 2 Mo) : avec des photos réelles, la taille de la base et des sauvegardes croîtra vite. Le **stockage objet reste à brancher** (voir BILAN-PHASE7.md §4).
+- **Une écriture par page publique non cachée** : sous forte affluence, le limiteur persistant ajoute une écriture par consultation. Le cache de 60 s côté navigateur et réseau de diffusion absorbe l'essentiel ; non mesuré sous charge concurrente.
