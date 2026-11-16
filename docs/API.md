@@ -171,7 +171,7 @@ Schémas : `commande.schema.js`, `paiement.schema.js`, `livraison.schema.js`, `a
 | `GET /api/commandes/export` | Atelier | CSV, mêmes filtres. |
 | `GET /api/commandes/production` | Permission `commandes.affecter` | Production : `employes` (actifs, avec `ouvertes` et `enRetard`), `nonAffectees`, `nonAffecteesEnRetard`, `enRetard`, `ouvertes`. Aucun montant. |
 | `GET /api/commandes/:id` | Atelier | Détail avec cliente, modèle, historique complet des paiements et des livraisons (annulés compris), `assigneA`, `affectations` (historique) et `totalPaye`, `solde`. |
-| `GET /api/commandes/:id/fiche-pdf` | Atelier | Fiche de commande en PDF. |
+| `GET /api/commandes/:id/fiche-pdf` | Atelier | Fiche de commande en PDF. `?langue=fr|en` facultatif (sinon la langue du compte). |
 | `PATCH /api/commandes/:id` | Atelier | Champs modifiables : `modeleId, typeVetement, description, couleur, tissu, quantite, priorite, dateLivraisonPrevue, observations, photoTissuUrl, photoModeleUrl`. Le prix et la cliente ne se modifient pas. |
 | `PUT /api/commandes/:id/affectation` | Permission `commandes.affecter` | `{ employeId }` (employé actif ou PDG de l'atelier, ou `null` pour retirer) — commandes ouvertes seulement (409 sinon) ; historisé ; répéter la même affectation renvoie `dejaTraite: true`. |
 | `POST /api/commandes/:id/statut` | Atelier | `{ statut, statutAttendu? }` — transition contrôlée. `statutAttendu` (facultatif, utilisé par les écritures rejouées hors ligne) : si le statut actuel est différent, **409** `details.code = "STATUT_CHANGE"` et rien n'est modifié. Accepte `Idempotency-Key`. |
@@ -196,7 +196,7 @@ Listes globales, toutes commandes confondues, en lecture seule :
 | `GET /api/livraisons` | Atelier¹ | `?q=`, `dateFrom`, `dateTo`, pagination. |
 | `GET /api/recus` | Atelier | `?q=`, `dateFrom`, `dateTo`, pagination. |
 | `GET /api/recus/:id` | Atelier | Un reçu. |
-| `GET /api/recus/:id/pdf` | Atelier | Reçu en PDF. |
+| `GET /api/recus/:id/pdf` | Atelier | Reçu en PDF. `?langue=fr|en` facultatif (sinon la langue du compte). |
 
 ## 8. Dépenses
 
@@ -336,7 +336,7 @@ Une cliente ne voit que ses propres données.
 | `GET /api/moi/demandes` | Cliente | Ses demandes. |
 | `POST /api/moi/commandes/:id/recus` | Cliente | Demande l'émission du reçu d'une de ses commandes. |
 | `GET /api/moi/recus` | Cliente | Ses reçus. |
-| `GET /api/moi/recus/:id/pdf` | Cliente | Un de ses reçus en PDF. |
+| `GET /api/moi/recus/:id/pdf` | Cliente | Un de ses reçus en PDF (dans la langue de son compte, ou `?langue=fr|en`). |
 | `GET /api/moi/export` | Cliente | Télécharge SES données (profil, mesures, commandes avec paiements et livraisons, reçus, demandes, activité) en JSON. 10 par heure et par IP. |
 | `POST /api/moi/suppression` | Cliente | `{ motDePasse }` — ferme son compte (session comprise) et marque la fiche « effacement demandé » ; 400 si mot de passe incorrect. 5 par heure et par IP. |
 
