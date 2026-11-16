@@ -10,7 +10,7 @@ const router = Router();
 // Réglages de la vitrine publique : réservés au PDG (administration, non délégable, comme les paramètres de l'atelier).
 router.use(requireAuth, requireAtelier);
 
-const SELECT = { slug: true, vitrineActive: true, vitrineDescription: true, couleurPrincipale: true, vitrineContact: true };
+const SELECT = { slug: true, vitrineActive: true, vitrineDescription: true, couleurPrincipale: true, vitrineContact: true, demandesEnLigne: true };
 
 router.get("/", async (req, res) => {
   const atelier = await prisma.atelier.findUnique({ where: { id: req.user.atelierId }, select: SELECT });
@@ -29,6 +29,9 @@ router.patch("/", requireAbonnementActif, async (req, res) => {
   const slugFinal = data.slug ?? actuel.slug;
   if (data.vitrineActive === true && !slugFinal) {
     throw new HttpError(400, "Champs invalides.", { slug: ["Choisissez un identifiant avant d'activer la vitrine."] });
+  }
+  if (data.demandesEnLigne === true && data.vitrineActive !== true && !(await prisma.atelier.findUnique({ where: { id: atelierId }, select: { vitrineActive: true } })).vitrineActive) {
+    throw new HttpError(400, "Champs invalides.", { demandesEnLigne: ["Activez la vitrine pour recevoir des demandes en ligne."] });
   }
 
   try {

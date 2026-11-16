@@ -6,5 +6,6 @@ import { buildQuery } from "../../lib/queryString.js";
 export const vitrineApi = {
   reglages: () => api.get("/vitrine"),
   modifier: (corps) => api.patch("/vitrine", corps),
+  envoyerDemande: (slug, corps) => api.post(`/public/vitrines/${encodeURIComponent(slug)}/demandes`, corps),
   publique: (slug, params) => api.get(`/public/vitrines/${encodeURIComponent(slug)}${buildQuery(params)}`),
 };

@@ -73,7 +73,7 @@ describe("Vitrine publique", () => {
     it("par défaut : désactivée, sans identifiant, avec le nombre de modèles publiés", async () => {
       const r = await pdg.get("/api/vitrine");
       assert.equal(r.status, 200);
-      assert.deepEqual(r.body, { slug: null, vitrineActive: false, vitrineDescription: null, couleurPrincipale: null, vitrineContact: false, modelesPublies: 1 });
+      assert.deepEqual(r.body, { slug: null, vitrineActive: false, vitrineDescription: null, couleurPrincipale: null, vitrineContact: false, demandesEnLigne: false, modelesPublies: 1 });
     });
 
     it("réservés au PDG : un employé même tout-puissant et un visiteur sont refusés", async () => {
@@ -133,7 +133,7 @@ describe("Vitrine publique", () => {
     it("LISTE BLANCHE : l'ensemble exact des clés exposées", async () => {
       const r = (await anonyme.get(`/api/public/vitrines/${slugA}`)).body;
       assert.deepEqual(cles(r), ["atelier", "meta", "modeles"]);
-      assert.deepEqual(cles(r.atelier), ["contact", "couleur", "description", "logo", "nom", "slogan"]);
+      assert.deepEqual(cles(r.atelier), ["contact", "couleur", "demandes", "description", "logo", "nom", "slogan"]);
       assert.deepEqual(cles(r.atelier.contact), ["adresse", "pays", "telephone", "ville"]);
       assert.deepEqual(cles(r.modeles[0]), ["categorie", "description", "id", "nom", "photos", "tags"]);
       assert.deepEqual(cles(r.modeles[0].photos[0]), ["legende", "url"]);

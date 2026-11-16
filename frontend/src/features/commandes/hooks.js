@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { commandesApi } from "./api.js";
 
-export function useCommandesQuery(params) {
+export function useCommandesQuery(params, { enabled = true } = {}) {
   return useQuery({
     queryKey: ["commandes", "list", params],
     queryFn: () => commandesApi.list(params),
     placeholderData: (prev) => prev,
+    enabled,
   });
 }
 

@@ -28,6 +28,7 @@ function Formulaire({ reglages, mutation }) {
     vitrineDescription: reglages.vitrineDescription ?? "",
     couleurPrincipale: reglages.couleurPrincipale ?? "",
     vitrineContact: reglages.vitrineContact,
+    demandesEnLigne: reglages.demandesEnLigne,
   });
   const [copie, setCopie] = useState(false);
   const details = mutation.error instanceof ApiError ? mutation.error.details : undefined;
@@ -42,6 +43,7 @@ function Formulaire({ reglages, mutation }) {
       vitrineDescription: form.vitrineDescription,
       couleurPrincipale: form.couleurPrincipale,
       vitrineContact: form.vitrineContact,
+      demandesEnLigne: form.demandesEnLigne,
     });
   }
 
@@ -99,6 +101,15 @@ function Formulaire({ reglages, mutation }) {
             <span className="font-medium">{t("vitadm.contact")}</span>
             <span className="block text-neutral-500">{t("vitadm.contactHelp")}</span>
           </span>
+        </label>
+
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={form.demandesEnLigne} onChange={(e) => maj("demandesEnLigne", e.target.checked)} data-testid="vitrine-demandes" />
+          <span>
+            <span className="font-medium">{t("dvitadm.settingLabel")}</span>
+            <span className="block text-neutral-500">{t("dvitadm.settingHelp")}</span>
+          </span>
+          <FieldError messages={details?.demandesEnLigne} />
         </label>
 
         <p className="text-sm text-neutral-600 dark:text-neutral-400" data-testid="vitrine-publies">

@@ -149,3 +149,31 @@ Les quatre options recommandées ont été retenues : **adaptateur de stockage d
 - **Aperçu de lien (Open Graph) non personnalisé** : l'application est une page unique ; les aperçus WhatsApp/Facebook d'un lien de vitrine montrent le titre générique. Le corriger demande une route serveur qui injecte les balises dans la page (réécriture Vercel à vérifier en déploiement, non testable ici).
 - Pas de nom de domaine personnalisé par atelier, pas de statistiques de visites, pas de prix affichés, pas de référencement garanti (pas de plan de site).
 - Modifier l'identifiant invalide l'ancien lien.
+
+## 9. Réalisé en 7.3 — demandes de commande en ligne (sans compte)
+
+**Fonctionnement** : si le PDG coche « Recevoir des demandes de commande en ligne » (désactivé par défaut, exige la vitrine active), la vitrine affiche « Faire une demande de commande » et, sur chaque modèle, « Demander ce modèle ». Le visiteur renseigne prénom, nom, téléphone et un message facultatif, et **coche un consentement explicite** (jamais pré-coché). L'atelier retrouve la demande dans **Demandes** (déjà comptée dans la cloche), crée en un clic la **fiche cliente** à partir des coordonnées (ou retrouve la fiche portant le même numéro), puis suit le circuit habituel : création de la commande, acceptation ou refus. **Aucune commande ni fiche cliente n'est créée automatiquement**, aucun paiement n'est demandé en ligne (prix, mesures et délais se conviennent avec l'atelier).
+
+**Intérêt commercial** : transforme la vitrine en canal d'acquisition de clientes, sans compte à créer pour la visiteuse ; la demande arrive déjà structurée (modèle souhaité, téléphone, message) au lieu d'une conversation WhatsApp à reconstituer.
+
+**Protection des données personnelles**
+- **Minimisation** : seulement prénom, nom, téléphone, message et modèle. Pas de courriel, pas d'adresse, pas de pièce jointe.
+- **Consentement** : valeur exactement `true` exigée côté serveur (la chaîne `"true"`, `1` ou l'absence sont refusés) et **horodatée**. Le texte affiché indique la finalité et la durée de conservation.
+- **Réponse muette** : le visiteur reçoit `{ ok: true }` sans identifiant ; un doublon détecté ou un piège à robots déclenché ne se distinguent pas d'un succès (aucune information exploitable).
+- **Conservation limitée** (`lib/demandesPubliques.js`, exécutée par la tâche quotidienne) : coordonnées **effacées de la demande dès son rattachement à une fiche cliente** (elles vivent alors sur la fiche) ; demande refusée jamais rattachée : purgée après **30 jours** ; demande restée en attente sans suite : après **90 jours**. Les demandes de l'espace client et celles qui ont une fiche ne sont jamais purgées.
+- **Isolation** : une demande n'est visible que de l'atelier destinataire (404 pour un autre) ; un modèle non publié, archivé ou d'un autre atelier est refusé.
+- **Garde-fou en base** : un `CHECK` interdit une demande sans fiche cliente qui n'aurait pas aussi nom, prénom, téléphone **et consentement**.
+
+**Anti-abus** : 5 envois par heure et par IP (429) ; piège à robots (champ hors écran, ignoré sans erreur s'il est rempli) ; pas de doublon pour la même personne et le même modèle en attente (y compris sous envois simultanés) ; 3 demandes par numéro et par jour ; 50 demandes en attente par atelier au plus ; champs bornés et schéma strict (prix, statut, atelier ou fiche refusés).
+
+**Base de données** (migration additive `20261128090000_demandes_vitrine`) : `DemandeCommande.clienteId` devient facultatif ; colonnes `origine`, `contactPrenom`, `contactNom`, `contactTelephone`, `consentementLe` ; `Atelier.demandesEnLigne`. Retour arrière : supprimer les demandes de la vitrine non rattachées, remettre `clienteId` obligatoire, supprimer les colonnes et la contrainte.
+
+**API** : 2 routes (`POST /api/public/vitrines/:slug/demandes`, `POST /api/demandes/:id/cliente`), 192 routes documentées.
+
+**Tests** : 17 d'intégration (activation, 404 identique, consentement et validations sur 17 corps invalides, piège à robots, doublons y compris simultanés, plafonds, limiteur par IP, apparition chez l'atelier et dans la cloche, accepter refusé avant la fiche, droits, isolation, rattachement avec effacement des coordonnées, réutilisation d'une fiche existante, fiche archivée, refus sans notification, purge ciblée, CHECK en base) ; **6 mutations détectées** (piège à robots, modèle non publié accepté, coordonnées non effacées, purge de demandes rattachées, consentement faible, doublons) ; 4 E2E (visiteur sans compte, consentement bloquant l'envoi, erreur de numéro affichée sans écran d'erreur, atelier crée la fiche, vitrine refermée). Suites complètes : 336 unitaires backend, 409 intégration, 97 frontend, 67 E2E.
+
+**Limites**
+- Aucune notification externe à l'atelier (courriel, push) à l'arrivée d'une demande : elle apparaît dans la cloche et la page Demandes ; un courriel au PDG est possible (Resend existe) mais n'a pas été ajouté pour ne pas multiplier les envois.
+- Pas de réponse automatique au visiteur (pas de courriel collecté) : l'atelier le rappelle par téléphone ou WhatsApp.
+- Le visiteur n'a aucun accès à sa demande après l'envoi ; pas de suivi en ligne tant qu'il n'a pas de compte (espace client).
+- La demande de **suppression anticipée** par le visiteur passe par l'atelier (le refus ou la suppression de la fiche) : pas de procédure en libre-service.

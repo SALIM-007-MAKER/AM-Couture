@@ -28,6 +28,18 @@ export function useAccepterDemandeMutation(id) {
   });
 }
 
+export function useRattacherClienteMutation(id) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => demandesApi.rattacherCliente(id),
+    onSuccess: (demande) => {
+      queryClient.setQueryData(["demandes", "detail", id], demande);
+      queryClient.invalidateQueries({ queryKey: ["demandes", "list"] });
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+    },
+  });
+}
+
 export function useRefuserDemandeMutation(id) {
   const queryClient = useQueryClient();
   return useMutation({

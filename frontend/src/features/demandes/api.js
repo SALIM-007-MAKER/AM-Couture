@@ -8,5 +8,6 @@ export const demandesApi = {
   list: (params) => api.get(`/demandes${buildQuery(params)}`),
   get: (id) => api.get(`/demandes/${id}`),
   accepter: (id, commandeId) => api.post(`/demandes/${id}/accepter`, { commandeId }),
+  rattacherCliente: (id) => api.post(`/demandes/${id}/cliente`, {}),
   refuser: (id, motifRefus) => api.post(`/demandes/${id}/refuser`, { motifRefus }),
 };
