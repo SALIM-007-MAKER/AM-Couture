@@ -56,23 +56,23 @@ test("serveur injoignable : l'application s'ouvre avec les données enregistrée
   await page.getByRole("link", { name: "Stock" }).first().click();
   await expect(page.getByTestId("hors-ligne-vide")).toBeVisible();
 
-  // Aucune écriture n'est mise en attente : elle échoue tout de suite, avec un message.
+  // Une écriture sûre (créer une cliente) est gardée sur l'appareil, pas perdue ni envoyée tout de suite (détails : hors-ligne-ecritures.spec.js).
   await page.getByRole("link", { name: "Clients" }).first().click();
   await page.getByRole("link", { name: /Nouveau client/ }).first().click();
   await page.getByLabel(/^Nom \*/).fill("Hors-ligne-E2E");
   await page.getByLabel(/^Prénom \*/).fill("Test");
   await page.getByLabel(/^Téléphone \*/).fill("98765432");
   await page.getByRole("button", { name: "Enregistrer" }).click();
-  await expect(page.getByText(/connexion|répondu/i).first()).toBeVisible();
+  await expect(page.getByTestId("file-ecritures")).toContainText("1 modification(s) en attente");
 
-  // Retour du serveur : le bandeau disparaît et rien n'a été rejoué en douce.
+  // Retour du serveur : le bandeau disparaît et la cliente existe, une seule fois.
   await context.unroute("**/api/**");
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await expect(page.getByTestId("hors-ligne")).toHaveCount(0, { timeout: 15_000 });
-  await page.waitForTimeout(1500);
+  await expect(page.getByTestId("file-ecritures")).toHaveCount(0, { timeout: 15_000 });
   const r = await page.request.get("/api/clientes?q=Hors-ligne-E2E");
   // (la recherche compare aussi les chiffres du terme au téléphone : on filtre donc sur le nom)
-  expect((await r.json()).data.filter((c) => c.nom === "Hors-ligne-E2E")).toHaveLength(0);
+  expect((await r.json()).data.filter((c) => c.nom === "Hors-ligne-E2E")).toHaveLength(1);
 });
 
 test("à la déconnexion, l'instantané est effacé de l'appareil", async ({ page, browser }) => {
