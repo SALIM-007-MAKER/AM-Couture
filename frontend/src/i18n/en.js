@@ -13,6 +13,7 @@ import production from "./parts/production.en.js";
 import fournisseurs from "./parts/fournisseurs.en.js";
 import achats from "./parts/achats.en.js";
 import lookbook from "./parts/lookbook.en.js";
+import vitrine from "./parts/vitrine.en.js";
 
 export default {
   ...shared,
@@ -27,6 +28,7 @@ export default {
   ...fournisseurs,
   ...achats,
   ...lookbook,
+  ...vitrine,
   common: {
     save: "Save",
     cancel: "Cancel",
@@ -72,6 +74,7 @@ export default {
     production: "Production",
     suppliers: "Suppliers",
     purchases: "Purchases",
+    storefront: "Storefront",
     finances: "Finances",
     notifications: "Notifications",
     unreadNotifications: "{{count}} unread notification(s)",

@@ -33,6 +33,7 @@ export const PERMISSION_PAR_CHEMIN = {
   "/finances": "finances.voir",
   "/notifications": "notifications.lire",
   "/parametres": ADMIN_SEUL,
+  "/vitrine": ADMIN_SEUL,
   "/abonnement": ADMIN_SEUL,
   "/employes": ADMIN_SEUL,
   "/compte": null,
