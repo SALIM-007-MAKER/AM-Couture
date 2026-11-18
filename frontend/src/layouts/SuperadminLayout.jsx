@@ -101,9 +101,9 @@ function Logo({ collapsed }) {
   // Logo Tailora sur carte blanche (il est bleu nuit sur fond transparent, illisible sur le thème sombre).
   return (
     <div
-      className={`flex flex-col items-center gap-2 border-b border-neutral-200 dark:border-neutral-800 ${collapsed ? "px-1 py-3" : "px-4 py-4"}`}
+      className={`flex flex-col items-center gap-2 border-b border-neutral-200 dark:border-neutral-800 ${collapsed ? "px-1 py-2.5" : "px-4 py-3"}`}
     >
-      <span className={`flex items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-neutral-200 dark:ring-neutral-700 ${collapsed ? "size-12 p-0.5" : "size-36 p-1.5"}`}>
+      <span className={`flex items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-neutral-200 dark:ring-neutral-700 ${collapsed ? "size-10 p-0.5" : "size-20 p-1"}`}>
         <img src="/logo-tailora.png" alt={t("brand.logoAlt")} width="640" height="640" className="size-full object-contain" />
       </span>
       {!collapsed && (
