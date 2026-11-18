@@ -222,15 +222,17 @@ router.post("/inscription-atelier", inscriptionLimiter, rejectIfDejaConnecte, as
   try {
     const verifToken = await creerToken({ userId: admin.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
     const origin = origineApplication(req);
-    await envoyerEmail({
-      to: admin.email,
-      subject: traduire(admin.langue, "email.verification.sujet"),
-      html: emailVerificationTemplate({
-        langue: admin.langue,
-        prenom: admin.prenom,
-        lienVerification: `${origin}/verifier-email?token=${verifToken}`,
-      }),
-    });
+    const lienVerification = `${origin}/verifier-email?token=${verifToken}`;
+    if (modeEmailLocal()) {
+      // Développement local sans Resend : le lien va dans le terminal du backend, jamais dans la réponse.
+      afficherLienLocal({ libelle: "Lien de vérification de l'email", identifiant: admin.identifiant, lien: lienVerification });
+    } else {
+      await envoyerEmail({
+        to: admin.email,
+        subject: traduire(admin.langue, "email.verification.sujet"),
+        html: emailVerificationTemplate({ langue: admin.langue, prenom: admin.prenom, lienVerification }),
+      });
+    }
   } catch (err) {
     log.error("erreur", { categorie: "email", operation: "verification_inscription", userId: admin.id, message: messageErreur(err) });
   }
@@ -267,16 +269,17 @@ router.post("/renvoyer-verification-email", requireAuth, renvoyerVerificationLim
   }
   const verifToken = await creerToken({ userId: user.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
   const origin = origineApplication(req);
+  const lienVerification = `${origin}/verifier-email?token=${verifToken}`;
   try {
-    await envoyerEmail({
-      to: user.email,
-      subject: traduire(user.langue, "email.verification.sujet"),
-      html: emailVerificationTemplate({
-        langue: user.langue,
-        prenom: user.prenom,
-        lienVerification: `${origin}/verifier-email?token=${verifToken}`,
-      }),
-    });
+    if (modeEmailLocal()) {
+      afficherLienLocal({ libelle: "Lien de vérification de l'email", identifiant: user.identifiant, lien: lienVerification });
+    } else {
+      await envoyerEmail({
+        to: user.email,
+        subject: traduire(user.langue, "email.verification.sujet"),
+        html: emailVerificationTemplate({ langue: user.langue, prenom: user.prenom, lienVerification }),
+      });
+    }
   } catch (err) {
     throw new HttpError(502, `Impossible d'envoyer l'email : ${err.message}`);
   }
