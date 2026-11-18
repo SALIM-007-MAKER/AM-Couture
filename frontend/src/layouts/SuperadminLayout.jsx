@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Scissors, LayoutDashboard, Building2, CreditCard, Tag, TrendingUp, Banknote, UserCircle, Menu, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { LayoutDashboard, Building2, CreditCard, Tag, TrendingUp, Banknote, UserCircle, Menu, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { useUiStore } from "../stores/uiStore.js";
 import { useTranslation } from "../i18n/index.js";
@@ -98,22 +98,18 @@ function BottomNav() {
 
 function Logo({ collapsed }) {
   const { t } = useTranslation();
+  // Logo Tailora sur carte blanche (il est bleu nuit sur fond transparent, illisible sur le thème sombre).
   return (
     <div
-      className={`flex items-center gap-2 px-4 py-4 border-b border-neutral-200 dark:border-neutral-800 ${collapsed ? "justify-center px-0" : ""}`}
+      className={`flex flex-col items-center gap-2 border-b border-neutral-200 dark:border-neutral-800 ${collapsed ? "px-1 py-3" : "px-4 py-4"}`}
     >
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 text-white shadow-glow-brand">
-        <Scissors className="size-4" aria-hidden="true" />
+      <span className={`flex items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-neutral-200 dark:ring-neutral-700 ${collapsed ? "size-12 p-0.5" : "size-36 p-1.5"}`}>
+        <img src="/logo-tailora.png" alt={t("brand.logoAlt")} width="640" height="640" className="size-full object-contain" />
       </span>
       {!collapsed && (
-        <div className="min-w-0">
-          <p className="text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 truncate">
-            {t("sa.layout.platformName")}
-          </p>
-          <p className="text-[10px] font-medium uppercase tracking-wider text-brand-600 dark:text-brand-400">
-            {t("sa.layout.role")}
-          </p>
-        </div>
+        <p className="text-[10px] font-medium uppercase tracking-wider text-brand-600 dark:text-brand-400">
+          {t("sa.layout.role")}
+        </p>
       )}
     </div>
   );
