@@ -41,17 +41,23 @@ export async function creerToken({ userId, type, dureeMs }, client = prisma) {
  * générique (jamais "expiré" vs "déjà utilisé" vs "inexistant" séparément :
  * ne donne aucune information supplémentaire à un attaquant qui devine des
  * jetons). Retourne l'utilisateur associé si valide.
+ *
+ * Usage unique GARANTI même sous requêtes simultanées : la vérification (type, non utilisé, non expiré) et le marquage
+ * « utilisé » sont UNE SEULE instruction SQL (UPDATE ... WHERE). Postgres verrouille la ligne : une requête concurrente
+ * réévalue la condition `utiliseLe IS NULL` après le verrou, la voit déjà posée et ne modifie rien. Seule la requête qui
+ * modifie exactement une ligne a consommé le jeton. (L'ancienne séquence lecture puis mise à jour laissait passer
+ * plusieurs consommations simultanées.)
  */
 export async function consommerToken({ token, type }) {
-  const enregistrement = await prisma.tokenAction.findUnique({ where: { token: hacherToken(token) }, include: { user: true } });
-  const invalide =
-    !enregistrement ||
-    enregistrement.type !== type ||
-    enregistrement.utiliseLe !== null ||
-    enregistrement.expireLe < new Date();
-  if (invalide) {
+  const hache = hacherToken(token);
+  const maintenant = new Date();
+  const { count } = await prisma.tokenAction.updateMany({
+    where: { token: hache, type, utiliseLe: null, expireLe: { gt: maintenant } },
+    data: { utiliseLe: maintenant },
+  });
+  if (count !== 1) {
     throw new HttpError(400, "Ce lien est invalide ou a expiré.");
   }
-  await prisma.tokenAction.update({ where: { id: enregistrement.id }, data: { utiliseLe: new Date() } });
+  const enregistrement = await prisma.tokenAction.findUnique({ where: { token: hache }, include: { user: true } });
   return enregistrement.user;
 }
