@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Scissors, Building2, User, Mail, Lock, Eye, EyeOff, Phone, MapPin, ArrowRight } from "lucide-react";
+import { Building2, User, Mail, Lock, Eye, EyeOff, Phone, MapPin, ArrowRight } from "lucide-react";
 import { useInscriptionAtelierMutation } from "../../hooks/useAuth.js";
 import { LANGUES_DISPONIBLES } from "../../features/compte/constants.js";
 import { ApiError } from "../../lib/apiClient.js";
 import { GlobalFormError, FieldError } from "../../components/QueryState.jsx";
 import ImageUploadField from "../../components/ImageUploadField.jsx";
 import { useTranslation } from "../../i18n/index.js";
+import LogoTailora from "../../components/LogoTailora.jsx";
 
 // Même esthétique que LoginPage.jsx (voir ses commentaires) — un propriétaire
 // d'atelier crée ici SON atelier + son propre compte ADMIN en une seule
@@ -91,9 +92,7 @@ export default function InscriptionAtelierPage() {
 
       <div className="relative w-full max-w-md flex flex-col items-center">
         <div className="mb-7">
-          <div className="flex size-24 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-[0_0_50px_-5px_rgba(217,158,63,0.45)]">
-            <Scissors className="size-10 text-neutral-950" aria-hidden="true" />
-          </div>
+          <LogoTailora />
         </div>
 
         <form

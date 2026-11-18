@@ -56,6 +56,7 @@ export default {
     today: "Today",
     loading: "Loading…",
   },
+  brand: { logoAlt: "Tailora logo — Your workshop, our solution" },
   nav: {
     groupMain: "Main",
     groupWorkshop: "Workshop",

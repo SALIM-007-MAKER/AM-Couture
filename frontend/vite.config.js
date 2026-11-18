@@ -32,11 +32,11 @@ export default defineConfig({
         display: "standalone",
         background_color: "#ffffff",
         theme_color: "#276386",
-        // TODO Phase 8 : favicon-512.png est encore le logo spécifique de
-        // l'atelier "AM Couture" (premier tenant, un atelier parmi d'autres : la plateforme s'appelle Tailora) - à remplacer par une icône
-        // générique de plateforme avant qu'un second atelier n'installe
-        // l'app (voir aussi apple-touch-icon.png, même image).
-        icons: [{ src: "/favicon-512.png", sizes: "512x512", type: "image/png", purpose: "any" }],
+        // Icônes de la plateforme Tailora (logo sur fond blanc), générées depuis le logo d'origine : jamais le logo d'un atelier.
+        icons: [
+          { src: "/pwa-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/favicon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+        ],
       },
     }),
   ],
