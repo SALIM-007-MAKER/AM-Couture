@@ -73,10 +73,3 @@ export function rateLimitPersistant({ prefixe, limite, fenetreMs, message = "Tro
     }
   };
 }
-
-/** Limite de tentatives de connexion par fenêtre : relevée en développement local seulement (liste d'autorisation stricte). */
-export const LIMITE_CONNEXION = 10;
-export const LIMITE_CONNEXION_LOCALE = 500;
-export function limiteConnexion(env = process.env) {
-  return env.NODE_ENV === "development" && !env.VERCEL ? LIMITE_CONNEXION_LOCALE : LIMITE_CONNEXION;
-}

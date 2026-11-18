@@ -14,7 +14,8 @@ import { creerAtelierEtAdmin } from "../lib/atelierProvisioning.js";
 import { creerToken, consommerToken } from "../lib/tokenAction.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { emailVerificationTemplate, emailReinitialisationTemplate } from "../lib/emailTemplates.js";
-import { rateLimitPersistant, limiteConnexion } from "../lib/rateLimiter.js";
+import { rateLimitPersistant } from "../lib/rateLimiter.js";
+import { limiteConnexion } from "../lib/limiteConnexion.js";
 import { modeEmailLocal, afficherLienLocal } from "../lib/lienLocal.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
@@ -29,12 +30,12 @@ const DUMMY_HASH = "$2b$10$/4y/w0cvEjmIpLaIBO4xNOLAdvUoH3oNwzYFeJ7fUnPvdyqtJ22de
 
 // Rate limiting sur /login uniquement : 10 tentatives / 15 min / IP.
 // Réponse volontairement générique pour ne pas aider un attaquant à calibrer.
-// Persistant (Postgres, voir lib/rateLimiter.js) — un store en mémoire ne
+// Persistant (Postgres, voir lib/limiteConnexion.js) — un store en mémoire ne
 // suffit pas en serverless (plusieurs instances, chacune avec son propre
 // compteur).
 const loginLimiter = rateLimitPersistant({
   prefixe: "login",
-  limite: limiteConnexion(), // 10 ; relevée en développement local seulement (voir lib/rateLimiter.js)
+  limite: limiteConnexion(), // 10 ; relevée en développement local seulement (voir lib/limiteConnexion.js)
   fenetreMs: 15 * 60 * 1000,
   message: "Trop de tentatives. Réessayez dans quelques minutes.",
 });

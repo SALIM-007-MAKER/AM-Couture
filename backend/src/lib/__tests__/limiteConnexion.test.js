@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { limiteConnexion, LIMITE_CONNEXION, LIMITE_CONNEXION_LOCALE } from "../rateLimiter.js";
+import { limiteConnexion, LIMITE_CONNEXION, LIMITE_CONNEXION_LOCALE } from "../limiteConnexion.js";
 
 test("la limite de production reste à 10 tentatives", () => {
   assert.equal(LIMITE_CONNEXION, 10);
