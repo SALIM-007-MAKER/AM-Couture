@@ -27,7 +27,7 @@ import LanguageSwitcher from "../../components/LanguageSwitcher.jsx";
 // tapé (débouncé) correspond à un compte existant, son logo remplace l'icône
 // générique — sinon on garde ce repli de plateforme, jamais le logo d'un
 // atelier en particulier.
-const NOM_PLATEFORME = "Gestion d'Atelier";
+const NOM_PLATEFORME = "Tailora";
 
 export default function LoginPage() {
   const { t } = useTranslation();

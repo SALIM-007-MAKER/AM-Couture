@@ -10,7 +10,7 @@ import { useTranslation } from "../../i18n/index.js";
 // ProtectedRoute (voir App.jsx) : accessible que la personne soit déjà
 // connectée ailleurs dans le même navigateur ou pas, le jeton dans l'URL
 // authentifie l'action à lui seul.
-const NOM_PLATEFORME = "Gestion d'Atelier";
+const NOM_PLATEFORME = "Tailora";
 
 export default function ReinitialiserMotDePasseTokenPage() {
   const { t } = useTranslation();

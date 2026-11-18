@@ -10,7 +10,7 @@ import { useTranslation } from "../../i18n/index.js";
 // backend) — jamais de distinction "compte trouvé" / "compte introuvable"
 // affichée ici, pour ne pas réintroduire côté frontend la fuite que le
 // backend évite déjà.
-const NOM_PLATEFORME = "Gestion d'Atelier";
+const NOM_PLATEFORME = "Tailora";
 
 export default function MotDePasseOublieePage() {
   const { t } = useTranslation();

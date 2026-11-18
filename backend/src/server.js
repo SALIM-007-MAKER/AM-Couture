@@ -5,5 +5,5 @@ import app from "./app.js";
 const port = process.env.PORT || 4000;
 
 app.listen(port, () => {
-  console.log(`Gestion d'Atelier API — http://localhost:${port}/api/health`);
+  console.log(`Tailora API — http://localhost:${port}/api/health`);
 });

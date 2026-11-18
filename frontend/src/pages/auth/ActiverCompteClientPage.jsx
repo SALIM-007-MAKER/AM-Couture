@@ -14,7 +14,7 @@ import { useTranslation } from "../../i18n/index.js";
 // navigateur. Contrairement à cette dernière, l'activation CONNECTE
 // immédiatement (voir useActiverCompteClientMutation) : on redirige donc
 // directement vers l'espace client plutôt que vers /login.
-const NOM_PLATEFORME = "Gestion d'Atelier";
+const NOM_PLATEFORME = "Tailora";
 
 export default function ActiverCompteClientPage() {
   const { t } = useTranslation();

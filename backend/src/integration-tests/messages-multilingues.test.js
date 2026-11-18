@@ -102,12 +102,12 @@ describe("Messages serveur multilingues", () => {
     const anonyme = client(baseUrl);
     assert.equal((await anonyme.post("/api/auth/mot-de-passe-oublie", { identifiant: pdgLogin.identifiant })).status, 200);
     assert.equal(envoyes.length, 1);
-    assert.equal(envoyes[0].body.subject, "Reset your password — Gestion d'Atelier");
+    assert.equal(envoyes[0].body.subject, "Reset your password — Tailora");
     assert.match(envoyes[0].body.html, /Reset my password/);
     await prisma.user.update({ where: { id: pdgLogin.admin.id }, data: { langue: "fr" } });
     envoyes.length = 0;
     assert.equal((await client(baseUrl).post("/api/auth/mot-de-passe-oublie", { identifiant: pdgLogin.identifiant })).status, 200);
-    assert.equal(envoyes[0].body.subject, "Réinitialisation de votre mot de passe — Gestion d'Atelier");
+    assert.equal(envoyes[0].body.subject, "Réinitialisation de votre mot de passe — Tailora");
   });
 
   it("invitation d'une cliente : langue de la personne qui invite", async () => {
@@ -115,6 +115,6 @@ describe("Messages serveur multilingues", () => {
     const c2 = await creerCliente(A.id, { nom: "Invitee", prenom: "Eng", telephone: `94${Date.now().toString().slice(-6)}`, email: `inv-${marque}@exemple.test` });
     const r = await pdg.post(`/api/clientes/${c2.id}/inviter`);
     assert.equal(r.status, 201, JSON.stringify(r.body));
-    assert.equal(envoyes.at(-1).body.subject, "Create your client account — Gestion d'Atelier");
+    assert.equal(envoyes.at(-1).body.subject, "Create your client account — Tailora");
   });
 });

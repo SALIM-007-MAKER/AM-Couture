@@ -1,7 +1,7 @@
 // Traductions EN — page Abonnement du PDG (mêmes clés que abonnement.fr.js).
 export default {
   sub: {
-    subtitle: "Your workshop's access to the Gestion d'Atelier platform.",
+    subtitle: "Your workshop's access to the Tailora platform.",
     currentStatus: "Current status",
     status: {
       ESSAI: "Free trial",

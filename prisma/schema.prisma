@@ -58,7 +58,7 @@ enum CategorieVetement {
   AUTRE
 }
 
-// Abonnement (Phase 6) : accès de l'atelier à la plateforme Gestion d'Atelier
+// Abonnement (Phase 6) : accès de l'atelier à la plateforme Tailora
 // elle-même (pas un produit vendu par l'atelier à ses clientes). EN_ATTENTE
 // = créé, aucun paiement réussi ; CONFIRME = au moins un paiement réussi
 // l'a activé — "actif" vs "expiré" se DÉRIVENT de dateExpiration à la
@@ -122,7 +122,7 @@ enum ActionAbonnement {
   REMBOURSEMENT
 }
 
-// Multi-tenant (Phase 8) — plateforme "Gestion d'Atelier" : SUPERADMIN gère
+// Multi-tenant (Phase 8) — plateforme "Tailora" : SUPERADMIN gère
 // toute la plateforme (aucun atelierId, voir User ci-dessous) ; ADMIN
 // appartient à exactement un atelier et n'accède qu'à ses propres données
 // (cloisonnement appliqué côté backend, voir lib/scopeAtelier.js). USER

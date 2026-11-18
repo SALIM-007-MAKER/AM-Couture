@@ -21,7 +21,7 @@ import { useTranslation } from "../../i18n/index.js";
 // bascule client/employé (portail self-service USER/CLIENT hors scope,
 // décision Phase 8), code de parrainage (aucun système de parrainage
 // n'existe derrière) — jamais de fonctionnalité simulée qui ne ferait rien.
-const NOM_PLATEFORME = "Gestion d'Atelier";
+const NOM_PLATEFORME = "Tailora";
 
 const FORM_INITIAL = {
   nom: "",

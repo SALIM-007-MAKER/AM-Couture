@@ -11,7 +11,7 @@ import { useTranslation } from "../../i18n/index.js";
 // connectée (l'inscription connecte immédiatement) quand elle clique ce
 // lien, souvent dans le même navigateur — cette page doit rester accessible
 // dans les deux cas.
-const NOM_PLATEFORME = "Gestion d'Atelier";
+const NOM_PLATEFORME = "Tailora";
 
 export default function VerifierEmailPage() {
   const { t } = useTranslation();

@@ -16,12 +16,12 @@ export default {
       commerceShort: "Commerce",
       pricingShort: "Tarifs",
       accountShort: "Compte",
-      platformName: "Gestion d'Atelier",
+      platformName: "Tailora",
       role: "Superadmin",
     },
     dashboard: {
       title: "Vue d'ensemble",
-      subtitle: "Totaux de la plateforme Gestion d'Atelier, tous ateliers confondus.",
+      subtitle: "Totaux de la plateforme Tailora, tous ateliers confondus.",
       loadingStats: "Chargement des statistiques…",
       kpiWorkshops: "Ateliers",
       kpiActive: "Ateliers actifs",
@@ -43,7 +43,7 @@ export default {
     },
     ateliers: {
       title: "Ateliers",
-      subtitle: "Les ateliers (tenants) de la plateforme Gestion d'Atelier.",
+      subtitle: "Les ateliers (tenants) de la plateforme Tailora.",
       newWorkshop: "Nouvel atelier",
       createdMessage: "Atelier « {{nom}} » créé — son admin peut se connecter avec l'identifiant « {{identifiant}} ».",
       searchPlaceholder: "Rechercher un atelier…",

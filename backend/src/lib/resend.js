@@ -20,7 +20,7 @@ function requireApiKey() {
 // sans vérification de domaine mais uniquement adapté à la mise en route :
 // Resend recommande un domaine propre vérifié dès que possible en production
 // (meilleure délivrabilité, pas de risque de blocage du domaine partagé).
-const FROM_DEFAULT = "Gestion d'Atelier <onboarding@resend.dev>";
+const FROM_DEFAULT = "Tailora <onboarding@resend.dev>";
 
 // Délai maximal d'un appel (ms). Sans lui, un service lent ou muet suspend la requête de
 // l'utilisateur (inscription, mot de passe oublié, invitation) et, dans le cron, tous les envois

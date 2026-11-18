@@ -6,7 +6,7 @@ import { api } from "../../lib/apiClient.js";
 // Pas de route "publique" (avant connexion) : avec plusieurs ateliers sur la
 // même plateforme, il n'y a plus "un seul" nom/logo à afficher avant que
 // l'utilisateur ne soit identifié — voir LoginPage.jsx (branding générique
-// "Gestion d'Atelier").
+// "Tailora").
 export const parametresApi = {
   get: () => api.get("/parametres"),
   put: (data) => api.put("/parametres", data),

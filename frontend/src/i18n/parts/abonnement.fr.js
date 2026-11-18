@@ -2,7 +2,7 @@
 // par le SUPERADMIN), namespace "sub".
 export default {
   sub: {
-    subtitle: "Accès de l'atelier à la plateforme Gestion d'Atelier.",
+    subtitle: "Accès de l'atelier à la plateforme Tailora.",
     currentStatus: "Statut actuel",
     status: {
       ESSAI: "Essai gratuit",
