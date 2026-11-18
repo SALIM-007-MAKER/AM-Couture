@@ -320,7 +320,7 @@ export default function AppLayout() {
           grands écrans (2xl, ≥1536px) — un iPad et un écran 27" n'ont pas la
           même largeur disponible pour le contenu principal. */}
       <aside
-        className={`hidden md:flex flex-col shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 transition-[width] duration-150 ${
+        className={`hidden md:flex flex-col shrink-0 sticky top-0 h-svh self-start border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 transition-[width] duration-150 ${
           sidebarCollapsed ? "w-16" : "w-56 lg:w-64 xl:w-72 2xl:w-80"
         }`}
       >
