@@ -8,7 +8,7 @@ import { LANGUES_TRADUITES } from "../i18n/index.js";
  * en base (User.langue) une fois connecté — sans ce composant, changer la
  * langue dans "Mon compte" (features/compte/ComptePage.jsx) mettrait à jour
  * la base sans jamais affecter l'interface réellement affichée. Ne fait
- * rien tant que `langue` n'est pas une langue RÉELLEMENT traduite (ex: "ha"
+ * rien tant que `langue` n'est pas une langue RÉELLEMENT traduite (ex: une langue retirée
  * pour l'instant) — le store garde alors la dernière langue traduite active
  * plutôt que de retomber silencieusement sur "fr" à chaque rendu.
  * Ne rend rien : composant purement d'effet, monté une fois dans AppLayout.

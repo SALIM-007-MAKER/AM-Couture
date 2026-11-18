@@ -28,11 +28,11 @@ function pdf(fonction, args) {
 const atelier = { nom: "Atelier", devise: "FCFA", adresse: "Niamey" };
 const cliente = { prenom: "Awa", nom: "Diop", telephone: "90000001" };
 
-test("langue inconnue ou non traduite (ex. « ha ») : retombe sur le français, jamais de clé brute", () => {
-  assert.equal(normaliserLangue("ha"), "fr");
+test("langue inconnue ou non traduite (ex. « de ») : retombe sur le français, jamais de clé brute", () => {
+  assert.equal(normaliserLangue("de"), "fr");
   assert.equal(normaliserLangue(undefined), "fr");
   assert.equal(normaliserLangue("en"), "en");
-  assert.equal(traduire("ha", "notif.RECU_EMIS", { numero: "C1" }), "Un reçu est disponible pour votre commande C1.");
+  assert.equal(traduire("de", "notif.RECU_EMIS", { numero: "C1" }), "Un reçu est disponible pour votre commande C1.");
   assert.equal(traduire("en", "cle.inexistante"), "cle.inexistante");
 });
 
@@ -77,7 +77,7 @@ test("ligne antérieure sans code : le texte enregistré est conservé, quelle q
 test("langue d'un document : paramètre valide prioritaire, sinon préférence du compte, sinon français", () => {
   assert.equal(langueDemandee({ query: { langue: "en" }, user: { langue: "fr" } }), "en");
   assert.equal(langueDemandee({ query: { langue: "xx" }, user: { langue: "en" } }), "en");
-  assert.equal(langueDemandee({ query: { langue: ["en"] }, user: { langue: "ha" } }), "fr");
+  assert.equal(langueDemandee({ query: { langue: ["en"] }, user: { langue: "de" } }), "fr");
   assert.equal(langueDemandee({ query: {}, user: {} }), "fr");
   assert.deepEqual(LANGUES_SERVEUR, ["fr", "en"]);
 });
@@ -115,5 +115,5 @@ test("courriels : langue du destinataire, valeurs saisies toujours échappées",
   assert.match(emailVerificationTemplate({ prenom: "Awa", lienVerification: "https://x" }), /Bienvenue Awa !/);
   assert.match(emailInvitationClientTemplate({ prenom: "A", identifiant: "9000", lienActivation: "https://x", langue: "en" }), /phone number \(9000\)/);
   assert.match(emailReinitialisationTemplate({ lienReinitialisation: "https://x", langue: "en" }), /Reset my password/);
-  assert.match(emailReinitialisationTemplate({ lienReinitialisation: "https://x", langue: "ha" }), /Réinitialiser mon mot de passe/);
+  assert.match(emailReinitialisationTemplate({ lienReinitialisation: "https://x", langue: "de" }), /Réinitialiser mon mot de passe/);
 });

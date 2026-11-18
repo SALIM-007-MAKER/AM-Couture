@@ -3,7 +3,7 @@ import fr from "./fr.js";
 import en from "./en.js";
 
 // Langues avec une VRAIE traduction (voir features/compte/constants.js pour
-// la liste complète proposée dans le sélecteur, "ha" compris) — une langue
+// la liste proposée dans le sélecteur) — une langue
 // sélectionnée mais absente d'ici retombe sur le français (voir
 // components/LocaleSync.jsx), jamais sur des clés brutes non traduites.
 export const DICTIONARIES = { fr, en };

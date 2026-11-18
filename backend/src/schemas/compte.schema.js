@@ -1,11 +1,11 @@
 import { z } from "zod";
 import { nouveauMotDePasseField } from "../lib/passwordPolicy.js";
 
-// Préférence stockée uniquement (Phase 6) : aucune traduction réelle de
-// l'interface derrière ce choix pour l'instant — voir User.langue
+// Langues proposées : français et anglais (le haoussa a été retiré). Préférence du compte, appliquée à l'interface et aux textes serveur ;
+// voir User.langue
 // (schema.prisma) et LANGUES_DISPONIBLES côté frontend (constants.js),
 // qui doit rester synchronisé avec cette liste.
-export const LANGUES_DISPONIBLES = ["fr", "en", "ha"];
+export const LANGUES_DISPONIBLES = ["fr", "en"];
 
 export const updateCompteSchema = z
   .object({

@@ -69,7 +69,7 @@ describe("Messages serveur multilingues", () => {
     assert.ok((await messages()).includes(`Votre commande ${commande.numero} a été enregistrée.`));
     await prisma.user.update({ where: { id: compte.user.id }, data: { langue: "en" } });
     assert.ok((await messages()).includes(`Your order ${commande.numero} has been recorded.`), "la MÊME ligne se lit en anglais");
-    await prisma.user.update({ where: { id: compte.user.id }, data: { langue: "ha" } });
+    await prisma.user.update({ where: { id: compte.user.id }, data: { langue: "de" } });
     assert.ok((await messages()).includes(`Votre commande ${commande.numero} a été enregistrée.`), "langue sans traduction : français");
   });
 

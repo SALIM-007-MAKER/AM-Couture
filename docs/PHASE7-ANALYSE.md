@@ -262,7 +262,7 @@ Les quatre options recommandées ont été retenues : **adaptateur de stockage d
 
 ## 13. Réalisé en 7.7 — textes du serveur dans la langue de la personne
 
-**Langues** : français et anglais. La préférence `User.langue` accepte aussi « ha », mais **aucune traduction haoussa n'existe** : cette valeur retombe sur le français (jamais de clé brute affichée). Catalogue unique : `backend/src/lib/messagesServeur.js` (une clé absente d'une langue retombe sur le français).
+**Langues** : français et anglais. Le haoussa, accepté jusqu’ici comme préférence sans traduction, a été retiré (migration `20261201090000_retire_haoussa`) ; une valeur inconnue retombe sur le français (jamais de clé brute affichée). Catalogue unique : `backend/src/lib/messagesServeur.js` (une clé absente d'une langue retombe sur le français).
 
 **Ce qui est traduit**
 - **Fil d'activité des clientes** (point reporté de la 7.4) : chaque événement enregistre désormais un **code et des paramètres** (`NotificationClient.code`, `params`) ; le message est **composé à la lecture** dans la langue de la cliente. Un changement de langue s'applique donc aussi aux événements passés. Le texte français reste enregistré dans `message` (secours, export de données). Libellés de statut traduits.

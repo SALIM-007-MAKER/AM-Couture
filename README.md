@@ -30,7 +30,7 @@ Plateforme SaaS multi-ateliers de gestion pour ateliers de couture — React/Vit
 
 **Paramètres** — identité de l'atelier (nom, logo, devise, coordonnées), thème clair/sombre, mentions personnalisées sur les reçus PDF (Orange Money, RIB, mentions légales...).
 
-**Mon compte** — changement de mot de passe (déconnecte les autres sessions ouvertes), préférence de langue (français/anglais — le haoussa est listé mais pas encore traduit).
+**Mon compte** — changement de mot de passe (déconnecte les autres sessions ouvertes), préférence de langue (français/anglais).
 
 **Abonnement** — souscription à une formule tarifaire de la plateforme, paiement mobile (Wave) avec confirmation automatique par webhook.
 

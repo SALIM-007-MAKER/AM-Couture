@@ -34,7 +34,7 @@
 |---|---|
 | Public cible | Ateliers de couture (marché ouest-africain : FCFA, Wave, Orange Money, WhatsApp) |
 | Type | SaaS multi-tenant, abonnement mensuel/multi-mois |
-| Langues | Français (complet), anglais ; le haoussa est listé mais non traduit |
+| Langues | Français (complet) et anglais ; le haoussa a été retiré |
 | Premier tenant | « AM Couture » (l'application est générique, ce n'est pas son nom) |
 | Taille approximative | ~28 500 lignes de JS/JSX, 25 tables, 24 fichiers de routes API |
 
@@ -241,7 +241,7 @@ Profil, mesures, liste et détail des commandes, paiements, reçus (PDF), fil de
 ### 9.2 Priorité moyenne
 
 - *(Partiellement traité en phases 6 et 7 : fournisseurs et achats faits ; galerie/lookbook et vitrine publique faits ; mode hors connexion partiel — voir les bilans.)*
-- Traduction **haoussa** (listé mais absent) et complétude de l'anglais sur tous les écrans.
+- Complétude de l'anglais sur tous les écrans.
 - **Devis / factures** distincts des reçus ; numérotation fiscale.
 - **Gestion des retouches et essayages** planifiés (rendez-vous, rappel).
 - **Liaison stock ↔ commande** : consommation automatique de tissu par commande.

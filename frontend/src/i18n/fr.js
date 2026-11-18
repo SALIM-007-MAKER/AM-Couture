@@ -270,7 +270,7 @@ export default {
     archivedNotice: "Article archivé : restaurez-le avant d'enregistrer un mouvement.",
   },
   compte: {
-    langueNote: "Préférence enregistrée sur votre compte. L'interface se traduit en français et en anglais ; les autres langues retombent sur le français tant qu'une vraie traduction n'est pas fournie.",
+    langueNote: "Préférence enregistrée sur votre compte : elle détermine la langue de l'interface et des messages envoyés.",
   },
   client: {
     profilLoading: "Chargement de votre profil…",

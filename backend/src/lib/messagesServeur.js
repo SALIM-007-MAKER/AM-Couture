@@ -1,6 +1,6 @@
 // Textes produits par le SERVEUR (fil d'activité des clientes, courriels, PDF) dans la langue de la personne (7.7).
 //
-// Langues : « fr » et « en ». Toute autre valeur (ex. « ha », acceptée comme préférence mais sans traduction) retombe sur
+// Langues : « fr » et « en ». Toute autre valeur (ex. une langue retirée ou inconnue) retombe sur
 // « fr » : jamais de clé brute affichée. Une clé absente d'une langue retombe aussi sur « fr », puis sur la clé elle-même.
 //
 // Le fil d'activité enregistre un CODE et des PARAMÈTRES (pas seulement un texte) : le message est composé à la lecture,

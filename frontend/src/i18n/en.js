@@ -269,7 +269,7 @@ export default {
     archivedNotice: "Archived item: restore it before recording a movement.",
   },
   compte: {
-    langueNote: "Preference saved on your account. The interface translates into French and English; other languages fall back to French until a real translation is provided.",
+    langueNote: "Preference saved on your account: it sets the language of the interface and of the messages sent.",
   },
   client: {
     profilLoading: "Loading your profile…",
