@@ -15,6 +15,7 @@ import { creerToken, consommerToken } from "../lib/tokenAction.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { emailVerificationTemplate, emailReinitialisationTemplate } from "../lib/emailTemplates.js";
 import { rateLimitPersistant } from "../lib/rateLimiter.js";
+import { modeEmailLocal, afficherLienLocal } from "../lib/lienLocal.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
 
@@ -309,14 +310,17 @@ router.post("/mot-de-passe-oublie", motDePasseOublieLimiter, async (req, res) =>
     try {
       const resetToken = await creerToken({ userId: user.id, type: "REINITIALISATION_MOT_DE_PASSE", dureeMs: 60 * 60 * 1000 });
       const origin = origineApplication(req);
-      await envoyerEmail({
-        to: user.email,
-        subject: traduire(user.langue, "email.reinitialisation.sujet"),
-        html: emailReinitialisationTemplate({
-          langue: user.langue,
-          lienReinitialisation: `${origin}/reinitialiser-mot-de-passe?token=${resetToken}`,
-        }),
-      });
+      const lienReinitialisation = `${origin}/reinitialiser-mot-de-passe?token=${resetToken}`;
+      if (modeEmailLocal()) {
+        // Développement local sans Resend : le lien va dans le terminal du backend, jamais dans la réponse.
+        afficherLienLocal({ libelle: "Lien de réinitialisation du mot de passe", identifiant: user.identifiant, lien: lienReinitialisation });
+      } else {
+        await envoyerEmail({
+          to: user.email,
+          subject: traduire(user.langue, "email.reinitialisation.sujet"),
+          html: emailReinitialisationTemplate({ langue: user.langue, lienReinitialisation }),
+        });
+      }
     } catch (err) {
       log.error("erreur", { categorie: "email", operation: "mot_de_passe_oublie", userId: user.id, message: messageErreur(err) });
     }
