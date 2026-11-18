@@ -14,7 +14,7 @@ import { creerAtelierEtAdmin } from "../lib/atelierProvisioning.js";
 import { creerToken, consommerToken } from "../lib/tokenAction.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { emailVerificationTemplate, emailReinitialisationTemplate } from "../lib/emailTemplates.js";
-import { rateLimitPersistant } from "../lib/rateLimiter.js";
+import { rateLimitPersistant, limiteConnexion } from "../lib/rateLimiter.js";
 import { modeEmailLocal, afficherLienLocal } from "../lib/lienLocal.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
@@ -34,7 +34,7 @@ const DUMMY_HASH = "$2b$10$/4y/w0cvEjmIpLaIBO4xNOLAdvUoH3oNwzYFeJ7fUnPvdyqtJ22de
 // compteur).
 const loginLimiter = rateLimitPersistant({
   prefixe: "login",
-  limite: 10,
+  limite: limiteConnexion(), // 10 ; relevée en développement local seulement (voir lib/rateLimiter.js)
   fenetreMs: 15 * 60 * 1000,
   message: "Trop de tentatives. Réessayez dans quelques minutes.",
 });
