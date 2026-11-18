@@ -127,6 +127,7 @@ describe("Emails — flux mot de passe oublié / vérification, avec Resend simu
     await api.post("/api/auth/login", { identifiant, password: NOUVEAU });
     const r = await api.post("/api/auth/renvoyer-verification-email", {});
     assert.equal(r.status, 200);
+    assert.equal(envoyes.length, 1, "un seul email par demande de renvoi (jamais de double envoi)");
     const lien = lienDe(envoyes[0]);
     const ok = await fetch(`${baseUrl}/api/auth/verifier-email?token=${lien.searchParams.get("token")}`);
     assert.ok(ok.status < 400, `vérification : HTTP ${ok.status}`);
