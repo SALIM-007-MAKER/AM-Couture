@@ -6,7 +6,7 @@
 | Unitaires frontend | `frontend/src/**/__tests__` | `node --test` | `npm test` | 124 | oui (`verifier`) |
 | Déploiement | `scripts/__tests__` | `node --test` | `npm test` | 7 | oui (`verifier`) |
 | Intégration (API + Prisma + Postgres) | `backend/src/integration-tests` | `node --test` | `npm run test:integration` | 461 (460 + 1 `TODO` volontaire) | oui (`tests-integration`) |
-| End-to-end (navigateur réel → frontend → API → Postgres) | `e2e/specs` | Playwright | `npm run test:e2e` | 117 | job `tests-e2e`, **non bloquant** (jamais exécuté sur GitHub) |
+| End-to-end (navigateur réel → frontend → API → Postgres) | `e2e/specs` | Playwright | `npm run test:e2e` | 120 | job `tests-e2e`, **non bloquant** (jamais exécuté sur GitHub) |
 | Cohérence schéma Prisma / migrations | `prisma/` | `prisma migrate diff` | voir `.github/workflows/ci.yml` | 1 contrôle | oui (`tests-integration`) |
 | Vulnérabilités des dépendances d'exécution | `package-lock.json` | `npm audit --omit=dev` | `npm audit --omit=dev --audit-level=high` | 0 constaté le 15/11/2026 | job `audit-dependances`, non bloquant |
 
@@ -73,6 +73,7 @@ captures et traces dans `e2e-resultats/` (`npx playwright show-trace <trace.zip>
 | `securite.spec.js` | 401 sans session, 403 par rôle, 404 sur les ressources d'un autre atelier (lecture et écriture), garde d'origine (CSRF), erreurs sans fuite technique |
 | `receptionniste-tableau-de-bord.spec.js` | tableau de bord complet d'une réceptionniste : compteur « Livraison ≤ 3 j », commandes en retard, livraisons à venir, aucun 403, aucun montant, 403 maintenu sur `/api/rapports/*`, isolation entre ateliers, refus sans `commandes.lire` |
 | `tout-voir-tableau-de-bord.spec.js` | liens « Tout voir » du tableau de bord : réceptionniste vers `/commandes` filtré (retard, fenêtre de livraison), jamais vers `/rapports` ; PDG et comptable vers `/rapports` |
+| `superadmin-vue-ensemble.spec.js` | vue d'ensemble de la plateforme : état vide des graphiques, devise FCFA, infobulle par mois, six indicateurs (tendances simulées) |
 | `espaces-metier.spec.js` | un employé de chaque poste (couturier, réceptionniste, magasinier, comptable, autre) : accueil et sections de son métier, aucune erreur d'API, écrans d'un autre métier fermés |
 | `stock-tracabilite.spec.js` | sortie sans motif refusée (formulaire et API), motif/origine/auteur dans l'historique, double envoi sans doublon, stock jamais négatif, entrée |
 | `auth-locale.spec.js` | inscription puis lien de vérification (dans le journal, vers l'écran), mot de passe oublié sans fuite ni énumération, nouveau mot de passe, lien à usage unique |

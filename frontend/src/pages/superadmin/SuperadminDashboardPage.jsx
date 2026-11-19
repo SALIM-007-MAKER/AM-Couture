@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   CreditCard,
   TrendingUp,
+  BarChart3,
 } from "lucide-react";
 import { useAteliersResumeQuery, useAteliersAlertesQuery, useAteliersTendancesQuery } from "../../features/ateliers/hooks.js";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
@@ -20,6 +21,7 @@ import Card from "../../components/Card.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
 import { useTranslation } from "../../i18n/index.js";
 import { useLocaleStore } from "../../stores/localeStore.js";
+import { moisCourt, anneeAAfficher, estVide, texteInfobulle } from "../../features/ateliers/tendances.js";
 
 const KPI_TONES = {
   neutral: "bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400",
@@ -117,40 +119,48 @@ function AlertesSection() {
   );
 }
 
-function moisLabel(cle) {
-  const [annee, mois] = cle.split("-").map(Number);
-  return new Date(annee, mois - 1, 1).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { month: "short" });
-}
-
 // Un seul axe, une seule teinte par graphique (voir skill dataviz) — deux
 // mesures d'échelles différentes (un compte d'ateliers, une somme d'argent)
 // ne partagent donc jamais le même graphique à deux axes ; deux mini-graphes
 // séparés à la place (voir TendancesSection). Étiquette de valeur directe
 // au-dessus de chaque barre plutôt qu'une légende (une seule série ici).
-function MiniBarChart({ data, valueKey, colorClass, formatValue }) {
+// Chaque colonne a une infobulle (mois complet, valeur, unité) pour la souris, le clavier et les lecteurs d'écran.
+function MiniBarChart({ data, valueKey, colorClass, formatValue, unite, titre }) {
+  const langue = useLocaleStore.getState().locale;
   const max = Math.max(1, ...data.map((d) => d[valueKey]));
   return (
-    <div className="flex items-end gap-2 h-28">
-      {data.map((d) => {
+    <div className="flex items-end gap-2 h-32" role="img" aria-label={titre}>
+      {data.map((d, i) => {
         const valeur = d[valueKey];
         const hauteurPct = Math.max(2, (valeur / max) * 100);
+        const annee = anneeAAfficher(data, i);
+        const infobulle = texteInfobulle(d.mois, valeur, { langue, unite });
         return (
-          <div key={d.mois} className="flex-1 flex flex-col items-center gap-1 h-full min-w-0">
-            <div
-              className="w-full flex-1 flex flex-col justify-end items-center min-w-0"
-              title={`${moisLabel(d.mois)} : ${formatValue(valeur)}`}
-            >
+          <div key={d.mois} className="flex-1 flex flex-col items-center gap-1 h-full min-w-0" title={infobulle} aria-label={infobulle}>
+            <div className="w-full flex-1 flex flex-col justify-end items-center min-w-0">
               {valeur > 0 && (
-                <span className="text-[10px] font-medium tabular-nums text-neutral-600 dark:text-neutral-400 truncate w-full text-center">
+                <span className="text-[11px] font-medium tabular-nums text-neutral-700 dark:text-neutral-300 truncate w-full text-center">
                   {formatValue(valeur)}
                 </span>
               )}
               <div className={`w-full rounded-t ${colorClass}`} style={{ height: `${hauteurPct}%` }} />
             </div>
-            <span className="text-[10px] text-neutral-500 shrink-0">{moisLabel(d.mois)}</span>
+            <span className="text-xs text-neutral-600 dark:text-neutral-400 shrink-0 leading-none">{moisCourt(d.mois, langue)}</span>
+            <span className="text-[10px] text-neutral-500 shrink-0 leading-none h-2.5">{annee ?? ""}</span>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** État vide d'un graphique : un message calme à la place de barres toutes à zéro. */
+function GraphiqueVide({ titre, indice }) {
+  return (
+    <div className="flex h-32 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-neutral-300 dark:border-neutral-700 px-4 text-center" data-testid="graphique-vide">
+      <BarChart3 className="size-5 text-neutral-400 dark:text-neutral-500" aria-hidden="true" />
+      <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{titre}</p>
+      <p className="text-xs text-neutral-500">{indice}</p>
     </div>
   );
 }
@@ -167,23 +177,34 @@ function TendancesSection() {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <Card variant="outlined">
-        <p className="text-xs font-medium text-neutral-500 mb-3">{t("sa.dashboard.newWorkshopsPerMonth")}</p>
-        <MiniBarChart
-          data={data}
-          valueKey="nouveauxAteliers"
-          colorClass="bg-brand-500 dark:bg-brand-400"
-          formatValue={(v) => String(v)}
-        />
+      <Card variant="outlined" data-testid="carte-tendance-ateliers">
+        <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">{t("sa.dashboard.newWorkshopsPerMonth")}</p>
+        {estVide(data, "nouveauxAteliers") ? (
+          <GraphiqueVide titre={t("sa.dashboard.newWorkshopsEmpty")} indice={t("sa.dashboard.newWorkshopsEmptyHint")} />
+        ) : (
+          <MiniBarChart
+            data={data}
+            valueKey="nouveauxAteliers"
+            colorClass="bg-brand-500 dark:bg-brand-400"
+            formatValue={(v) => String(v)}
+            titre={t("sa.dashboard.newWorkshopsPerMonth")}
+          />
+        )}
       </Card>
-      <Card variant="outlined">
-        <p className="text-xs font-medium text-neutral-500 mb-3">{t("sa.dashboard.revenuePerMonth")}</p>
-        <MiniBarChart
-          data={data}
-          valueKey="revenus"
-          colorClass="bg-amber-500 dark:bg-amber-400"
-          formatValue={(v) => v.toLocaleString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR")}
-        />
+      <Card variant="outlined" data-testid="carte-tendance-revenus">
+        <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-3">{t("sa.dashboard.revenuePerMonth")}</p>
+        {estVide(data, "revenus") ? (
+          <GraphiqueVide titre={t("sa.dashboard.revenueEmpty")} indice={t("sa.dashboard.revenueEmptyHint")} />
+        ) : (
+          <MiniBarChart
+            data={data}
+            valueKey="revenus"
+            colorClass="bg-amber-500 dark:bg-amber-400"
+            formatValue={(v) => v.toLocaleString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR")}
+            unite="FCFA"
+            titre={t("sa.dashboard.revenuePerMonth")}
+          />
+        )}
       </Card>
     </div>
   );
