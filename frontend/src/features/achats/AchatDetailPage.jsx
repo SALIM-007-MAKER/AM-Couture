@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ShoppingCart, PackageCheck, Banknote, Ban } from "lucide-react";
+import { useCleOperation } from "../../lib/cleOperation.js";
 import { useAchatQuery, useReceptionMutation, usePayerAchatMutation, useAnnulerAchatMutation } from "./hooks.js";
 import { BadgeReception, BadgePaiement, BadgeAnnule } from "./Badges.jsx";
 import { uniteLabel } from "../stock/constants.js";
@@ -118,6 +119,8 @@ function ReceptionForm({ achat, voirFinances }) {
   const details = mutation.error instanceof ApiError ? mutation.error.details : undefined;
   const lignes = achat.lignes.filter((l) => positif(l.quantiteRestante));
   const aEnvoyer = lignes.filter((l) => positif(saisie[l.id] ?? "")).map((l) => ({ ligneId: l.id, quantite: String(saisie[l.id]).replace(",", ".") }));
+  // Même saisie = même clé : un double clic ne reçoit pas deux fois la marchandise.
+  const cle = useCleOperation(JSON.stringify([achat.id, aEnvoyer]));
 
   return (
     <section className="space-y-2">
@@ -126,7 +129,7 @@ function ReceptionForm({ achat, voirFinances }) {
         as="form"
         onSubmit={(e) => {
           e.preventDefault();
-          mutation.mutate(aEnvoyer, { onSuccess: () => setSaisie({}) });
+          mutation.mutate({ lignes: aEnvoyer, cle }, { onSuccess: () => setSaisie({}) });
         }}
         className="space-y-3"
       >

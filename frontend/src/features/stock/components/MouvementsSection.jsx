@@ -10,6 +10,7 @@ import Pagination from "../../../components/Pagination.jsx";
 import Card from "../../../components/Card.jsx";
 import Button from "../../../components/Button.jsx";
 import { ApiError } from "../../../lib/apiClient.js";
+import { useCleOperation } from "../../../lib/cleOperation.js";
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString(useLocaleStore.getState().locale === "en" ? "en-GB" : "fr-FR", { year: "numeric", month: "long", day: "numeric" });
@@ -21,12 +22,14 @@ function MouvementForm({ articleId, unite }) {
   const [quantite, setQuantite] = useState("");
   const [motif, setMotif] = useState("");
   const mutation = useCreateMouvementMutation(articleId);
+  // Même saisie = même clé : un double clic n'enregistre pas deux mouvements.
+  const cle = useCleOperation(JSON.stringify([articleId, type, quantite, motif]));
   const details = mutation.error instanceof ApiError ? mutation.error.details : undefined;
 
   function handleSubmit(e) {
     e.preventDefault();
     mutation.mutate(
-      { type, quantite, motif: motif || undefined },
+      { data: { type, quantite, motif: motif || undefined }, cle },
       { onSuccess: () => { setQuantite(""); setMotif(""); } },
     );
   }
@@ -57,8 +60,12 @@ function MouvementForm({ articleId, unite }) {
           <FieldError messages={details?.quantite} />
         </label>
         <label className="block space-y-1">
-          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t("stockMore.reason")}</span>
-          <input value={motif} onChange={(e) => setMotif(e.target.value)} className={inputClass} />
+          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            {t("stockMore.reason")}{type === "SORTIE" ? " *" : ""}
+          </span>
+          <input value={motif} onChange={(e) => setMotif(e.target.value)} required={type === "SORTIE"} maxLength={300} className={inputClass} />
+          {type === "SORTIE" && <span className="block text-xs text-neutral-500">{t("stockMore.reasonExitHint")}</span>}
+          <FieldError messages={details?.motif} />
         </label>
       </div>
       <Button
@@ -111,6 +118,10 @@ export default function MouvementsSection({ articleId, unite, archived }) {
                     <div>
                       <p className="text-neutral-900 dark:text-neutral-100">{formatDate(m.createdAt)}</p>
                       {m.motif && <p className="text-neutral-500 text-xs">{m.motif}</p>}
+                      <p className="text-neutral-400 text-xs">
+                        {t(`stockMore.source.${m.source}`)}
+                        {m.creePar?.identifiant ? ` · ${t("stockMore.by", { auteur: m.creePar.identifiant })}` : ""}
+                      </p>
                     </div>
                   </div>
                   <span

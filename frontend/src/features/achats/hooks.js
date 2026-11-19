@@ -30,6 +30,6 @@ function useOperation(id, fn, { stock = false, depenses = false } = {}) {
   });
 }
 
-export const useReceptionMutation = (id) => useOperation(id, (lignes) => achatsApi.receptionner(id, lignes), { stock: true });
+export const useReceptionMutation = (id) => useOperation(id, ({ lignes, cle }) => achatsApi.receptionner(id, lignes, cle), { stock: true });
 export const usePayerAchatMutation = (id) => useOperation(id, () => achatsApi.payer(id), { depenses: true });
 export const useAnnulerAchatMutation = (id) => useOperation(id, (motif) => achatsApi.annuler(id, motif));

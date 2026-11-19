@@ -175,6 +175,9 @@ export default {
     recordEntry: "Record the entry",
     recordExit: "Record the exit",
     loadingMovements: "Loading movements…",
+    reasonExitHint: "Required: say why the material leaves the stock (e.g. Mrs Diop's dress).",
+    by: "by {{auteur}}",
+    source: { MANUEL: "Manual entry", RECEPTION_ACHAT: "Purchase receipt", STOCK_INITIAL: "Initial stock" },
     emptyMovements: "No movement recorded.",
     units: {
       METRE: "Meter",

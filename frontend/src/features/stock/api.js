@@ -13,7 +13,7 @@ export const stockApi = {
   alertes: () => api.get("/stock/alertes"),
   mouvements: {
     list: (articleId, params) => api.get(`/stock/${articleId}/mouvements${buildQuery(params)}`),
-    create: (articleId, data) => api.post(`/stock/${articleId}/mouvements`, data),
+    create: (articleId, data, cle) => api.post(`/stock/${articleId}/mouvements`, data, cle ? { headers: { "Idempotency-Key": cle } } : undefined),
   },
 };
 

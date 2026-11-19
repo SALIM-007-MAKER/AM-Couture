@@ -7,7 +7,7 @@ export const achatsApi = {
   options: () => api.get("/achats/options"),
   get: (id) => api.get(`/achats/${id}`),
   create: (data, cle) => api.post("/achats", data, cle ? { headers: { "Idempotency-Key": cle } } : undefined),
-  receptionner: (id, lignes) => api.post(`/achats/${id}/receptions`, { lignes }),
+  receptionner: (id, lignes, cle) => api.post(`/achats/${id}/receptions`, { lignes }, cle ? { headers: { "Idempotency-Key": cle } } : undefined),
   payer: (id) => api.post(`/achats/${id}/paiement`, {}),
   annuler: (id, motif) => api.post(`/achats/${id}/annuler`, { motif }),
 };

@@ -80,7 +80,7 @@ export function useMouvementsQuery(articleId, params) {
 export function useCreateMouvementMutation(articleId) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data) => stockApi.mouvements.create(articleId, data),
+    mutationFn: ({ data, cle }) => stockApi.mouvements.create(articleId, data, cle),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stock", "mouvements", articleId] });
       queryClient.invalidateQueries({ queryKey: ["stock", "detail", articleId] });
