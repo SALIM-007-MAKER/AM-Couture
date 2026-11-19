@@ -13,6 +13,7 @@ export const ateliersApi = {
   abonnements: () => api.get("/ateliers/abonnements"),
   get: (id) => api.get(`/ateliers/${id}`),
   activite: (id) => api.get(`/ateliers/${id}/activite`),
+  utilisation: (id) => api.get(`/ateliers/${id}/utilisation`),
   create: (data) => api.post("/ateliers", data),
   update: (id, data) => api.patch(`/ateliers/${id}`, data),
   updateStatut: (id, actif) => api.patch(`/ateliers/${id}/statut`, { actif }),

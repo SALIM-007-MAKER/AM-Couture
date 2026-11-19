@@ -8,6 +8,8 @@ export const plansAdminApi = {
   tous: () => api.get("/plans-abonnement/tous"),
   creer: (data) => api.post("/plans-abonnement", data),
   modifier: (id, data) => api.patch(`/plans-abonnement/${id}`, data),
+  // Ateliers dont l'usage actuel dépasse déjà les limites de la formule (lecture seule).
+  depassements: (id) => api.get(`/plans-abonnement/${id}/depassements`),
 };
 
 // Contact WhatsApp de la plateforme — voir backend/src/routes/plateforme.routes.js.

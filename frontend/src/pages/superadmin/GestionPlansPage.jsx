@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { CreditCard, Plus, X, Save, ShieldCheck, ShieldOff, Pencil, Trash2, MessageCircle, CheckCircle2 } from "lucide-react";
 import {
+  useDepassementsPlanQuery,
   usePlansTousQuery,
   useCreerPlanMutation,
   useModifierPlanMutation,
@@ -218,6 +220,42 @@ function PlanForm({ plan, onCancel, onDone }) {
   );
 }
 
+/** Aide à la décision : ateliers dont l'usage actuel dépasse déjà les limites de cette formule. Lecture seule. */
+function DepassementsFormule({ plan }) {
+  const { t } = useTranslation();
+  const [ouvert, setOuvert] = useState(false);
+  const { data, isPending, isError, error, refetch } = useDepassementsPlanQuery(plan.id, ouvert);
+  if (RESSOURCES.every((cle) => plan.limites?.[cle] == null)) return null;
+  return (
+    <div className="space-y-2" data-testid={`depassements-${plan.id}`}>
+      <Button variant="ghost" size="sm" onClick={() => setOuvert((o) => !o)} data-testid="voir-depassements">
+        {ouvert ? t("quotas.admin.masquerDepassements") : t("quotas.admin.voirDepassements")}
+      </Button>
+      {ouvert && isPending && <LoadingState label={t("common.loading")} />}
+      {ouvert && isError && <ErrorState error={error} onRetry={refetch} />}
+      {ouvert && data && (
+        data.ateliers.length === 0 ? (
+          <p className="text-sm text-neutral-500" data-testid="aucun-depassement">{t("quotas.admin.aucunDepassement")}</p>
+        ) : (
+          <div className="space-y-1">
+            <p className="text-xs text-neutral-500">{t("quotas.admin.depassementsNote")}</p>
+            <ul className="text-sm space-y-1">
+              {data.ateliers.map((a) => (
+                <li key={a.atelierId} className="flex flex-wrap gap-x-2">
+                  <Link to={`/ateliers/${a.atelierId}`} className="underline font-medium">{a.nom}</Link>
+                  <span className="text-neutral-600 dark:text-neutral-400">
+                    {a.depassements.map((d) => `${t(`quotas.ressources.${d.ressource}`)} ${d.usage}/${d.limite}`).join(" · ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 function PlanCard({ plan }) {
   const { t } = useTranslation();
   const mutation = useModifierPlanMutation();
@@ -263,6 +301,7 @@ function PlanCard({ plan }) {
           ))}
         </ul>
       )}
+      <DepassementsFormule plan={plan} />
       <GlobalFormError error={mutation.error} />
       <div className="flex gap-2 flex-wrap">
         <Button variant="secondary" size="sm" icon={Pencil} onClick={() => setEditing(true)}>
