@@ -84,21 +84,25 @@ d'impersonation (couverts seulement par les tests d'intégration).
 Les calculs financiers (totaux, soldes, statut de paiement) sont **côté serveur** (`backend/src/lib/money.js`, testés
 en unitaire et en intégration) ; le frontend n'en refait aucun, il affiche les montants reçus.
 
-## Problème connu : `vercel.json : le hash CSP correspond au script inline de index.html` échoue sur Windows (CRLF)
+## CSP : le hash du script inline et les fins de ligne (Windows)
 
-Le test (`backend/src/lib/__tests__/security.test.js`) calcule le hash SHA-256 du script inline de `frontend/index.html` et vérifie qu'il figure
-dans la `Content-Security-Policy` de `vercel.json`. **Il échoue sur un poste Windows et réussit sur Linux (CI, Vercel).**
+La CSP de `vercel.json` autorise le script inline de `frontend/index.html` par son hash SHA-256. Vite recopie ce script **octet pour octet** dans
+le build : le hash servi dépend donc des fins de ligne de la source au moment du build. Un CRLF (extraction Git sous Windows avec
+`core.autocrlf=true`) donne un autre hash, et le navigateur bloquerait le script (initialisation du thème). Cas concerné : un déploiement lancé
+depuis un poste Windows (`vercel deploy`), qui envoie les fichiers tels qu'ils sont sur le disque ; un déploiement par Git (build sous Linux) est en LF.
 
-- **Cause** : fins de ligne. Git stocke `frontend/index.html` et `vercel.json` en LF (`git ls-files --eol` : `i/lf`), mais avec
-  `core.autocrlf=true` le fichier est extrait en CRLF sur le disque (`w/crlf`). Le script inline contient alors des `\r\n`, donc un autre hash.
-- **Preuve** : calculé sur le contenu **commité** (LF), le hash correspond bien à la CSP ; calculé sur le fichier du disque (CRLF), non.
-- **Ce n'est pas une CSP désynchronisée dans le dépôt** : le contenu commité est cohérent ; l'échec vient de la copie de travail locale. (Le rendu
-  réel en production n'a pas été vérifié ici : Vercel construit à partir d'une extraction Git sous Linux, donc en LF.)
-- **Pourquoi il peut passer parfois en local** : un fichier réécrit par un outil qui écrit en LF (cas observé sur une branche où `index.html`
-  avait été modifié par un script).
-- **Non corrigé volontairement** (le test n'est pas modifié). Pistes, à décider : (1) une règle `.gitattributes` `frontend/index.html text eol=lf` et
-  `vercel.json text eol=lf` ; (2) `git config core.autocrlf input` sur le poste ; (3) normaliser les fins de ligne dans le test avant de hacher.
-  Ne pas « recalculer le hash » dans `vercel.json` depuis un poste Windows : on y mettrait le hash de la version CRLF et la CI échouerait.
+**Correction.**
+- `.gitattributes` : `frontend/index.html text eol=lf` et `vercel.json text eol=lf` — ces deux fichiers sont extraits en LF sur tous les postes,
+  quel que soit `core.autocrlf`. La CSP de production n'est pas modifiée.
+- Trois tests dans `backend/src/lib/__tests__/security.test.js` : le hash du fichier source figure dans la CSP (test d'origine, inchangé) ;
+  `index.html` et `vercel.json` ne contiennent aucun CR (message qui renvoie à `.gitattributes`) ; le script inline du **build réel**
+  (`vite build` vers un dossier temporaire) a un hash présent dans la CSP — c'est ce dernier qui garantit que le hash testé est celui du script servi.
+
+**Après un `git pull` qui apporte cette règle**, une copie de travail déjà en CRLF doit être re-extraite : supprimer `frontend/index.html` et
+`vercel.json`, puis `git checkout -- frontend/index.html vercel.json` (aucun contenu n'est perdu, le dépôt les stocke en LF).
+
+**Ne pas** « recalculer le hash » dans `vercel.json` depuis un poste Windows en CRLF : on y mettrait le hash de la version CRLF. Si le script inline
+change volontairement, recalculer le hash sur la version LF (`git show HEAD:frontend/index.html`).
 
 ## Non couvert (à ne pas présumer)
 
