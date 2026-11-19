@@ -8,6 +8,7 @@ import {
   planchersFusionnes,
   estEligiblePlancher,
   figerLimites,
+  recalculerLimites,
   limitesApplicables,
   etatJauge,
   peutAjouter,
@@ -37,11 +38,11 @@ test("limite effective = max(formule, plancher), pour les seules ressources limi
   assert.deepEqual(limitesEffectives({ clientes: 100 }, { modeles: 80 }), { clientes: 100 });
 });
 
-test("plancherInitial : seulement les ressources dont l'usage dépasse la limite de la formule", () => {
-  assert.deepEqual(plancherInitial(STARTER, { clientes: 140, employes: 1, commandesActives: 10, modeles: 51 }), { clientes: 140, modeles: 51 });
-  assert.deepEqual(plancherInitial(STARTER, { clientes: 100, employes: 1, commandesActives: 50, modeles: 50 }), {}, "usage égal à la limite : pas de plancher");
-  assert.deepEqual(plancherInitial({ clientes: 100 }, { clientes: 3_000_000 }), { clientes: 1_000_000 }, "plafonné à la borne");
-  assert.deepEqual(plancherInitial({}, { clientes: 999 }), {});
+test("plancherInitial : l'usage réel de chaque ressource (au moins 1), plafonné à la borne ; zéro n'est pas un plancher", () => {
+  assert.deepEqual(plancherInitial({ clientes: 140, employes: 1, commandesActives: 10, modeles: 0 }), { clientes: 140, employes: 1, commandesActives: 10 });
+  assert.deepEqual(plancherInitial({ clientes: 3_000_000 }), { clientes: 1_000_000 });
+  assert.deepEqual(plancherInitial({}), {});
+  assert.deepEqual(plancherInitial(null), {});
 });
 
 test("éligibilité au plancher : atelier ancien, jamais activé ; pas pour un atelier qui a eu l'essai", () => {
@@ -58,27 +59,41 @@ test("figerLimites : exemple Starter / 140 clientes, renouvellements, changement
 
   // 1. première souscription Starter à 140 clientes : limite effective 140, plancher enregistré
   const a1 = figerLimites({ limitesFormule: STARTER, atelier: ancien, autres: [], usages });
-  assert.deepEqual(a1.plancher, { clientes: 140 });
+  assert.deepEqual(a1.plancher, { clientes: 140, employes: 1, commandesActives: 12, modeles: 20 });
   assert.equal(a1.limites.clientes, 140);
   assert.equal(a1.limites.employes, 1);
+  assert.equal(a1.limites.commandesActives, 50, "usage sous la limite : la limite de la formule reste");
+  assert.equal(a1.limites.modeles, 50);
 
   const precedent = (r) => ({ dateDebut: jours(-30), plancher: r.plancher });
   // 2. renouvellement Starter : plancher reporté, jamais recalculé (même si l'usage a changé)
   const a2 = figerLimites({ limitesFormule: STARTER, atelier: ancien, autres: [precedent(a1)], usages: { clientes: 999 } });
-  assert.deepEqual(a2.plancher, { clientes: 140 });
+  assert.deepEqual(a2.plancher, a1.plancher);
   assert.equal(a2.limites.clientes, 140);
   // 3. correction vers Professionnel : limite effective 500, plancher conservé (inactif)
   const a3 = figerLimites({ limitesFormule: PRO, atelier: ancien, autres: [precedent(a1)] });
   assert.equal(a3.limites.clientes, 500);
-  assert.deepEqual(a3.plancher, { clientes: 140 }, "le plancher reste conservé même inférieur à la limite de la formule");
+  assert.deepEqual(a3.plancher, a1.plancher, "le plancher reste conservé même inférieur à la limite de la formule");
   // 4. retour vers Starter : 140 de nouveau
   const a4 = figerLimites({ limitesFormule: STARTER, atelier: ancien, autres: [precedent(a3)] });
   assert.equal(a4.limites.clientes, 140);
   // 5. Premium (aucune limite) puis retour : le plancher traverse la formule illimitée
   const a5 = figerLimites({ limitesFormule: {}, atelier: ancien, autres: [precedent(a4)] });
   assert.deepEqual(a5.limites, {});
-  assert.deepEqual(a5.plancher, { clientes: 140 });
+  assert.deepEqual(a5.plancher, a1.plancher);
   assert.equal(figerLimites({ limitesFormule: STARTER, atelier: ancien, autres: [precedent(a5)] }).limites.clientes, 140);
+});
+
+test("recalculerLimites (correction d'un abonnement activé) : nouvelle formule, plancher conservé intégralement, usage jamais remesuré", () => {
+  const abonnement = { plancher: { clientes: 140 } };
+  assert.deepEqual(recalculerLimites({ limitesFormule: PRO, abonnement }), { limites: PRO, plancher: { clientes: 140 } });
+  const retour = recalculerLimites({ limitesFormule: STARTER, abonnement: { plancher: { clientes: 140 } } });
+  assert.equal(retour.limites.clientes, 140);
+  assert.deepEqual(recalculerLimites({ limitesFormule: {}, abonnement }), { limites: {}, plancher: { clientes: 140 } });
+  // le plancher d'un autre abonnement de l'atelier est repris (le plus élevé)
+  assert.deepEqual(recalculerLimites({ limitesFormule: STARTER, abonnement: { plancher: {} }, autres: [{ plancher: { modeles: 70 } }] }).limites.modeles, 70);
+  // abonnement antérieur aux quotas (plancher {}) : limites strictes de la nouvelle formule
+  assert.deepEqual(recalculerLimites({ limitesFormule: STARTER, abonnement: { plancher: {} } }).limites, STARTER);
 });
 
 test("figerLimites : un atelier passé par l'essai n'a aucun plancher (quotas stricts)", () => {
@@ -88,11 +103,14 @@ test("figerLimites : un atelier passé par l'essai n'a aucun plancher (quotas st
   assert.deepEqual(r.limites, STARTER);
 });
 
-test("figerLimites : usage sous les limites, ou aucune limite : aucun plancher", () => {
-  const r = figerLimites({ limitesFormule: STARTER, atelier: { trialEndsAt: null }, autres: [], usages: { clientes: 10, employes: 0, commandesActives: 0, modeles: 0 } });
-  assert.deepEqual(r.plancher, {});
+test("figerLimites : usage sous les limites : limites de la formule ; première formule illimitée (Premium) : plancher enregistré pour la suite", () => {
+  const usage = { clientes: 10, employes: 0, commandesActives: 0, modeles: 0 };
+  const r = figerLimites({ limitesFormule: STARTER, atelier: { trialEndsAt: null }, autres: [], usages: usage });
   assert.deepEqual(r.limites, STARTER);
-  assert.deepEqual(figerLimites({ limitesFormule: {}, atelier: { trialEndsAt: null }, autres: [], usages: { clientes: 500 } }), { limites: {}, plancher: {} });
+  const premium = figerLimites({ limitesFormule: {}, atelier: { trialEndsAt: null }, autres: [], usages: { clientes: 500 } });
+  assert.deepEqual(premium, { limites: {}, plancher: { clientes: 500 } });
+  // plus tard, passage à Starter : l'usage d'alors (500) est protégé
+  assert.equal(figerLimites({ limitesFormule: STARTER, atelier: { trialEndsAt: null }, autres: [{ dateDebut: jours(-30), plancher: premium.plancher }] }).limites.clientes, 500);
 });
 
 test("planchersFusionnes : le plus élevé par ressource", () => {

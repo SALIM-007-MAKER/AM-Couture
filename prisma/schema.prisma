@@ -842,6 +842,13 @@ model Abonnement {
   prix           Decimal            @db.Decimal(10, 2)
   dateDebut      DateTime?
   dateExpiration DateTime?
+  // Quotas commerciaux FIGÉS à l'activation (voir backend/src/lib/quotas.js), comme le prix : { clientes, employes,
+  // commandesActives, modeles }, entiers de 1 à 1 000 000, clé absente = illimité. `limites` = ce que les contrôles
+  // appliquent (limite de la formule relevée par le plancher) ; `plancher` = plancher d'usage d'un atelier ancien à sa
+  // première activation, reporté tel quel aux abonnements suivants. {} (défaut, et valeur de tous les abonnements
+  // antérieurs aux quotas) = illimité : aucun quota n'est attribué automatiquement.
+  limites        Json               @default("{}")
+  plancher       Json               @default("{}")
   statut         StatutAbonnement   @default(EN_ATTENTE)
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt

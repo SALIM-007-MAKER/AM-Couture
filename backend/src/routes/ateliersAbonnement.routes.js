@@ -9,6 +9,8 @@ import { nextNumero } from "../lib/numero.js";
 import { activerAbonnementSchema, modifierAbonnementSchema, noteSchema } from "../schemas/abonnement.schema.js";
 import { suspensionSchema } from "../schemas/abonnementPaiement.schema.js";
 import { suspendreAbonnement, reactiverAbonnement } from "../lib/souscription.js";
+import { recalculerLimites } from "../lib/quotas.js";
+import { calculerFigeage } from "../lib/quotasServeur.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
 import { calculerDateExpiration, etatAbonnementAtelier, statutEffectif, prixPourDuree } from "../lib/abonnement.js";
 
@@ -33,6 +35,9 @@ const ABONNEMENT_SELECT = {
   prix: true,
   dateDebut: true,
   dateExpiration: true,
+  // Quotas figés (voir lib/quotas.js) : limites appliquées et plancher d'usage.
+  limites: true,
+  plancher: true,
   creePar: true,
   createdAt: true,
 };
@@ -133,8 +138,13 @@ router.post("/:atelierId/abonnement/activer", idempotence, async (req, res) => {
 
   const abonnement = await prisma.$transaction(
     async (tx) => {
+      // Quotas figés à l'activation : limites de la formule relevées par le plancher d'usage (atelier ancien, première
+      // activation) ou plancher reporté des abonnements précédents (lib/quotas.js).
+      const { limites, plancher } = await calculerFigeage(tx, { atelierId: atelier.id, limitesFormule: plan.limites });
       const cree = await tx.abonnement.create({
         data: {
+          limites,
+          plancher,
           numero: await nextNumero(tx, "ABN"),
           atelierId: atelier.id,
           planId: plan.id,
@@ -165,10 +175,12 @@ router.patch("/:atelierId/abonnement/:abonnementId", async (req, res) => {
   if (abonnement.statut !== "CONFIRME") throw new HttpError(409, "Seul un abonnement activé peut être modifié.");
 
   const data = {};
+  let planCorrige = null;
   if (parsed.data.planId) {
     const plan = await chargerPlanActif(parsed.data.planId);
     data.planId = plan.id;
     data.planNom = plan.nom;
+    planCorrige = plan;
   }
   if (parsed.data.dateDebut) data.dateDebut = parsed.data.dateDebut;
   if (parsed.data.dateExpiration) data.dateExpiration = parsed.data.dateExpiration;
@@ -181,6 +193,15 @@ router.patch("/:atelierId/abonnement/:abonnementId", async (req, res) => {
   }
 
   const maj = await prisma.$transaction(async (tx) => {
+    if (planCorrige) {
+      // CORRECTION de formule : limites recalculées depuis la nouvelle formule, plancher historique conservé intégralement
+      // (aucune nouvelle mesure de l'usage). Le prix, lui, reste inchangé. Les quotas des autres écritures ne bougent pas.
+      const autres = await tx.abonnement.findMany({ where: { atelierId: abonnement.atelierId, id: { not: abonnement.id } }, select: { plancher: true } });
+      const courant = await tx.abonnement.findUnique({ where: { id: abonnement.id }, select: { plancher: true } });
+      const { limites, plancher } = recalculerLimites({ limitesFormule: planCorrige.limites, abonnement: courant, autres });
+      data.limites = limites;
+      data.plancher = plancher;
+    }
     const m = await tx.abonnement.update({ where: { id: abonnement.id }, data, select: ABONNEMENT_SELECT });
     await ecrireHistorique(tx, { abonnement: m, action: "MODIFICATION", req, note: parsed.data.note });
     return m;

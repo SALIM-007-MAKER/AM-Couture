@@ -8,7 +8,8 @@
 //    catalogue ne touche que les futures souscriptions ;
 //  - l'essai gratuit n'a aucun quota ; un atelier sans abonnement non plus ;
 //  - PLANCHER D'USAGE : un atelier ANCIEN (sans échéance d'essai) qui souscrit pour la première fois ne peut pas avoir une
-//    limite effective inférieure à son usage réel au moment de l'activation. Le plancher est enregistré (Abonnement.plancher),
+//    limite effective inférieure à son usage réel au moment de l'activation (usage mesuré pour les quatre ressources, même si la
+//    première formule est illimitée). Le plancher est enregistré (Abonnement.plancher),
 //    reporté tel quel à chaque abonnement suivant, et ne se recalcule jamais ;
 //  - aucune donnée n'est jamais supprimée ni masquée pour appliquer un quota : seule la CRÉATION de la ressource est refusée.
 import { statutEffectif } from "./abonnement.js";
@@ -39,13 +40,16 @@ export function limitesEffectives(limitesFormule, plancher) {
   return sortie;
 }
 
-/** Plancher d'un premier abonnement : l'usage, pour chaque ressource limitée dont l'usage dépasse la limite de la formule. */
-export function plancherInitial(limitesFormule, usages) {
-  const formule = normaliserLimites(limitesFormule);
+/**
+ * Plancher d'un premier abonnement : l'usage réel de chaque ressource au moment de l'activation (au moins 1), quelle que soit
+ * la formule. Il ne sert que si la limite d'une formule est inférieure ; il est enregistré même pour une formule illimitée
+ * (Premium), afin de protéger l'usage de l'atelier s'il passe plus tard à une formule limitée.
+ */
+export function plancherInitial(usages) {
   const sortie = {};
-  for (const cle of Object.keys(formule)) {
-    const usage = Number(usages?.[cle] ?? 0);
-    if (usage > formule[cle]) sortie[cle] = Math.min(usage, LIMITE_MAX);
+  for (const cle of RESSOURCES) {
+    const usage = Math.floor(Number(usages?.[cle] ?? 0));
+    if (usage >= LIMITE_MIN) sortie[cle] = Math.min(usage, LIMITE_MAX);
   }
   return sortie;
 }
@@ -81,7 +85,17 @@ export function estEligiblePlancher(atelier, autres) {
  */
 export function figerLimites({ limitesFormule, atelier, autres = [], usages = null }) {
   const herite = planchersFusionnes(autres);
-  const plancher = estEligiblePlancher(atelier, autres) ? plancherInitial(limitesFormule, usages ?? {}) : herite;
+  const plancher = estEligiblePlancher(atelier, autres) ? plancherInitial(usages ?? {}) : herite;
+  return { limites: limitesEffectives(limitesFormule, plancher), plancher };
+}
+
+/**
+ * CORRECTION d'un abonnement déjà activé (changement de formule par le SUPERADMIN) : les limites sont recalculées depuis la
+ * nouvelle formule ; le plancher historique est conservé INTÉGRALEMENT (celui de l'abonnement corrigé et des autres), sans
+ * nouvelle mesure de l'usage — même s'il devient temporairement inférieur à la limite de la formule.
+ */
+export function recalculerLimites({ limitesFormule, abonnement, autres = [] }) {
+  const plancher = planchersFusionnes([abonnement, ...autres]);
   return { limites: limitesEffectives(limitesFormule, plancher), plancher };
 }
 

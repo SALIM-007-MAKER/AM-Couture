@@ -15,6 +15,8 @@ import { randomUUID } from "node:crypto";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { nextNumero } from "./numero.js";
 import { verrouillerCle } from "./verrous.js";
+import { normaliserLimites } from "./quotas.js";
+import { calculerFigeage } from "./quotasServeur.js";
 import { calculerDateExpiration, dateDebutSouscription, prixPourDuree, tarifsDuree } from "./abonnement.js";
 
 export const cleVerrouAtelier = (atelierId) => `abonnement:${atelierId}`;
@@ -85,6 +87,9 @@ export async function souscrire(
       planNom: plan.nom,
       dureeMois,
       prix: montant,
+      // Limites de la formule figées dès la déclaration, comme le prix ; le plancher d'usage et les limites effectives sont
+      // calculés à l'ACTIVATION (confirmerTransaction).
+      limites: normaliserLimites(plan.limites),
       statut: "EN_ATTENTE",
       creePar: par,
     },
@@ -146,9 +151,16 @@ export async function confirmerTransaction(tx, { transactionId, par, note, ateli
   const dateDebut = dateDebutSouscription(autres, now);
   const dateExpiration = calculerDateExpiration(dateDebut, t.abonnement.dureeMois);
 
+  // Quotas figés à l'activation : limites de la formule relevées par le plancher d'usage (atelier ancien, première activation)
+  // ou plancher reporté des abonnements précédents. Voir lib/quotas.js.
+  const { limites, plancher } = await calculerFigeage(tx, {
+    atelierId: t.atelierId,
+    limitesFormule: t.abonnement.limites,
+    exclureAbonnementId: t.abonnementId,
+  });
   const abonnement = await tx.abonnement.update({
     where: { id: t.abonnementId },
-    data: { statut: "CONFIRME", dateDebut, dateExpiration },
+    data: { statut: "CONFIRME", dateDebut, dateExpiration, limites, plancher },
   });
   const transaction = await tx.transaction.update({
     where: { id: t.id },
