@@ -34,3 +34,37 @@ export function envPourGeneration(env, decision) {
   if (env.DIRECT_URL || decision.migrer) return env;
   return { ...env, DIRECT_URL: URL_FACTICE_GENERATION };
 }
+
+// Étapes Prisma d'un build qui migre (production seulement). Séparées de vercel-build.mjs pour être testées sans base ni build.
+//
+// - « etat-avant » : INFORMATIF. `prisma migrate status` renvoie le code 1 dès qu'il existe des migrations EN ATTENTE, ce qui est
+//   justement le cas normal avant `migrate deploy` ; ce code ne doit pas arrêter le build (il a fait échouer le premier build de
+//   production qui avait des migrations à appliquer, avant même `migrate deploy`).
+// - « application » : BLOQUANT. `migrate deploy` applique les migrations ; son échec arrête le build, Vercel garde alors le
+//   déploiement précédent en ligne.
+// - « verification-finale » : BLOQUANT. Une fois le déploiement réussi, `migrate status` doit répondre « à jour » (code 0). Sinon la
+//   base n'est pas dans l'état attendu par le code qu'on s'apprête à publier : le build s'arrête avant la publication.
+export function etapesMigration(decision) {
+  if (!decision.migrer) return [];
+  return [
+    { id: "etat-avant", args: ["prisma", "migrate", "status"], bloquant: false, libelle: "état avant application, informatif : le code 1 est normal s'il y a des migrations en attente" },
+    { id: "application", args: ["prisma", "migrate", "deploy"], bloquant: true, libelle: "application des migrations" },
+    { id: "verification-finale", args: ["prisma", "migrate", "status"], bloquant: true, libelle: "vérification finale : la base doit être à jour" },
+  ];
+}
+
+/**
+ * Exécute les étapes dans l'ordre. `executer(etape)` renvoie le code de sortie (0 = succès ; tout autre résultat, y compris
+ * null ou undefined quand le processus a été interrompu, est un échec). Une étape non bloquante en échec est notée puis ignorée ;
+ * une étape bloquante en échec arrête tout : les suivantes ne sont pas exécutées.
+ * Retourne { ok, echec?: { id, code }, resultats: [{ id, code, bloquant }] }.
+ */
+export function executerEtapes(etapes, executer) {
+  const resultats = [];
+  for (const etape of etapes) {
+    const code = executer(etape);
+    resultats.push({ id: etape.id, code, bloquant: etape.bloquant });
+    if (code !== 0 && etape.bloquant) return { ok: false, echec: { id: etape.id, code }, resultats };
+  }
+  return { ok: true, resultats };
+}
