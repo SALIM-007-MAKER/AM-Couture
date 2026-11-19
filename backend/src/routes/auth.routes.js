@@ -16,7 +16,7 @@ import { envoyerEmail } from "../lib/resend.js";
 import { emailVerificationTemplate, emailReinitialisationTemplate } from "../lib/emailTemplates.js";
 import { rateLimitPersistant } from "../lib/rateLimiter.js";
 import { limiteConnexion } from "../lib/limiteConnexion.js";
-import { modeEmailLocal, afficherLienLocal } from "../lib/lienLocal.js";
+import { modeEmailLocal, afficherLienLocal, origineLienLocal } from "../lib/lienLocal.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
 
@@ -222,7 +222,7 @@ router.post("/inscription-atelier", inscriptionLimiter, rejectIfDejaConnecte, as
   // jamais l'action principale" (le .catch() reste local, jamais propagé).
   try {
     const verifToken = await creerToken({ userId: admin.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
-    const origin = origineApplication(req);
+    const origin = origineLienLocal(req.get("origin"), origineApplication(req));
     const lienVerification = `${origin}/verifier-email?token=${verifToken}`;
     if (modeEmailLocal()) {
       // Développement local sans Resend : le lien va dans le terminal du backend, jamais dans la réponse.
@@ -269,7 +269,7 @@ router.post("/renvoyer-verification-email", requireAuth, renvoyerVerificationLim
     throw new HttpError(400, "Cet email est déjà vérifié.");
   }
   const verifToken = await creerToken({ userId: user.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
-  const origin = origineApplication(req);
+  const origin = origineLienLocal(req.get("origin"), origineApplication(req));
   const lienVerification = `${origin}/verifier-email?token=${verifToken}`;
   try {
     if (modeEmailLocal()) {
@@ -313,7 +313,7 @@ router.post("/mot-de-passe-oublie", motDePasseOublieLimiter, async (req, res) =>
   if (user?.email) {
     try {
       const resetToken = await creerToken({ userId: user.id, type: "REINITIALISATION_MOT_DE_PASSE", dureeMs: 60 * 60 * 1000 });
-      const origin = origineApplication(req);
+      const origin = origineLienLocal(req.get("origin"), origineApplication(req));
       const lienReinitialisation = `${origin}/reinitialiser-mot-de-passe?token=${resetToken}`;
       if (modeEmailLocal()) {
         // Développement local sans Resend : le lien va dans le terminal du backend, jamais dans la réponse.

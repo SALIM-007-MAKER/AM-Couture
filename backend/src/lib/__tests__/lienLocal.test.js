@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { modeEmailLocal, afficherLienLocal } from "../lienLocal.js";
+import { modeEmailLocal, afficherLienLocal, origineLienLocal } from "../lienLocal.js";
 
 test("actif seulement en développement, sans clé Resend, hors Vercel", () => {
   assert.equal(modeEmailLocal({ NODE_ENV: "development" }), true);
@@ -30,4 +30,20 @@ test("le lien est écrit sur la sortie fournie", () => {
   assert.equal(lignes.length, 1);
   assert.match(lignes[0], /http:\/\/localhost:5173\/x\?token=abc/);
   assert.match(lignes[0], /aucun email envoyé/);
+});
+
+test("origineLienLocal : en local, l'origine de la page remplace celle de l'API", () => {
+  const env = { NODE_ENV: "development" };
+  assert.equal(origineLienLocal("http://localhost:5173", "http://localhost:4000", env), "http://localhost:5173");
+});
+
+test("origineLienLocal : jamais hors du mode local", () => {
+  assert.equal(origineLienLocal("http://localhost:5173", "https://app.exemple", { NODE_ENV: "production" }), "https://app.exemple");
+  assert.equal(origineLienLocal("http://localhost:5173", "https://app.exemple", { NODE_ENV: "development", RESEND_API_KEY: "re_x" }), "https://app.exemple");
+});
+
+test("origineLienLocal : PUBLIC_APP_URL a toujours priorité, un hôte distant est ignoré, un en-tête invalide aussi", () => {
+  assert.equal(origineLienLocal("http://localhost:5173", "https://x", { NODE_ENV: "development", PUBLIC_APP_URL: "https://x" }), "https://x");
+  assert.equal(origineLienLocal("http://evil.example", "http://localhost:4000", { NODE_ENV: "development" }), "http://localhost:4000");
+  assert.equal(origineLienLocal(undefined, "http://localhost:4000", { NODE_ENV: "development" }), "http://localhost:4000");
 });

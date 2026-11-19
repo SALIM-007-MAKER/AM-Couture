@@ -16,3 +16,19 @@ export function modeEmailLocal(env = process.env) {
 export function afficherLienLocal({ libelle, identifiant, lien }, sortie = console.log) {
   sortie(`\n[DEV LOCAL] ${libelle} pour « ${identifiant} » (aucun email envoyé) :\n${lien}\n`);
 }
+
+/**
+ * Origine à mettre dans le lien affiché en local. Derrière le proxy Vite (changeOrigin), l'en-tête Host est celui de
+ * l'API (ex. :4000) : un lien bâti dessus mènerait à l'API et pas à l'écran. L'en-tête Origin, lui, est celui de la page
+ * (ex. :5173). On l'utilise seulement en mode local, seulement vers localhost, et jamais si PUBLIC_APP_URL est défini.
+ */
+export function origineLienLocal(origineHeader, repli, env = process.env) {
+  if (!modeEmailLocal(env) || env.PUBLIC_APP_URL) return repli;
+  try {
+    const u = new URL(origineHeader);
+    if (["localhost", "127.0.0.1"].includes(u.hostname) && u.protocol === "http:") return u.origin;
+  } catch {
+    // En-tête absent ou invalide : on garde l'origine déduite de la requête.
+  }
+  return repli;
+}
