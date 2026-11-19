@@ -43,3 +43,11 @@ tableau de bord (`features/dashboard/hooks.js`) utilise ces routes ; la page Rap
 
 **Limite.** Un compte qui aurait `dashboard.lire` sans `commandes.lire` (permissions personnalisées ; aucun poste de
 base) reçoit 403 sur ces deux listes et sur les « commandes récentes ».
+
+**Liens « Tout voir » du tableau de bord.** Les deux listes (commandes en retard, livraisons à venir) menaient à `/rapports`, fermé à la
+réceptionniste. Le lien est maintenant choisi selon les droits (`features/dashboard/liens.js`) : avec `rapports.lire` (PDG, comptable) il va
+toujours à `/rapports` ; sans `rapports.lire` mais avec `commandes.lire` (réceptionniste) il va à `/commandes?enRetard=true` ou à
+`/commandes?livraisonDu=…&livraisonAu=…` (filtre visible et retirable) ; sans aucun des deux, il n'y a pas de lien. `rapports.lire` n'est jamais
+ajouté au poste. Écart connu : le filtre « en retard » de la liste des commandes compte les statuts ouverts avant le début du jour (définition de la
+production), la liste du tableau de bord compare à l'instant et inclut les commandes terminées non livrées ; le filtre de dates n'exclut pas les
+commandes déjà livrées ou annulées (leur badge de statut les distingue).

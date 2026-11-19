@@ -211,6 +211,8 @@ export default {
     allStatuts: "Tous statuts",
     allPriorites: "Toutes priorités",
     emptyFiltered: "Aucune commande ne correspond à ces critères.",
+    filtreLivraison: "Livraison du {{du}} au {{au}}",
+    retirerFiltreLivraison: "Retirer",
     emptyAll: "Aucune commande pour l'instant.",
     colNumero: "N°",
     colClient: "Client",
