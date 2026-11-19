@@ -301,7 +301,9 @@ export default function AppLayout() {
   const logoutMutation = useLogoutMutation();
   const { sidebarOpen, closeSidebar, toggleSidebar, sidebarCollapsed, toggleSidebarCollapsed } = useUiStore();
   const location = useLocation();
-  const currentNavItem = useCurrentNavItem(location.pathname);
+  // « / » : tableau de bord pour le PDG, « Accueil » pour un employé ; « /tableau-de-bord » reste le tableau de bord.
+  const currentNavItem = useCurrentNavItem(location.pathname === "/tableau-de-bord" ? "/" : location.pathname);
+  const libelleCourant = location.pathname === "/" && user?.role === "EMPLOYE" ? "nav.home" : currentNavItem?.labelKey;
   // isPending/isError volontairement ignorés ici : le logo est un détail
   // décoratif de la sidebar, pas une donnée dont l'absence doit bloquer ou
   // dégrader le reste de la mise en page (voir Logo — repli sur l'icône
@@ -387,7 +389,7 @@ export default function AppLayout() {
               <div className="flex items-center gap-2 min-w-0 text-sm text-neutral-500">
                 <currentNavItem.icon className="size-4 shrink-0 hidden sm:block" aria-hidden="true" />
                 <span className="truncate font-medium text-neutral-900 dark:text-neutral-100">
-                  {t(currentNavItem.labelKey)}
+                  {t(libelleCourant)}
                 </span>
               </div>
             )}
