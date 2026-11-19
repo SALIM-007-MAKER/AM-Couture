@@ -3,6 +3,7 @@ import { LayoutDashboard, Building2, CreditCard, Tag, TrendingUp, Banknote, User
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { useUiStore } from "../stores/uiStore.js";
 import { useTranslation } from "../i18n/index.js";
+import LocaleSync from "../components/LocaleSync.jsx";
 
 // Shell dédié au SUPERADMIN — délibérément distinct d'AppLayout (Phase 8) :
 // AppLayout suppose partout un atelier courant (cloche de notifications,
@@ -129,6 +130,7 @@ export default function SuperadminLayout() {
 
   return (
     <div className="min-h-svh flex bg-neutral-50 dark:bg-neutral-950">
+      <LocaleSync />
       {/* Sidebar desktop — même comportement réductible que AppLayout.jsx */}
       <aside
         className={`hidden md:flex flex-col shrink-0 sticky top-0 h-svh self-start border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 transition-[width] duration-150 ${

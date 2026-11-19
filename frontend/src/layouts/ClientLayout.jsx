@@ -4,6 +4,7 @@ import { Scissors, User, Ruler, ClipboardList, Wallet, FileText, Inbox, Bell, Me
 import { useLogoutMutation } from "../hooks/useAuth.js";
 import { useMonProfilQuery, useMesNombreNonLuesQuery } from "../features/moi/hooks.js";
 import { useTranslation } from "../i18n/index.js";
+import LocaleSync from "../components/LocaleSync.jsx";
 
 // Espace client final (§ plan rôle USER, Phase 3) — mêmes conventions que
 // AppLayout.jsx : 5 destinations principales dans la barre du bas (mobile)
@@ -84,6 +85,7 @@ export default function ClientLayout() {
 
   return (
     <div className="min-h-svh flex flex-col bg-neutral-50 dark:bg-neutral-950">
+      <LocaleSync />
       <header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 px-4 py-3">
         <div className="flex items-center gap-2 min-w-0">
           <button

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { compteApi } from "./api.js";
+import { fusionnerUtilisateur } from "./fusion.js";
 
 // Même clé que useMeQuery (hooks/useAuth.js) — une préférence modifiée ici
 // doit se refléter partout où l'utilisateur courant est lu (ex: en-tête).
@@ -9,7 +10,7 @@ export function useUpdatePreferencesMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data) => compteApi.updatePreferences(data),
-    onSuccess: (user) => queryClient.setQueryData(ME_KEY, user),
+    onSuccess: (user) => queryClient.setQueryData(ME_KEY, (ancien) => fusionnerUtilisateur(ancien, user)),
   });
 }
 
