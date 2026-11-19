@@ -164,7 +164,7 @@ test.describe("SuperAdmin : formules et utilisation", () => {
     await expect(nouvelle.getByTestId("quotas-formule")).toContainText("Modèles : Illimité");
   });
 
-  test("valeurs refusées par l API (zéro, trop grand) : 400, aucune formule créée", async ({ request }) => {
+  test("valeurs refusées par l'API (zéro, trop grand) : 400, aucune formule créée", async ({ request }) => {
     for (const limites of [{ clientes: 0 }, { modeles: 1_000_001 }]) {
       const res = await request.post("/api/plans-abonnement", { data: { nom: "Invalide E2E", prixMensuel: "1000", limites } });
       expect(res.status()).toBe(400);

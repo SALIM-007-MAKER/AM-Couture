@@ -2,10 +2,10 @@ import { HelpCircle } from "lucide-react";
 import SectionTitle from "../../../components/SectionTitle.jsx";
 import { useTranslation } from "../../../i18n/index.js";
 
-const QUESTIONS = [1, 2, 3, 4];
+const QUESTIONS = [1, 2, 3, 4, 5];
 
 // Questions fréquentes — réponses volontairement alignées sur le
-// fonctionnement RÉEL (activation manuelle, aucun paiement en ligne).
+// fonctionnement RÉEL (paiement déclaré puis vérifié par la plateforme, lecture seule après la grâce, quotas).
 export default function PlansFaq() {
   const { t } = useTranslation();
   return (

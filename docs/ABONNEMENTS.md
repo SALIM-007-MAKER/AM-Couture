@@ -14,7 +14,7 @@ Ce document décrit le système d'abonnement tel qu'il est **dans le code** à l
 
 | Table | Rôle |
 |---|---|
-| `PlanAbonnement` | Formule : nom, prix mensuel, fonctionnalités (texte), remises par durée, `limites` (structure prévue, **non appliquée**), actif |
+| `PlanAbonnement` | Formule : nom, prix mensuel, fonctionnalités (texte), remises par durée, `limites` (quotas, voir §12), actif |
 | `Abonnement` | Période d'accès d'un atelier : formule et durée figées, prix figé, dates, statut (`EN_ATTENTE`, `CONFIRME`, `ANNULE`, `SUSPENDU`) |
 | `Transaction` | Un paiement d'abonnement : moyen, montant, statut, qui l'a déclaré et quand, qui l'a tranché et quand, motifs de rejet et de remboursement, référence chez le prestataire |
 | `FactureAbonnement` | Justificatif numéroté (`FAC-AAAA-NNNN`), **immuable** : instantané de l'atelier, de la formule, de la période et du montant au jour de l'émission |
@@ -115,7 +115,73 @@ Le PDF s'intitule « Justificatif de paiement d'abonnement » et ne porte **aucu
 - Le rapprochement d'un paiement manuel est **humain** : aucune API d'opérateur n'est disponible (NITA, Amana, Airtel, Moov, Orange : aucune documentation publique trouvée).
 - Remboursement total seulement ; un abonnement planifié à la suite d'un abonnement remboursé garde ses dates (un trou peut subsister).
 - Les revenus ne comptent que les paiements enregistrés ; les activations manuelles sans paiement sont signalées à part.
-- Limites chiffrées par formule : structure prévue, **non appliquée**.
+- Limites chiffrées par formule : **appliquées** depuis les quotas commerciaux (voir §12).
 - Pas de relance d'impayé au-delà des rappels d'échéance ; pas de pénalité ; pas de facturation récurrente automatique (chaque renouvellement est une démarche de l'atelier).
 - Durée de grâce unique pour toute la plateforme ; tout est en FCFA.
 - Textes de courriels en français uniquement.
+
+## 12. Quotas commerciaux des formules
+
+Les formules se différencient **uniquement par des quotas** ; toutes les fonctionnalités restent accessibles. Quatre ressources sont limitées : `clientes`, `employes`, `commandesActives`, `modeles`. Une clé absente = illimité ; valeurs entières de 1 à 1 000 000 (zéro interdit). Les formules (Starter, Professionnel, Premium…) sont **créées à la main par le SUPERADMIN** (Tarification) : aucune migration n'insère de formule ni de donnée commerciale.
+
+Règles : `backend/src/lib/quotas.js` (pures), `backend/src/lib/quotasServeur.js` (comptage, verrous, contrôle).
+
+### Ce qui est compté
+
+| Ressource | Comptage |
+|---|---|
+| Clientes | fiches non archivées (une fiche anonymisée est archivée) |
+| Employés | comptes `EMPLOYE` actifs ; ni le PDG, ni les comptes clientes, ni les employés désactivés |
+| Commandes actives | statuts `NOUVELLE`, `EN_CONFECTION`, `ESSAYAGE`, `RETOUCHES`, `TERMINEE` (ni livrées, ni annulées) |
+| Modèles | modèles non archivés |
+
+Le plafond technique de 8 photos par modèle (et les autres plafonds techniques) est **indépendant** des quotas.
+
+### Quand les quotas s'appliquent
+
+| Situation | Quotas |
+|---|---|
+| Essai gratuit en cours | aucun (même si un abonnement est déjà activé) |
+| Atelier ancien (sans échéance d'essai) sans abonnement | aucun |
+| Abonnement actif | les `limites` **figées** de cet abonnement |
+| Période de grâce après un abonnement échu | celles du **dernier abonnement échu** |
+| Période de grâce après l'essai, sans abonnement | aucun |
+| Lecture seule, suspension | l'écriture est déjà refusée (402) avant tout contrôle de quota |
+| Abonnement antérieur aux quotas (`limites` = `{}`) | **illimité** : aucun quota n'est attribué automatiquement |
+
+Les quotas s'appliquent aussi pendant l'usurpation d'identité du SUPERADMIN.
+
+### Figeage dans les abonnements
+
+`Abonnement.limites` (ce que les contrôles appliquent) et `Abonnement.plancher` (plancher d'usage reporté). Modifier une formule du catalogue **ne touche que les futures souscriptions**.
+1. **Déclaration** (`souscrire`) : copie des limites de la formule.
+2. **Activation** (confirmation d'un paiement, Wave compris, ou activation manuelle) : calcul des limites effectives.
+3. **Correction** d'un abonnement activé (`PATCH …/abonnement/:id` avec un autre plan) : limites recalculées depuis la nouvelle formule, **plancher conservé intégralement**, prix inchangé (comme aujourd'hui).
+4. Réactivation d'une suspension, expiration, désactivation : les limites ne changent pas.
+
+### Plancher d'usage
+
+Un atelier **ancien** (sans échéance d'essai) qui n'a **jamais eu d'abonnement activé** voit, à sa première activation, son usage réel de chaque ressource enregistré (au moins 1) comme **plancher**, y compris si sa première formule est illimitée. Limite effective = `max(limite de la formule, plancher)`. Le plancher est reporté tel quel à chaque abonnement suivant, **ne se recalcule jamais** et traverse une formule illimitée.
+
+Exemple : Starter (100 clientes), atelier à 140 clientes → limite effective 140 ; renouvellement → 140 ; correction vers Professionnel (500) → 500 ; retour à Starter → 140.
+
+Un atelier qui a bénéficié de l'essai n'a **pas** de plancher : à la fin de l'essai, les quotas de sa formule s'appliquent strictement ; au-dessus d'une limite, seules les nouvelles créations sont refusées. Un atelier ancien qui avait déjà un abonnement activé avant les quotas n'a pas non plus de plancher calculé (règle « première souscription » à la lettre) : voir « Points à connaître » ci-dessous.
+
+### Refus et cohérence
+
+- Refus : **HTTP 409** avec `details.quota = { ressource, limite, usage }`, traité comme une erreur de formulaire (jamais la bannière de lecture seule du 402).
+- Points d'entrée contrôlés : création de cliente, de modèle, de commande, d'employé ; **restauration** d'une cliente ou d'un modèle ; **réactivation** d'un employé ; rattachement d'une demande à une **nouvelle** fiche. Archiver, désactiver, modifier, consulter et exporter ne sont jamais contrôlés (archiver libère une place).
+- Un atelier au-dessus de sa limite (plancher, formule changée) garde l'usage de tout : seule la création est refusée. **Aucune donnée n'est jamais supprimée, désactivée ou masquée.**
+- Cohérence sous requêtes simultanées : verrou consultatif par atelier et par ressource (`quota:<atelier>:<ressource>`), pris dans la transaction de création, puis comptage. **Ordre des verrous : quota d'abord, puis verrous métier** (téléphone, nom de modèle, compteur de numéros) ; plusieurs quotas : ordre alphabétique. Testé : 20 créations simultanées pour 5 places = exactement 5.
+
+### Suivi
+
+- Atelier (PDG) : page Abonnement, section « Utilisation de votre formule » (`GET /api/abonnements/utilisation`) ; avertissement en tête des formulaires de création quand la limite est atteinte.
+- SuperAdmin : fiche atelier (utilisation), Tarification (quotas de chaque formule, liste en lecture seule des ateliers qui dépasseraient déjà une formule).
+
+### Points à connaître
+
+- **Abonnements déclarés avant la mise en service** : un paiement déjà déclaré (`EN_ATTENTE`) a `limites` = `{}` ; confirmé, il reste illimité.
+- **Atelier ancien ayant un abonnement activé avant les quotas** : à son premier renouvellement vers une formule limitée, aucun plancher n'est calculé (il a déjà eu un abonnement activé) ; ses limites sont celles de la formule, strictes. À arbitrer si ce cas existe en production : une exception « premier abonnement soumis à des limites » serait une modification d'une fonction (`estEligiblePlancher`).
+- **Montée en gamme immédiate** : non développée ; un nouvel abonnement prend effet à l'échéance de l'abonnement en cours.
+- Les formules inactives ne sont plus proposées, mais restent attachées aux abonnements déjà souscrits.
