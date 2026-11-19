@@ -1,4 +1,5 @@
 import { test, expect, request } from "@playwright/test";
+import { PORT_WEB } from "../ports.js";
 import { ETATS } from "../global-setup.js";
 
 // Protections de l'API vues depuis un navigateur authentifié (cookie de session réel) : permissions par rôle,
@@ -8,7 +9,7 @@ import { ETATS } from "../global-setup.js";
 async function contexte(baseURL, etat) {
   return request.newContext({ baseURL, storageState: etat });
 }
-const base = "http://localhost:5173";
+const base = `http://localhost:${PORT_WEB}`;
 
 test("sans session : 401 sur les routes protégées", async () => {
   const api = await request.newContext({ baseURL: base });

@@ -1,10 +1,11 @@
 import { test, expect, request } from "@playwright/test";
+import { PORT_WEB } from "../ports.js";
 import { ETATS } from "../global-setup.js";
 
 // Parcours d'abonnement de bout en bout : fin d'essai → souscription (déclaration d'un paiement) → vérification par le
 // SUPERADMIN → accès rétabli → justificatif. Atelier GAMMA : essai terminé depuis 30 jours (lecture seule).
 // Atelier DELTA : essai terminé depuis 3 jours (période de grâce).
-const base = "http://localhost:5173";
+const base = `http://localhost:${PORT_WEB}`;
 const ESPACE = /[\s  ]?/;
 
 test.describe("période de grâce", () => {

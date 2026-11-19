@@ -1,4 +1,5 @@
 import { test, expect, request as pwRequest } from "@playwright/test";
+import { PORT_API } from "../ports.js";
 import { ETATS } from "../global-setup.js";
 import { ouvrirSession } from "../session.js";
 
@@ -19,7 +20,7 @@ test("l'atelier crée la fiche et la cliente active son compte", async ({ reques
   const inv = await request.post(`/api/clientes/${clienteId}/inviter`);
   expect(inv.status()).toBe(201);
   const token = new URL((await inv.json()).lienActivation).searchParams.get("token");
-  const anonyme = await pwRequest.newContext({ baseURL: "http://localhost:4000", extraHTTPHeaders: { "X-Forwarded-For": "10.88.1.1" } });
+  const anonyme = await pwRequest.newContext({ baseURL: `http://localhost:${PORT_API}`, extraHTTPHeaders: { "X-Forwarded-For": "10.88.1.1" } });
   const act = await anonyme.post("/api/auth/activer-compte-client", { data: { token, nouveauMotDePasse: MDP } });
   expect(act.status()).toBe(200);
   await anonyme.dispose();

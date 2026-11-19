@@ -1,4 +1,9 @@
 import { defineConfig } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+import { PORT_API, PORT_WEB } from "./ports.js";
+
+// Le dossier du journal de l'API doit exister avant le démarrage du serveur.
+mkdirSync(new URL("../e2e-journal/", import.meta.url), { recursive: true });
 
 // Tests end-to-end : vrai navigateur → vrai frontend (Vite) → vraie API (Express) → vraie base Postgres.
 //
@@ -13,14 +18,14 @@ if (!baseDeDonnees) {
   process.exit(1);
 }
 
-const PORT_API = 4000; // le proxy de Vite (frontend/vite.config.js) vise ce port
-const PORT_WEB = 5173;
+// Ports : voir ports.js (E2E_PORT_API / E2E_PORT_WEB pour ne pas heurter des serveurs de développement ouverts).
 const env = {
   ...process.env,
   DATABASE_URL: baseDeDonnees,
   DIRECT_URL: baseDeDonnees,
   JWT_SECRET: process.env.JWT_SECRET ?? "secret-e2e-uniquement",
   PORT: String(PORT_API),
+  VITE_API_PORT: String(PORT_API),
   NODE_ENV: "development",
   LOG_REQUETES: "0",
 };
@@ -46,7 +51,9 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "node backend/src/server.js",
+      // Sortie de l'API dans un journal : en développement local sans Resend, les liens de réinitialisation et de
+      // vérification y sont écrits (jamais dans la réponse HTTP) ; auth-locale.spec.js les y lit. Dossier ignoré par Git.
+      command: "node backend/src/server.js > e2e-journal/api.log 2>&1",
       cwd: "..",
       url: `http://localhost:${PORT_API}/api/health`,
       env,
@@ -56,7 +63,7 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: "npm run dev -w frontend -- --port 5173 --strictPort",
+      command: `npm run dev -w frontend -- --port ${PORT_WEB} --strictPort`,
       cwd: "..",
       url: `http://localhost:${PORT_WEB}`,
       env,
