@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 200 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 202 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -278,6 +278,8 @@ Périodes : `period=today\|week\|month\|quarter\|year`, ou `from` et `to` (dates
 |---|---|---|
 | `GET /api/dashboard/summary` | Atelier | `period` ou `from`/`to` → clientes actives, commandes (créées sur la période ; en cours, terminées, livrées, en retard, non payées à l'instant T), encaissements, dépenses, résultat de trésorerie. |
 | `GET /api/dashboard/recent` | Atelier | `?limit=` (1–50, défaut 10) → dernières commandes, paiements, livraisons, dépenses (annulés exclus). |
+| `GET /api/dashboard/commandes/en-retard` | Atelier (`dashboard.lire` + `commandes.lire`) | Pagination → mêmes données et même format que `/api/rapports/commandes/en-retard`, sans exiger `rapports.lire` (tableau de bord d'une réceptionniste). |
+| `GET /api/dashboard/commandes/a-livrer` | Atelier (`dashboard.lire` + `commandes.lire`) | `?horizonJours=`, pagination → mêmes données que `/api/rapports/commandes/a-livrer`. |
 | `GET /api/rapports/finances` | Atelier | Période → total commandé, encaissé, dépenses, solde ; avec une période, comparaison à la période précédente (`variation`). |
 | `GET /api/rapports/evolution` | Atelier | `from`, `to` → série mensuelle (commandes, encaissements, dépenses), plafonnée à 60 mois. |
 | `GET /api/rapports/commandes` | Atelier | Période → répartition par statut, priorité et type de vêtement. |

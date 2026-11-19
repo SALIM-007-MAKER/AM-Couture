@@ -7,8 +7,9 @@ import { masquerFinancesSiNonAutorise } from "../lib/masquageFinances.js";
 import { peutVoirFinances } from "../lib/permissions.js";
 import { formatZodError } from "../lib/validation.js";
 import { resolvePeriod, dateRangeWhere } from "../lib/period.js";
-import { periodQuerySchema, recentQuerySchema } from "../schemas/dashboard.schema.js";
+import { periodQuerySchema, recentQuerySchema, enRetardQuerySchema, aLivrerQuerySchema } from "../schemas/dashboard.schema.js";
 import { whereCommandesImpayees } from "../lib/commandesImpayees.js";
+import { listerCommandesEnRetard, listerCommandesALivrer } from "../lib/listesCommandes.js";
 
 // Module PUREMENT consultatif : aucune route de ce fichier n'écrit en base
 // (que des `count`/`aggregate`/`findMany` en lecture seule).
@@ -189,6 +190,23 @@ router.get("/recent", async (req, res) => {
   ]);
 
   res.json({ limit, commandes, paiements, livraisons, depenses });
+});
+
+// GET /api/dashboard/commandes/en-retard et /a-livrer — les deux listes du tableau de bord. Mêmes données et même format
+// que /api/rapports/commandes/* (implémentation partagée, lib/listesCommandes.js), mais accessibles avec
+// dashboard.lire + commandes.lire : un poste sans rapports.lire (réceptionniste) peut afficher son tableau de bord sans
+// recevoir l'accès aux rapports. Le routeur exige déjà dashboard.lire ; commandes.lire est exigé en plus parce que ces
+// listes exposent des commandes et des clientes.
+router.get("/commandes/en-retard", requirePermission("commandes.lire"), async (req, res) => {
+  const parsed = enRetardQuerySchema.safeParse(req.query);
+  if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
+  res.json(await listerCommandesEnRetard(req.user.atelierId, parsed.data));
+});
+
+router.get("/commandes/a-livrer", requirePermission("commandes.lire"), async (req, res) => {
+  const parsed = aLivrerQuerySchema.safeParse(req.query);
+  if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
+  res.json(await listerCommandesALivrer(req.user.atelierId, parsed.data));
 });
 
 export default router;

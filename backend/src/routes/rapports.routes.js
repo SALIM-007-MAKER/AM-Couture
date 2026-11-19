@@ -24,6 +24,7 @@ import {
 import { STATUTS_COMMANDE, PRIORITES } from "../schemas/commande.schema.js";
 import { CATEGORIES_VETEMENT } from "../schemas/modele.schema.js";
 import rapportsAvancesRouter from "./rapportsAvances.routes.js";
+import { listerCommandesEnRetard, listerCommandesALivrer } from "../lib/listesCommandes.js";
 
 // Module PUREMENT consultatif : aucune écriture en base dans ce fichier.
 const router = Router();
@@ -34,7 +35,6 @@ router.use("/avances", rapportsAvancesRouter);
 
 const D0 = new Prisma.Decimal(0);
 const dec = (v) => (v == null ? D0 : new Prisma.Decimal(v));
-const COMMANDES_NON_TERMINALES = { notIn: ["LIVREE", "ANNULEE"] };
 
 // Agrégats finances pour UNE plage donnée — factorisé pour être appelé deux
 // fois par GET /finances (période demandée + période précédente, § stats
@@ -271,16 +271,6 @@ router.get("/commandes", async (req, res) => {
   });
 });
 
-const COMMANDE_LISTE_SELECT = {
-  id: true,
-  numero: true,
-  statut: true,
-  priorite: true,
-  dateLivraisonPrevue: true,
-  prixTotal: true,
-  cliente: { select: { id: true, nom: true, prenom: true, telephone: true } },
-};
-
 // ───────────────────────────────────────────────────────────────────────
 // GET /api/rapports/commandes/en-retard?page=&pageSize=
 // §9 : dateLivraisonPrevue dépassée ET statut non terminal. Une commande
@@ -292,31 +282,7 @@ const COMMANDE_LISTE_SELECT = {
 router.get("/commandes/en-retard", async (req, res) => {
   const parsed = enRetardQuerySchema.safeParse(req.query);
   if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
-  const { page, pageSize } = parsed.data;
-  const now = new Date();
-
-  const where = {
-    atelierId: req.user.atelierId,
-    statut: COMMANDES_NON_TERMINALES,
-    dateLivraisonPrevue: { lt: now },
-  };
-  const [rows, total] = await Promise.all([
-    prisma.commande.findMany({
-      where,
-      orderBy: [{ dateLivraisonPrevue: "asc" }, { id: "asc" }], // les plus en retard d'abord
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      select: COMMANDE_LISTE_SELECT,
-    }),
-    prisma.commande.count({ where }),
-  ]);
-
-  const data = rows.map((c) => ({
-    ...c,
-    joursDeRetard: Math.floor((now.getTime() - c.dateLivraisonPrevue.getTime()) / 86_400_000),
-  }));
-
-  res.json({ data, meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) } });
+  res.json(await listerCommandesEnRetard(req.user.atelierId, parsed.data));
 });
 
 // ───────────────────────────────────────────────────────────────────────
@@ -328,31 +294,7 @@ router.get("/commandes/en-retard", async (req, res) => {
 router.get("/commandes/a-livrer", async (req, res) => {
   const parsed = aLivrerQuerySchema.safeParse(req.query);
   if (!parsed.success) throw new HttpError(400, "Paramètres invalides.", formatZodError(parsed.error));
-  const { horizonJours, page, pageSize } = parsed.data;
-  const now = new Date();
-  const horizon = new Date(now.getTime() + horizonJours * 86_400_000);
-
-  const where = {
-    atelierId: req.user.atelierId,
-    statut: COMMANDES_NON_TERMINALES,
-    dateLivraisonPrevue: { gte: now, lt: horizon },
-  };
-  const [data, total] = await Promise.all([
-    prisma.commande.findMany({
-      where,
-      orderBy: [{ dateLivraisonPrevue: "asc" }, { id: "asc" }],
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      select: COMMANDE_LISTE_SELECT,
-    }),
-    prisma.commande.count({ where }),
-  ]);
-
-  res.json({
-    horizonJours,
-    data,
-    meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
-  });
+  res.json(await listerCommandesALivrer(req.user.atelierId, parsed.data));
 });
 
 // ───────────────────────────────────────────────────────────────────────
