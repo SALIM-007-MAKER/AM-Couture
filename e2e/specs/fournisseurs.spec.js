@@ -48,7 +48,8 @@ test("le PDG crée un magasinier : il voit les fournisseurs, sans les finances",
   const emp = await ctx.newPage();
   await emp.goto("/");
   await expect(emp).not.toHaveURL(/\/login/);
-  await expect(emp.getByRole("navigation").getByRole("link", { name: "Fournisseurs" })).toBeVisible();
+  // Menu latéral (« complementary ») : l'accueil du magasinier a aussi un bloc « Raccourcis » (un autre <nav>) avec le même lien.
+  await expect(emp.getByRole("complementary").getByRole("link", { name: "Fournisseurs" })).toBeVisible();
   await emp.goto("/fournisseurs");
   await expect(emp.getByTestId(`fournisseur-${NOM}`)).toBeVisible();
   await expect(emp.getByText("Une erreur inattendue")).toHaveCount(0);

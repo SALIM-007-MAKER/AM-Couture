@@ -44,7 +44,7 @@ export default defineConfig({
     proxy: {
       // Dev local uniquement : en prod, frontend et API sont sur le même domaine.
       "/api": {
-        target: "http://localhost:4000",
+        target: `http://localhost:${process.env.VITE_API_PORT ?? 4000}`,
         changeOrigin: true,
       },
     },

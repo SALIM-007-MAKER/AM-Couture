@@ -6,7 +6,7 @@
 | Unitaires frontend | `frontend/src/**/__tests__` | `node --test` | `npm test` | 124 | oui (`verifier`) |
 | Déploiement | `scripts/__tests__` | `node --test` | `npm test` | 7 | oui (`verifier`) |
 | Intégration (API + Prisma + Postgres) | `backend/src/integration-tests` | `node --test` | `npm run test:integration` | 461 (460 + 1 `TODO` volontaire) | oui (`tests-integration`) |
-| End-to-end (navigateur réel → frontend → API → Postgres) | `e2e/specs` | Playwright | `npm run test:e2e` | 83 | job `tests-e2e`, **non bloquant** (jamais exécuté sur GitHub) |
+| End-to-end (navigateur réel → frontend → API → Postgres) | `e2e/specs` | Playwright | `npm run test:e2e` | 106 | job `tests-e2e`, **non bloquant** (jamais exécuté sur GitHub) |
 | Cohérence schéma Prisma / migrations | `prisma/` | `prisma migrate diff` | voir `.github/workflows/ci.yml` | 1 contrôle | oui (`tests-integration`) |
 | Vulnérabilités des dépendances d'exécution | `package-lock.json` | `npm audit --omit=dev` | `npm audit --omit=dev --audit-level=high` | 0 constaté le 15/11/2026 | job `audit-dependances`, non bloquant |
 
@@ -56,7 +56,10 @@ DATABASE_URL=postgresql://test:test@localhost:55432/gestion_atelier_e2e DIRECT_U
 E2E_DATABASE_URL=postgresql://test:test@localhost:55432/gestion_atelier_e2e npm run test:e2e
 ```
 
-Les ports 4000 (API) et 5173 (Vite) doivent être libres : les serveurs sont lancés et arrêtés par Playwright.
+Les ports 4000 (API) et 5173 (Vite) doivent être libres : les serveurs sont lancés et arrêtés par Playwright. Pour lancer les E2E **à côté de
+serveurs de développement déjà ouverts**, choisir d'autres ports : `E2E_PORT_API=4391 E2E_PORT_WEB=5391` (voir `e2e/ports.js`, le proxy de
+Vite suit via `VITE_API_PORT`). L'API de test écrit sa sortie dans `e2e-journal/api.log` (ignoré par Git) : c'est là que `auth-locale.spec.js`
+lit les liens de réinitialisation et de vérification, qui en développement local ne sont jamais renvoyés dans la réponse HTTP.
 Jeu de données : `e2e/seed.js` (1 SUPERADMIN ; ateliers Alpha et Beta avec leur PDG ; une cliente avec compte et
 commande acomptée dans Alpha ; une cliente et une commande dans Beta pour prouver l'isolation). En cas d'échec :
 captures et traces dans `e2e-resultats/` (`npx playwright show-trace <trace.zip>`).
@@ -68,6 +71,10 @@ captures et traces dans `e2e-resultats/` (`npx playwright show-trace <trace.zip>
 | `pdg.spec.js` | création de cliente, doublon de téléphone, règle « pas de commande sans mesure », commande + paiement (le solde diminue), refus d'un paiement supérieur au solde, isolation, espace plateforme fermé |
 | `client.spec.js` | profil, commande avec payé / reste, aucune donnée d'un autre atelier, espace de gestion fermé |
 | `securite.spec.js` | 401 sans session, 403 par rôle, 404 sur les ressources d'un autre atelier (lecture et écriture), garde d'origine (CSRF), erreurs sans fuite technique |
+| `espaces-metier.spec.js` | un employé de chaque poste (couturier, réceptionniste, magasinier, comptable, autre) : accueil et sections de son métier, aucune erreur d'API, écrans d'un autre métier fermés |
+| `stock-tracabilite.spec.js` | sortie sans motif refusée (formulaire et API), motif/origine/auteur dans l'historique, double envoi sans doublon, stock jamais négatif, entrée |
+| `auth-locale.spec.js` | inscription puis lien de vérification (dans le journal, vers l'écran), mot de passe oublié sans fuite ni énumération, nouveau mot de passe, lien à usage unique |
+| `interface-marque-menu-langue.spec.js` | logo Tailora sur les écrans d'accès, menu latéral fixe (atelier et SuperAdmin) avec défilement interne, mobile, langue du SuperAdmin |
 | `abonnement.spec.js` | période de grâce, lecture seule avec saisie refusée, souscription (instructions, référence obligatoire, une seule déclaration à la fois), confirmation par le SUPERADMIN, accès rétabli, justificatif PDF (non accessible à un autre atelier), tableau de bord commercial, réglages |
 
 Limites : une seule connexion par rôle (session réutilisée) pour rester sous le limiteur de débit ; un seul navigateur
