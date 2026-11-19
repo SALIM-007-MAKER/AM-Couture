@@ -6,4 +6,7 @@ import { buildQuery } from "../../lib/queryString.js";
 export const dashboardApi = {
   summary: (params) => api.get(`/dashboard/summary${buildQuery(params)}`),
   recent: (params) => api.get(`/dashboard/recent${buildQuery(params)}`),
+  // Mêmes données que /rapports/commandes/*, mais sous dashboard.lire + commandes.lire (voir dashboard.routes.js).
+  commandesEnRetard: (params) => api.get(`/dashboard/commandes/en-retard${buildQuery(params)}`),
+  commandesALivrer: (params) => api.get(`/dashboard/commandes/a-livrer${buildQuery(params)}`),
 };

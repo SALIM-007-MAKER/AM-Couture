@@ -16,3 +16,21 @@ export function useDashboardRecentQuery(limit) {
     placeholderData: (prev) => prev,
   });
 }
+
+// Listes « en retard » / « à livrer » du tableau de bord. Passent par /dashboard/* et non /rapports/* : un poste qui a
+// dashboard.lire sans rapports.lire (réceptionniste) peut ainsi afficher son tableau de bord.
+export function useCommandesEnRetardQuery(params) {
+  return useQuery({
+    queryKey: ["dashboard", "commandes", "en-retard", params],
+    queryFn: () => dashboardApi.commandesEnRetard(params),
+    placeholderData: (prev) => prev,
+  });
+}
+
+export function useCommandesALivrerQuery(params) {
+  return useQuery({
+    queryKey: ["dashboard", "commandes", "a-livrer", params],
+    queryFn: () => dashboardApi.commandesALivrer(params),
+    placeholderData: (prev) => prev,
+  });
+}

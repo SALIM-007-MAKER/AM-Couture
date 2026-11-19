@@ -25,32 +25,21 @@ Code : `frontend/src/features/accueil/` (`espaces.js` : logique pure et testée 
 
 Il n'y a pas de section « rendez-vous » : le modèle de données n'en contient pas.
 
-## Problème connu : deux API renvoient 403 sur le tableau de bord complet d'une réceptionniste
+## Tableau de bord complet d'une réceptionniste (ancien problème, corrigé)
 
-**Constaté** (vérification du 19 novembre 2026, compte de test réceptionniste) : sur `/tableau-de-bord`, deux appels
-échouent en 403 :
+**Constat initial.** Sur `/tableau-de-bord`, un compte réceptionniste recevait un 403 sur deux appels
+(`GET /api/rapports/commandes/en-retard` et `/a-livrer`) : le poste RECEPTIONNISTE a `dashboard.lire` mais pas
+`rapports.lire`, que tout le routeur `/api/rapports` exige. Trois zones de la page (encart « En retard », encart
+« À livrer », compteur « Livraison ≤ 3 j ») restaient en erreur. Le défaut datait de la création du poste.
 
-- `GET /api/rapports/commandes/en-retard`
-- `GET /api/rapports/commandes/a-livrer`
+**Correction.** Les deux listes sont aussi servies par `GET /api/dashboard/commandes/en-retard` et
+`GET /api/dashboard/commandes/a-livrer`, qui exigent `dashboard.lire` **et** `commandes.lire`. L'implémentation est
+unique et partagée avec les routes Rapports (`backend/src/lib/listesCommandes.js`) : mêmes requêtes, même format de
+réponse (dont `joursDeRetard`), même isolation par atelier, mêmes montants masqués sans `finances.voir`. Le
+tableau de bord (`features/dashboard/hooks.js`) utilise ces routes ; la page Rapports garde les siennes.
 
-**Cause.** Le poste RECEPTIONNISTE (`backend/src/lib/permissions.js`) a `dashboard.lire` mais pas `rapports.lire`. Tout
-le routeur `/api/rapports` exige `rapports.lire` (`rapports.routes.js`, `router.use(... requirePermission("rapports.lire"))`),
-alors que `DashboardPage.jsx` appelle ces deux routes (listes « en retard » et « à livrer »). Les deux encarts de la
-page affichent donc une erreur pour tout employé qui a `dashboard.lire` sans `rapports.lire`.
+**Ce qui n'a pas changé.** Aucune permission de poste n'est modifiée : la réceptionniste n'a toujours pas
+`rapports.lire` et reçoit toujours 403 sur `/api/rapports/*`. Test : `dashboard-listes-commandes.test.js`.
 
-**Ancienneté.** Le défaut existe depuis la création du poste : avant les espaces métiers, ce tableau de bord était
-l'accueil de la réceptionniste. Les espaces métiers ne l'ont pas introduit ; ils le rendent seulement moins visible, car
-l'accueil de la réceptionniste utilise `GET /api/commandes` (`commandes.lire`), qui fonctionne.
-
-**Comportement conservé volontairement.** Les permissions de la réceptionniste n'ont pas été modifiées et
-`DashboardPage.jsx` non plus. Aucun accès supplémentaire n'a été accordé pour masquer le symptôme.
-
-**Pistes de correction (à décider)**
-
-1. Dans `DashboardPage.jsx`, ne pas afficher les deux listes (ou les alimenter depuis `GET /api/commandes?enRetard=true`
-   et `?statut=TERMINEE`, qui exigent `commandes.lire`) quand l'utilisateur n'a pas `rapports.lire`. Ne donne aucun droit
-   de plus, mais modifie la page du PDG.
-2. Retirer `dashboard.lire` du poste RECEPTIONNISTE : son accueil lui suffit déjà, le lien « Tableau de bord complet »
-   disparaît. Les comptes existants gardent leurs permissions déjà accordées (un poste n'est qu'un modèle).
-3. Accorder `rapports.lire` à la réceptionniste : donne accès à tous les rapports, y compris financiers selon
-   `finances.voir`. À éviter sans décision explicite.
+**Limite.** Un compte qui aurait `dashboard.lire` sans `commandes.lire` (permissions personnalisées ; aucun poste de
+base) reçoit 403 sur ces deux listes et sur les « commandes récentes ».

@@ -13,9 +13,8 @@ import {
   ClipboardList,
   ArrowRight,
 } from "lucide-react";
-import { useDashboardSummaryQuery } from "../features/dashboard/hooks.js";
+import { useDashboardSummaryQuery, useCommandesEnRetardQuery, useCommandesALivrerQuery } from "../features/dashboard/hooks.js";
 import { useCommandesQuery } from "../features/commandes/hooks.js";
-import { useCommandesEnRetardQuery, useCommandesALivrerQuery } from "../features/rapports/hooks.js";
 import CommandeStatutBadge from "../features/commandes/components/CommandeStatutBadge.jsx";
 import { useTranslation } from "../i18n/index.js";
 import PageHeader from "../components/PageHeader.jsx";
