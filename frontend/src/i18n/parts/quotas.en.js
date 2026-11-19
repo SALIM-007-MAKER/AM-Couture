@@ -28,6 +28,7 @@ export default {
       plancher: "limit kept to protect your current usage",
       raison: {
         ESSAI: "Free trial: no limit during the trial. Your plan's limits will apply once it is activated, after the trial ends.",
+        ILLIMITE: "Your {{formule}} plan has no limit: every resource is unlimited.",
         AUCUN: "No limit currently applies to your workshop.",
         ABONNEMENT: "Limits of your {{formule}} plan. They stay those of your subscription until it ends.",
         GRACE: "Grace period: the limits of your last plan ({{formule}}) still apply.",

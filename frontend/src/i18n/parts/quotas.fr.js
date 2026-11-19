@@ -29,6 +29,7 @@ export default {
       plancher: "limite conservée pour protéger votre usage actuel",
       raison: {
         ESSAI: "Essai gratuit : aucune limite pendant l'essai. Les limites de votre formule s'appliqueront à son activation, une fois l'essai terminé.",
+        ILLIMITE: "Votre formule {{formule}} n'a aucune limite : toutes les ressources sont illimitées.",
         AUCUN: "Aucune limite ne s'applique actuellement à votre atelier.",
         ABONNEMENT: "Limites de votre formule {{formule}}. Elles restent celles de votre abonnement jusqu'à son terme.",
         GRACE: "Période de grâce : les limites de votre dernière formule ({{formule}}) restent appliquées.",

@@ -146,9 +146,12 @@ export async function utilisationAtelier(db, atelierId, now = new Date()) {
   const { limites, raison, abonnement, abonnements } = await limitesEnVigueur(db, atelierId, now);
   const usages = await usageComplet(db, atelierId);
   const plancher = abonnement?.plancher ?? {};
+  // Abonnement sans aucune limite (abonnement antérieur aux quotas, formule illimitée) : aucun quota ne s'applique, et le
+  // dire (raison ILLIMITE) évite d'annoncer « limites de votre formule » alors que toutes les jauges sont illimitées.
+  const aucuneLimite = limites != null && Object.keys(limites).length === 0;
   return {
-    quotasAppliques: limites != null,
-    raison,
+    quotasAppliques: limites != null && !aucuneLimite,
+    raison: aucuneLimite ? "ILLIMITE" : raison,
     formule: abonnement?.planNom ?? null,
     jauges: jauges(usages, limites, plancher),
     abonnementsPrisEnCompte: abonnements.length,
