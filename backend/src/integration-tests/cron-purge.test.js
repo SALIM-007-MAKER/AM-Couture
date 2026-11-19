@@ -4,8 +4,15 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { prisma } from "../lib/prisma.js";
 import { demarrerServeur, arreterServeur } from "./helpers.js";
+import { prendreVerrou } from "./verrou-cron.js";
 
 describe("Cron — rappels quotidiens et purge du journal de sécurité", () => {
+  // La tâche examine tous les ateliers de la base : un seul fichier à la fois (voir verrou-cron.js). Pris en premier, libéré en dernier.
+  let libererVerrou;
+  before(async () => {
+    libererVerrou = await prendreVerrou();
+  });
+
   let server, baseUrl;
   const secretAvant = process.env.CRON_SECRET;
   const cleAvant = process.env.RESEND_API_KEY;
@@ -35,6 +42,11 @@ describe("Cron — rappels quotidiens et purge du journal de sécurité", () => 
 
   const appeler = (auth) =>
     fetch(`${baseUrl}/api/cron/rappels-quotidiens`, { headers: auth ? { Authorization: auth } : {} });
+
+  // Déclaré APRÈS le nettoyage ci-dessus : les hooks `after` s'exécutent dans l'ordre de déclaration.
+  after(async () => {
+    await libererVerrou?.();
+  });
 
   it("sans CRON_SECRET configuré : 503 (fail-closed) et rien n'est purgé", async () => {
     delete process.env.CRON_SECRET;

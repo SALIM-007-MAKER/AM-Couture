@@ -4,11 +4,18 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { prisma } from "../lib/prisma.js";
 import { demarrerServeur, arreterServeur, creerAtelierEtAdmin, creerCliente, creerCommande, supprimerAtelier } from "./helpers.js";
+import { prendreVerrou } from "./verrou-cron.js";
 
 const SECRET = "secret-cron-resilience";
 const marque = `res${process.pid}${Date.now()}`;
 
 describe("Tâche quotidienne — résistance à un atelier en erreur", () => {
+  // La tâche examine tous les ateliers de la base : un seul fichier à la fois (voir verrou-cron.js). Pris en premier, libéré en dernier.
+  let libererVerrou;
+  before(async () => {
+    libererVerrou = await prendreVerrou();
+  });
+
   let server, baseUrl, bon, poison;
   const envoyes = [];
   const fetchOriginal = globalThis.fetch;
@@ -56,6 +63,11 @@ describe("Tâche quotidienne — résistance à un atelier en erreur", () => {
     await supprimerAtelier(poison.atelier.id);
     await supprimerAtelier(bon.atelier.id);
     await prisma.$disconnect();
+  });
+
+  // Déclaré APRÈS le nettoyage ci-dessus : les hooks `after` s'exécutent dans l'ordre de déclaration.
+  after(async () => {
+    await libererVerrou?.();
   });
 
   it("l'atelier en panne est consigné dans le compte rendu, les autres reçoivent leur résumé", async () => {

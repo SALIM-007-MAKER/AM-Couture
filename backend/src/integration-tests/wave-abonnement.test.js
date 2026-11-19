@@ -8,6 +8,7 @@ import { prisma } from "../lib/prisma.js";
 import { signerWebhook } from "../lib/wave.js";
 import { demarrerServeur, arreterServeur, client, creerAtelierEtAdmin, supprimerAtelier } from "./helpers.js";
 import { demarrerFauxWave, CLE_API } from "./faux-wave.js";
+import { prendreVerrou } from "./verrou-cron.js";
 
 const MDP = "Atelier-Test-2026!";
 const SECRET_WEBHOOK = "wave_sn_WHS_secret_de_test";
@@ -15,6 +16,13 @@ const SECRET_CRON = "secret-cron-wave";
 const ENV = ["WAVE_ENABLED", "WAVE_API_KEY", "WAVE_WEBHOOK_SECRET", "WAVE_API_BASE", "PUBLIC_APP_URL", "CRON_SECRET", "RESEND_API_KEY"];
 
 describe("Paiement d'abonnement par Wave (faux serveur Wave)", () => {
+  // Ce fichier lance la tâche quotidienne, qui examine tous les ateliers de la base : un seul fichier à la fois (voir verrou-cron.js).
+  // Pris en premier, libéré en dernier.
+  let libererVerrou;
+  before(async () => {
+    libererVerrou = await prendreVerrou();
+  });
+
   let server, baseUrl, wave, atelier, autreAtelier, api, apiAutre, superApi, superId, plan;
   const avant = Object.fromEntries(ENV.map((k) => [k, process.env[k]]));
   let compteurEvt = 0;
@@ -107,6 +115,11 @@ describe("Paiement d'abonnement par Wave (faux serveur Wave)", () => {
     await prisma.journalSecurite.deleteMany({ where: { atelierId: { in: [atelier.id, autreAtelier.id] } } });
     await prisma.user.delete({ where: { id: superId } });
     await prisma.$disconnect();
+  });
+
+  // Déclaré APRÈS le nettoyage ci-dessus : les hooks `after` s'exécutent dans l'ordre de déclaration.
+  after(async () => {
+    await libererVerrou?.();
   });
 
   describe("inactif par défaut", () => {

@@ -6,12 +6,21 @@ import assert from "node:assert/strict";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { demarrerServeur, arreterServeur, client, creerAtelierEtAdmin, supprimerAtelier } from "./helpers.js";
+import { prendreVerrou } from "./verrou-cron.js";
 
 const JOUR = 86_400_000;
 const MDP = "Atelier-Test-2026!";
 const SECRET = "secret-cron-rappels-abonnement";
 
 describe("Rappels d'abonnement et courriels de paiement", () => {
+  // La tâche quotidienne examine tous les ateliers de la base : si une autre suite la lance pendant que les ateliers de celle-ci
+  // existent, elle envoie leurs rappels à sa place et celle-ci échoue. Un seul fichier à la fois (voir verrou-cron.js).
+  // Pris en premier, libéré en dernier.
+  let libererVerrou;
+  before(async () => {
+    libererVerrou = await prendreVerrou();
+  });
+
   let server, baseUrl;
   const marque = `rappels${process.pid}${Date.now()}`;
   const ateliers = {}; // nom court → { atelier, email, admin }
@@ -130,6 +139,11 @@ describe("Rappels d'abonnement et courriels de paiement", () => {
     await prisma.journalSecurite.deleteMany({ where: { userId: superId } });
     await prisma.user.delete({ where: { id: superId } });
     await prisma.$disconnect();
+  });
+
+  // Déclaré APRÈS le nettoyage ci-dessus : les hooks `after` s'exécutent dans l'ordre de déclaration.
+  after(async () => {
+    await libererVerrou?.();
   });
 
   describe("tâche quotidienne", () => {
