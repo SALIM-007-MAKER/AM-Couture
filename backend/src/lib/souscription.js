@@ -12,12 +12,14 @@
 //  - aucune ligne n'est supprimée : tout changement est un changement d'état daté, signé, avec motif, et laisse une
 //    entrée d'historique.
 import { randomUUID } from "node:crypto";
+import { Prisma } from "../generated/prisma/client.ts";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { nextNumero } from "./numero.js";
 import { verrouillerCle } from "./verrous.js";
 import { normaliserLimites } from "./quotas.js";
 import { calculerFigeage } from "./quotasServeur.js";
-import { calculerDateExpiration, dateDebutSouscription, prixPourDuree, tarifsDuree } from "./abonnement.js";
+import { calculerDateExpiration, dateDebutSouscription } from "./abonnement.js";
+import { offrePourDuree, DEVISE } from "./tarifs.js";
 
 export const cleVerrouAtelier = (atelierId) => `abonnement:${atelierId}`;
 
@@ -60,13 +62,14 @@ export async function souscrire(
 ) {
   await verrouillerCle(tx, cleVerrouAtelier(atelier.id));
 
-  if (!tarifsDuree(plan).some((t) => t.dureeMois === dureeMois)) {
-    throw new HttpError(400, "Champs invalides.", { dureeMois: ["Cette durée n'est pas proposée pour cette formule."] });
+  // Seules les périodicités mensuelle (1 mois) et annuelle (12 mois) sont proposées, et seulement si le prix de la période est
+  // configuré dans le catalogue : aucun prix par défaut, aucune formule gratuite. Le prix lu ICI (au moment de la déclaration)
+  // est figé dans l'abonnement et la transaction : une modification ultérieure du catalogue ne les change jamais.
+  const offre = offrePourDuree(plan, dureeMois);
+  if (!offre) {
+    throw new HttpError(400, "Champs invalides.", { dureeMois: ["Cette période n'est pas proposée pour cette formule."] });
   }
-  const montant = prixPourDuree(plan, dureeMois);
-  if (montant.lte(0)) {
-    throw new HttpError(409, "Cette formule n'est pas payante : contactez la plateforme pour l'activer.");
-  }
+  const montant = new Prisma.Decimal(offre.prix);
   const enAttente = await tx.transaction.findFirst({
     where: { atelierId: atelier.id, statut: "EN_ATTENTE" },
     select: { numero: true },
@@ -101,6 +104,7 @@ export async function souscrire(
       atelierId: atelier.id,
       moyenPaiement,
       montant,
+      devise: DEVISE,
       statut: "EN_ATTENTE",
       // Clé de rapprochement unique ; préfixe WAV- pour un paiement Wave (envoyée à Wave comme client_reference).
       referenceInterne: `${moyenPaiement === "WAVE" ? "WAV" : "MAN"}-${randomUUID()}`,

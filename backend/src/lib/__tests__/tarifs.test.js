@@ -13,7 +13,7 @@ import {
   quotasNonDefinis,
   estProposee,
   verifierActivation,
-  tarifsAncienFormat,
+  planCatalogue,
 } from "../tarifs.js";
 
 // Les montants ci-dessous sont des DONNÉES DE TEST : aucun tarif n'est écrit dans le code de production.
@@ -94,10 +94,12 @@ test("activation commerciale : exige un tarif ET des quotas définis ; les raiso
   assert.deepEqual(verifierActivation({}), { ok: false, raisons: ["AUCUN_TARIF", "QUOTAS_NON_DEFINIS"] });
 });
 
-test("ancien format `tarifs` dérivé des offres : durées 1 et 12 seulement, aucune remise stockée", () => {
-  assert.deepEqual(tarifsAncienFormat({ prixMensuel: 1000, prixAnnuel: 10000 }), [
-    { dureeMois: 1, remisePourcent: 0, total: 1000 },
-    { dureeMois: 12, remisePourcent: 0, total: 10000 },
-  ]);
-  assert.deepEqual(tarifsAncienFormat({}), []);
+test("formule du catalogue : offres, économie informative et état commercial", () => {
+  const c = planCatalogue({ actif: false, prixMensuel: 3000, prixAnnuel: 30000, limites: {} });
+  assert.equal(c.offres.length, 2);
+  assert.equal(c.economieAnnuelle, 6000);
+  assert.equal(c.moisOffertsAnnuel, 2);
+  assert.equal(c.proposee, false, "inactive : jamais proposée");
+  assert.deepEqual(c.quotasNonDefinis, ["clientes", "employes", "commandesActives", "modeles"]);
+  assert.deepEqual(c.activationPossible, { ok: false, raisons: ["QUOTAS_NON_DEFINIS"] });
 });

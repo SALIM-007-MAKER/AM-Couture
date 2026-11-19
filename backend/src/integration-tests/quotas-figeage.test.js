@@ -46,7 +46,9 @@ describe("Quotas : figeage dans les abonnements", () => {
     superId = (await prisma.user.create({ data: { identifiant, passwordHash: await bcrypt.hash(MDP, 4), role: "SUPERADMIN" } })).id;
     superApi = client(baseUrl);
     assert.equal((await superApi.post("/api/auth/login", { identifiant, password: MDP })).status, 200);
-    const creerPlan = async (nom, limites) => (await superApi.post("/api/plans-abonnement", { nom: `${nom} ${marque}`, prixMensuel: "5000", limites })).body;
+    // Formules créées directement en base, ACTIVES, avec des quotas éventuellement partiels : ce sont des cas de moteur (clé absente = illimité pour
+    // un abonnement), indépendants de la règle d'activation commerciale du catalogue (quotas définis) testée dans quotas-plans.
+    const creerPlan = (nom, limites) => prisma.planAbonnement.create({ data: { nom: `${nom} ${marque}`, prixMensuel: 5000, limites, actif: true } });
     mini = await creerPlan("Mini", { clientes: 2, employes: 1, commandesActives: 1, modeles: 1 });
     pro = await creerPlan("Pro", { clientes: 500, employes: 5, commandesActives: 250, modeles: 250 });
     premium = await creerPlan("Premium", {});
@@ -153,7 +155,7 @@ describe("Quotas : figeage dans les abonnements", () => {
 
   it("activation MANUELLE (SUPERADMIN) : mêmes règles (plancher d'usage d'un atelier ancien)", async () => {
     const a = await nouvelAtelier("Manuel", { clientes: 6 });
-    const res = await superApi.post(`/api/ateliers/${a.atelier.id}/abonnement/activer`, { planId: mini.id, dureeMois: 1 });
+    const res = await superApi.post(`/api/ateliers/${a.atelier.id}/abonnement/activer`, { mode: "CATALOGUE", planId: mini.id, periodicite: "MENSUEL" });
     assert.equal(res.status, 201, JSON.stringify(res.body));
     assert.deepEqual(res.body.plancher, { clientes: 6 });
     assert.equal(res.body.limites.clientes, 6);
@@ -162,8 +164,8 @@ describe("Quotas : figeage dans les abonnements", () => {
 
   it("CORRECTION d'un abonnement activé : limites recalculées, plancher conservé intégralement, prix inchangé", async () => {
     const a = await nouvelAtelier("Correction", { clientes: 140 });
-    const plan140 = (await superApi.post("/api/plans-abonnement", { nom: `Starter140 ${marque}`, prixMensuel: "5000", limites: { clientes: 100 } })).body;
-    const base = await superApi.post(`/api/ateliers/${a.atelier.id}/abonnement/activer`, { planId: plan140.id, dureeMois: 1 });
+    const plan140 = await prisma.planAbonnement.create({ data: { nom: `Starter140 ${marque}`, prixMensuel: 5000, limites: { clientes: 100 }, actif: true } });
+    const base = await superApi.post(`/api/ateliers/${a.atelier.id}/abonnement/activer`, { mode: "CATALOGUE", planId: plan140.id, periodicite: "MENSUEL" });
     assert.equal(base.body.limites.clientes, 140, "Starter 100 avec 140 clientes : limite effective 140");
     const prix = base.body.prix;
     const abonnementId = base.body.id;

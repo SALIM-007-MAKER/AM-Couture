@@ -1,13 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { Prisma } from "../../generated/prisma/client.ts";
 import {
   calculerDateExpiration,
   statutEffectif,
   etatAbonnementAtelier,
   modeAcces,
   dateDebutSouscription,
-  prixPourDuree,
 } from "../abonnement.js";
 
 const J = 86_400_000;
@@ -110,13 +108,4 @@ describe("dateDebutSouscription — renouvellement sans perte de jours", () => {
     const abos = [{ statut: "EN_ATTENTE", dateExpiration: null }, abo("ANNULE", -5, 99), abo("SUSPENDU", -5, 99)];
     assert.deepEqual(dateDebutSouscription(abos, NOW), NOW);
   });
-});
-
-describe("prixPourDuree", () => {
-  const plan = { prixMensuel: new Prisma.Decimal(5000), tarifsDuree: [{ dureeMois: 1, remisePourcent: 0 }, { dureeMois: 12, remisePourcent: 20 }] };
-  it("applique la remise de la durée", () => {
-    assert.equal(prixPourDuree(plan, 1).toString(), "5000");
-    assert.equal(prixPourDuree(plan, 12).toString(), "48000");
-  });
-  it("durée non proposée : pas de remise", () => assert.equal(prixPourDuree(plan, 3).toString(), "15000"));
 });

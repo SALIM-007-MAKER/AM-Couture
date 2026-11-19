@@ -103,7 +103,15 @@ export function verifierActivation(plan) {
   return { ok: raisons.length === 0, raisons };
 }
 
-/** Ancien format `tarifs` (durée, remise, total) dérivé des offres, pour les écrans qui ne connaissent pas encore `offres`. */
-export function tarifsAncienFormat(plan) {
-  return offres(plan).map((o) => ({ dureeMois: o.dureeMois, remisePourcent: 0, total: o.prix }));
+/** Formule telle qu'exposée par l'API : offres, économie annuelle informative, état commercial. Aucun prix n'est calculé ici. */
+export function planCatalogue(plan) {
+  return {
+    ...plan,
+    offres: offres(plan),
+    economieAnnuelle: economieAnnuelle(plan),
+    moisOffertsAnnuel: moisOffertsAnnuel(plan),
+    proposee: estProposee(plan),
+    quotasNonDefinis: quotasNonDefinis(plan.limites),
+    activationPossible: verifierActivation(plan),
+  };
 }

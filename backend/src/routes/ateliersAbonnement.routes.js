@@ -12,7 +12,8 @@ import { suspendreAbonnement, reactiverAbonnement } from "../lib/souscription.js
 import { recalculerLimites } from "../lib/quotas.js";
 import { calculerFigeage, utilisationAtelier } from "../lib/quotasServeur.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
-import { calculerDateExpiration, etatAbonnementAtelier, statutEffectif, prixPourDuree } from "../lib/abonnement.js";
+import { calculerDateExpiration, etatAbonnementAtelier, statutEffectif } from "../lib/abonnement.js";
+import { offrePourDuree, PERIODICITES } from "../lib/tarifs.js";
 
 // Gestion MANUELLE de l'abonnement d'un atelier par le SUPERADMIN (§
 // abonnement sans paiement en ligne). Monté sous /api/ateliers — chemins
@@ -33,6 +34,7 @@ const ABONNEMENT_SELECT = {
   planNom: true,
   dureeMois: true,
   prix: true,
+  tarifExceptionnel: true,
   dateDebut: true,
   dateExpiration: true,
   // Quotas figés (voir lib/quotas.js) : limites appliquées et plancher d'usage.
@@ -124,23 +126,39 @@ router.get("/:atelierId/abonnement", async (req, res) => {
 // POST /api/ateliers/:atelierId/abonnement/activer — crée un abonnement
 // CONFIRME pour cet atelier. dateDebut par défaut = maintenant ; une date de
 // début future donne un abonnement "En attente d'activation" jusqu'à cette
-// date. Le prix est figé à l'activation : prix mensuel × durée, avec la remise
-// de la durée si elle fait partie des durées proposées du plan (prixPourDuree).
+// date. Deux modes : CATALOGUE (période mensuelle ou annuelle, prix du catalogue) ou EXCEPTIONNEL (durée et montant saisis
+// explicitement, motif obligatoire). Dans les deux cas le prix et la durée sont figés dans l'abonnement ; rien n'est déduit.
 router.post("/:atelierId/abonnement/activer", idempotence, async (req, res) => {
   const parsed = activerAbonnementSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
-  const { planId, note } = parsed.data;
+  const { planId, note, mode } = parsed.data;
   const atelier = await chargerAtelier(req.params.atelierId);
   const plan = await chargerPlanActif(planId);
 
+  let prixFige;
+  let dureeDemandee;
+  let dateExpirationDemandee;
+  if (mode === "CATALOGUE") {
+    dureeDemandee = PERIODICITES[parsed.data.periodicite].dureeMois;
+    const offre = offrePourDuree(plan, dureeDemandee);
+    if (!offre) {
+      throw new HttpError(400, "Champs invalides.", { periodicite: ["Cette période n'a pas de tarif dans le catalogue pour cette formule."] });
+    }
+    prixFige = offre.prix;
+  } else {
+    prixFige = parsed.data.prix;
+    dureeDemandee = parsed.data.dureeMois;
+    dateExpirationDemandee = parsed.data.dateExpiration;
+  }
+
   const dateDebut = parsed.data.dateDebut ?? new Date();
-  const dateExpiration = parsed.data.dateExpiration ?? calculerDateExpiration(dateDebut, parsed.data.dureeMois);
+  const dateExpiration = dateExpirationDemandee ?? calculerDateExpiration(dateDebut, dureeDemandee);
   if (dateExpiration <= dateDebut) {
     throw new HttpError(400, "Champs invalides.", {
       dateExpiration: ["La date d'expiration doit être postérieure à la date de début."],
     });
   }
-  const dureeMois = parsed.data.dureeMois ?? dureeEntre(dateDebut, dateExpiration);
+  const dureeMois = dureeDemandee ?? dureeEntre(dateDebut, dateExpiration);
 
   const abonnement = await prisma.$transaction(
     async (tx) => {
@@ -156,7 +174,8 @@ router.post("/:atelierId/abonnement/activer", idempotence, async (req, res) => {
           planId: plan.id,
           planNom: plan.nom,
           dureeMois,
-          prix: prixPourDuree(plan, dureeMois),
+          prix: prixFige,
+          tarifExceptionnel: mode === "EXCEPTIONNEL",
           statut: "CONFIRME",
           dateDebut,
           dateExpiration,
