@@ -12,7 +12,7 @@ async function envoyerAuxDestinataires(destinataires, { sujet, titre, paragraphe
     try {
       await envoyer({
         to: d.email,
-        subject: `Gestion d'Atelier — ${sujet}`,
+        subject: `Tailora — ${sujet}`,
         html: notificationAbonnementTemplate({ prenom: d.prenom, titre, paragraphes, lien, libelleLien }),
       });
       envoyes += 1;

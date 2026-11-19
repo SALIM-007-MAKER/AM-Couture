@@ -2,7 +2,7 @@ import { api } from "../../lib/apiClient.js";
 import { buildQuery } from "../../lib/queryString.js";
 
 // Réservé au SUPERADMIN — voir backend/src/routes/ateliers.routes.js.
-// Gestion des ateliers (tenants) de la plateforme "Gestion d'Atelier",
+// Gestion des ateliers (tenants) de la plateforme "Tailora",
 // distincte de /parametres (un ADMIN gère SON PROPRE atelier, jamais les
 // autres).
 export const ateliersApi = {

@@ -105,7 +105,7 @@ export function notificationAbonnementTemplate({ prenom, titre, paragraphes, lie
       ${corps}
       <a href="${esc(lien)}" style="${STYLE_BOUTON}">${esc(libelleLien)}</a>
       <p style="${STYLE_PIED}">
-        Vous recevez ce message parce que vous administrez un atelier sur Gestion d'Atelier.
+        Vous recevez ce message parce que vous administrez un atelier sur Tailora.
       </p>
     </div>
   `;

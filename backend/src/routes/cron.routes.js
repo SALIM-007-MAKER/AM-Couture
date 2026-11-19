@@ -99,7 +99,7 @@ router.get("/rappels-quotidiens", async (req, res) => {
         try {
           await envoyerEmail({
             to: user.email,
-            subject: "Gestion d'Atelier — vos rappels du jour",
+            subject: "Tailora — vos rappels du jour",
             html: rappelsQuotidiensTemplate({ prenom: user.prenom, lignes, lienNotifications: `${origin}/notifications` }),
           });
           emailsEnvoyes += 1;

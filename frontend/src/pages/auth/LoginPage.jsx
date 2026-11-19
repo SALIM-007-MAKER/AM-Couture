@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { Scissors, User, Phone, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { User, Phone, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { useLoginMutation, useAtelierPourIdentifiantQuery } from "../../hooks/useAuth.js";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue.js";
 import { useTranslation } from "../../i18n/index.js";
 import { ApiError } from "../../lib/apiClient.js";
 import { GlobalFormError, FieldError } from "../../components/QueryState.jsx";
 import LanguageSwitcher from "../../components/LanguageSwitcher.jsx";
+import LogoTailora from "../../components/LogoTailora.jsx";
 
 // Écran de connexion volontairement à part du reste de l'app (voir demande —
 // esthétique sombre/dorée dédiée, indépendante du thème clair/sombre choisi
@@ -27,7 +28,7 @@ import LanguageSwitcher from "../../components/LanguageSwitcher.jsx";
 // tapé (débouncé) correspond à un compte existant, son logo remplace l'icône
 // générique — sinon on garde ce repli de plateforme, jamais le logo d'un
 // atelier en particulier.
-const NOM_PLATEFORME = "Gestion d'Atelier";
+const NOM_PLATEFORME = "Tailora";
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -75,9 +76,7 @@ export default function LoginPage() {
               className="size-24 rounded-2xl object-contain bg-white/5 border border-white/10 p-2 shadow-[0_0_50px_-5px_rgba(217,158,63,0.35)]"
             />
           ) : (
-            <div className="flex size-24 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-[0_0_50px_-5px_rgba(217,158,63,0.45)]">
-              <Scissors className="size-10 text-neutral-950" aria-hidden="true" />
-            </div>
+            <LogoTailora />
           )}
         </div>
 

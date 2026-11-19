@@ -1,4 +1,4 @@
-# AM Couture — Documentation complète du projet
+# Tailora — Documentation complète du projet
 
 > Plateforme SaaS multi-ateliers de gestion pour ateliers de couture.
 > Document rédigé à partir de l'analyse du code (backend, frontend, schéma Prisma, migrations, CI) — état au 14 novembre 2026.
@@ -28,14 +28,14 @@
 
 ## 1. Vue d'ensemble
 
-**AM Couture — Gestion d'Atelier** est une application web (PWA installable) qui permet à des ateliers de couture de gérer toute leur activité : clients et mesures, commandes, paiements et reçus, livraisons, dépenses, stock, rapports et notifications. Chaque atelier est un **tenant** isolé ; une console **SuperAdmin** administre l'ensemble de la plateforme (ateliers, abonnements, tarifs). Les **clients finaux** disposent d'un espace personnel pour suivre leurs commandes et envoyer des demandes.
+**Tailora** est une application web (PWA installable) qui permet à des ateliers de couture de gérer toute leur activité : clients et mesures, commandes, paiements et reçus, livraisons, dépenses, stock, rapports et notifications. Chaque atelier est un **tenant** isolé ; une console **SuperAdmin** administre l'ensemble de la plateforme (ateliers, abonnements, tarifs). Les **clients finaux** disposent d'un espace personnel pour suivre leurs commandes et envoyer des demandes.
 
 | Élément | Valeur |
 |---|---|
 | Public cible | Ateliers de couture (marché ouest-africain : FCFA, Wave, Orange Money, WhatsApp) |
 | Type | SaaS multi-tenant, abonnement mensuel/multi-mois |
 | Langues | Français (complet) et anglais ; le haoussa a été retiré |
-| Premier tenant | « AM Couture » (l'application est générique, ce n'est pas son nom) |
+| Premier tenant | « AM Couture » (un atelier parmi d'autres ; la plateforme s'appelle Tailora) |
 | Taille approximative | ~28 500 lignes de JS/JSX, 25 tables, 24 fichiers de routes API |
 
 ---

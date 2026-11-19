@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { Scissors, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { useVerifierEmailMutation } from "../../hooks/useAuth.js";
 import { messageUtilisateur } from "../../lib/errorMessage.js";
 import { useTranslation } from "../../i18n/index.js";
+import LogoTailora from "../../components/LogoTailora.jsx";
 
 // Page atteinte depuis le lien envoyé par email à l'inscription (voir POST
 // /inscription-atelier) — volontairement PAS sous PublicOnlyRoute/
@@ -11,7 +12,7 @@ import { useTranslation } from "../../i18n/index.js";
 // connectée (l'inscription connecte immédiatement) quand elle clique ce
 // lien, souvent dans le même navigateur — cette page doit rester accessible
 // dans les deux cas.
-const NOM_PLATEFORME = "Gestion d'Atelier";
+const NOM_PLATEFORME = "Tailora";
 
 export default function VerifierEmailPage() {
   const { t } = useTranslation();
@@ -43,9 +44,7 @@ export default function VerifierEmailPage() {
 
       <div className="relative w-full max-w-sm flex flex-col items-center">
         <div className="mb-7">
-          <div className="flex size-24 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-[0_0_50px_-5px_rgba(217,158,63,0.45)]">
-            <Scissors className="size-10 text-neutral-950" aria-hidden="true" />
-          </div>
+          <LogoTailora />
         </div>
 
         <div className="w-full rounded-3xl bg-neutral-900/70 backdrop-blur-xl border border-white/10 shadow-2xl p-6 space-y-5 text-center">

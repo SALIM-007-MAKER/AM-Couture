@@ -1,4 +1,4 @@
-# AM Couture — Gestion d'Atelier
+# Tailora — plateforme de gestion d'ateliers de couture
 
 Plateforme SaaS multi-ateliers de gestion pour ateliers de couture — React/Vite (PWA) + Express + Prisma 7 + PostgreSQL (Neon) + Vercel. Chaque atelier (tenant) gère son activité en autonomie complète ; une console plateforme séparée (SUPERADMIN) administre l'ensemble des ateliers.
 

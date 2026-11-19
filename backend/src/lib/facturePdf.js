@@ -1,13 +1,13 @@
 import PDFDocument from "pdfkit";
 import { sanitizeForPdf, formatDate } from "./recuPdf.js";
 
-// Justificatif de paiement d'un abonnement AM Couture. Généré à la demande depuis la ligne FactureAbonnement
+// Justificatif de paiement d'un abonnement Tailora. Généré à la demande depuis la ligne FactureAbonnement
 // (instantané figé à l'émission), jamais stocké.
 //
 // Ce document atteste d'un paiement enregistré par la plateforme. Il ne porte volontairement AUCUNE mention légale
 // que le dépôt ne connaît pas (identifiant fiscal, registre de commerce, adresse du siège) : elles sont à renseigner
 // par l'exploitant de la plateforme dans EMETTEUR ci-dessous avant tout usage comptable (voir docs/ABONNEMENTS.md).
-const EMETTEUR = { nom: "AM Couture", lignes: [] };
+const EMETTEUR = { nom: "Tailora", lignes: [] };
 const OR = "#B8912F";
 const SOMBRE = "#1A1A1A";
 const GRIS = "#4A4A4A";

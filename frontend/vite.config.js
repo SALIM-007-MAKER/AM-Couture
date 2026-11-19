@@ -25,18 +25,18 @@ export default defineConfig({
         // ce nom d'installation PWA est vu par TOUS les ateliers, jamais un
         // seul tenant en particulier - voir aussi AppLayout.jsx (Logo), qui
         // affiche lui le nom de l'atelier de l'utilisateur connecté.
-        name: "Gestion d'Atelier",
-        short_name: "Gestion d'Atelier",
+        name: "Tailora",
+        short_name: "Tailora",
         description: "Plateforme de gestion pour ateliers de couture",
         start_url: "/",
         display: "standalone",
         background_color: "#ffffff",
         theme_color: "#276386",
-        // TODO Phase 8 : favicon-512.png est encore le logo spécifique de
-        // l'atelier "AM Couture" (premier tenant) - à remplacer par une icône
-        // générique de plateforme avant qu'un second atelier n'installe
-        // l'app (voir aussi apple-touch-icon.png, même image).
-        icons: [{ src: "/favicon-512.png", sizes: "512x512", type: "image/png", purpose: "any" }],
+        // Icônes de la plateforme Tailora (logo sur fond blanc), générées depuis le logo d'origine : jamais le logo d'un atelier.
+        icons: [
+          { src: "/pwa-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/favicon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+        ],
       },
     }),
   ],

@@ -15,12 +15,12 @@ export default {
       commerceShort: "Sales",
       pricingShort: "Pricing",
       accountShort: "Account",
-      platformName: "Workshop Manager",
+      platformName: "Tailora",
       role: "Superadmin",
     },
     dashboard: {
       title: "Overview",
-      subtitle: "Totals for the Workshop Manager platform, across all workshops.",
+      subtitle: "Totals for the Tailora platform, across all workshops.",
       loadingStats: "Loading statistics…",
       kpiWorkshops: "Workshops",
       kpiActive: "Active workshops",
@@ -42,7 +42,7 @@ export default {
     },
     ateliers: {
       title: "Workshops",
-      subtitle: "The workshops (tenants) of the Workshop Manager platform.",
+      subtitle: "The workshops (tenants) of the Tailora platform.",
       newWorkshop: "New workshop",
       createdMessage: "Workshop “{{nom}}” created — its admin can sign in with the username “{{identifiant}}”.",
       searchPlaceholder: "Search for a workshop…",

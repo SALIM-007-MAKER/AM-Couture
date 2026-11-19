@@ -91,7 +91,7 @@ export function contenuRappel(rappel, { prenom, lien }) {
         "Si vous avez déjà renouvelé, ce message ne vous concerne plus : votre paiement est en cours de vérification.",
       ];
   return {
-    sujet: `Gestion d'Atelier — ${MESSAGES[rappel.type].sujet}`,
+    sujet: `Tailora — ${MESSAGES[rappel.type].sujet}`,
     html: notificationAbonnementTemplate({
       prenom,
       titre: MESSAGES[rappel.type].sujet,

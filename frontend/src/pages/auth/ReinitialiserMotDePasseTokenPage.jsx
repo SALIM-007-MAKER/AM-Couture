@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { Scissors, Lock, Eye, EyeOff, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Lock, Eye, EyeOff, ArrowRight, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useReinitialiserMotDePasseTokenMutation } from "../../hooks/useAuth.js";
 import { GlobalFormError } from "../../components/QueryState.jsx";
 import { useTranslation } from "../../i18n/index.js";
+import LogoTailora from "../../components/LogoTailora.jsx";
 
 // Page atteinte depuis le lien envoyé par email (voir POST
 // /mot-de-passe-oublie) — volontairement PAS sous PublicOnlyRoute/
 // ProtectedRoute (voir App.jsx) : accessible que la personne soit déjà
 // connectée ailleurs dans le même navigateur ou pas, le jeton dans l'URL
 // authentifie l'action à lui seul.
-const NOM_PLATEFORME = "Gestion d'Atelier";
+const NOM_PLATEFORME = "Tailora";
 
 export default function ReinitialiserMotDePasseTokenPage() {
   const { t } = useTranslation();
@@ -47,9 +48,7 @@ export default function ReinitialiserMotDePasseTokenPage() {
 
       <div className="relative w-full max-w-sm flex flex-col items-center">
         <div className="mb-7">
-          <div className="flex size-24 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 shadow-[0_0_50px_-5px_rgba(217,158,63,0.45)]">
-            <Scissors className="size-10 text-neutral-950" aria-hidden="true" />
-          </div>
+          <LogoTailora />
         </div>
 
         <div className="w-full rounded-3xl bg-neutral-900/70 backdrop-blur-xl border border-white/10 shadow-2xl p-6 space-y-5">

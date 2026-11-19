@@ -264,7 +264,7 @@ function Logo({ collapsed, logoUrl, nom }) {
       )}
       {!collapsed && (
         <span className="text-base font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 truncate">
-          {nom || "Gestion d'Atelier"}
+          {nom || "Tailora"}
         </span>
       )}
     </div>
