@@ -67,7 +67,13 @@ export const createMouvementStockSchema = z
     quantite: quantiteField("Quantité"),
     motif: optionalTrimmed(300),
   })
-  .strict();
+  .strict()
+  // Une sortie manuelle doit toujours dire pourquoi la matière quitte le stock (traçabilité) ; l'entrée manuelle reste libre.
+  .superRefine((v, ctx) => {
+    if (v.type === "SORTIE" && !v.motif) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["motif"], message: "Motif requis pour une sortie de stock." });
+    }
+  });
 
 export const listMouvementsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),

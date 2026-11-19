@@ -134,9 +134,9 @@ describe("Notifications automatiques", () => {
     it("apparaît quand la quantité atteint le seuil, avec la quantité actuelle ; disparaît après réapprovisionnement", async () => {
       await prisma.mouvementStock.create({ data: { articleId: article.id, type: "ENTREE", quantite: "10" } });
       assert.ok(!types(await pdg.get("/api/notifications?pageSize=100")).includes("STOCK_BAS"));
-      await pdg.post(`/api/stock/${article.id}/mouvements`, { type: "SORTIE", quantite: "5" }); // reste 5 = le seuil : déjà en alerte
+      await pdg.post(`/api/stock/${article.id}/mouvements`, { type: "SORTIE", quantite: "5", motif: "Test notifications" }); // reste 5 = le seuil : déjà en alerte
       assert.ok(types(await pdg.get("/api/notifications?pageSize=100")).includes("STOCK_BAS"), "quantité égale au seuil : alerte");
-      await pdg.post(`/api/stock/${article.id}/mouvements`, { type: "SORTIE", quantite: "1" }); // reste 4
+      await pdg.post(`/api/stock/${article.id}/mouvements`, { type: "SORTIE", quantite: "1", motif: "Test notifications" }); // reste 4
       const liste = await pdg.get("/api/notifications?pageSize=100");
       const alerte = liste.body.data.find((x) => x.type === "STOCK_BAS");
       assert.ok(alerte);
@@ -144,7 +144,7 @@ describe("Notifications automatiques", () => {
       assert.equal(alerte.article.quantite, "4");
       await pdg.post(`/api/stock/${article.id}/mouvements`, { type: "ENTREE", quantite: "20" });
       assert.ok(!types(await pdg.get("/api/notifications?pageSize=100")).includes("STOCK_BAS"));
-      await pdg.post(`/api/stock/${article.id}/mouvements`, { type: "SORTIE", quantite: "22" }); // reste 2
+      await pdg.post(`/api/stock/${article.id}/mouvements`, { type: "SORTIE", quantite: "22", motif: "Test notifications" }); // reste 2
     });
 
     it("un article sans seuil ou archivé ne génère aucune alerte", async () => {
@@ -211,7 +211,7 @@ describe("Notifications automatiques", () => {
 
     it("« tout marquer lu » d'un employé ne touche que sa propre vue ; le filtre lu fonctionne", async () => {
       // La réception de l'achat a remonté le stock : on le fait redescendre sous le seuil pour qu'il y ait une alerte à lire.
-      await pdg.post(`/api/stock/${article.id}/mouvements`, { type: "SORTIE", quantite: "10" });
+      await pdg.post(`/api/stock/${article.id}/mouvements`, { type: "SORTIE", quantite: "10", motif: "Test notifications" });
       const toutes = await magasinier.api.get("/api/notifications?pageSize=100");
       const idsVisibles = toutes.body.data.map((x) => x.id);
       assert.ok(idsVisibles.length >= 1);

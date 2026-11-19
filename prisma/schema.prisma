@@ -204,6 +204,7 @@ model User {
   affectationsFaites  AffectationCommande[] @relation("AffectationAuteur")
   notificationsRecues Notification[]        @relation("NotificationsRecues")
   notificationsLues   NotificationLue[]     @relation("NotificationsLues")
+  mouvementsStock     MouvementStock[]      @relation("MouvementsStockCrees")
 
   @@index([atelierId])
 }
@@ -777,10 +778,23 @@ model MouvementStock {
   // Renseigné quand l'entrée vient de la réception d'un achat (Phase 6.5) : trace et garde-fou contre le double comptage.
   ligneAchatId String?
   ligneAchat   LigneAchat?        @relation(fields: [ligneAchatId], references: [id], onDelete: Restrict)
+  // D'où vient le mouvement. Explicite plutôt que déduit de ligneAchatId : une consommation automatique par les
+  // commandes s'ajoutera plus tard comme une valeur de plus, sans toucher aux mouvements existants.
+  source       SourceMouvementStock @default(MANUEL)
+  // Qui a enregistré le mouvement (null si le compte a disparu depuis). Un mouvement n'est jamais modifié ni supprimé.
+  creeParId    String?
+  creePar      User?              @relation("MouvementsStockCrees", fields: [creeParId], references: [id], onDelete: SetNull)
   createdAt    DateTime           @default(now())
 
   @@index([articleId])
   @@index([ligneAchatId])
+  @@index([creeParId])
+}
+
+enum SourceMouvementStock {
+  MANUEL
+  RECEPTION_ACHAT
+  STOCK_INITIAL
 }
 
 // ─────────────────────────────────────────────────────────────────────────

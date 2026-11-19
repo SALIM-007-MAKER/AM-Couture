@@ -234,7 +234,7 @@ router.post("/:id/receptions", requireUnePermission("achats.recevoir", "achats.e
 
         await tx.ligneAchat.update({ where: { id: ligne.id }, data: { quantiteRecue: { increment: demande.quantite } } });
         await tx.mouvementStock.create({
-          data: { articleId: ligne.articleId, type: "ENTREE", quantite: demande.quantite, motif: `Réception achat ${achat.numero}`, ligneAchatId: ligne.id },
+          data: { articleId: ligne.articleId, type: "ENTREE", quantite: demande.quantite, motif: `Réception achat ${achat.numero}`, ligneAchatId: ligne.id, source: "RECEPTION_ACHAT", creeParId: req.user.id },
         });
       }
     },

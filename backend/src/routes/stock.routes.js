@@ -54,7 +54,7 @@ router.post("/", async (req, res) => {
     const created = await tx.articleStock.create({ data: { ...data, atelierId: req.user.atelierId } });
     if (quantiteInitiale) {
       await tx.mouvementStock.create({
-        data: { articleId: created.id, type: "ENTREE", quantite: quantiteInitiale, motif: "Stock initial" },
+        data: { articleId: created.id, type: "ENTREE", quantite: quantiteInitiale, motif: "Stock initial", source: "STOCK_INITIAL", creeParId: req.user.id },
       });
     }
     return created;
@@ -238,6 +238,8 @@ router.get("/:id/mouvements", async (req, res) => {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
+      // Auteur : identifiant seulement (jamais le hash ni les autres champs du compte). Historique en lecture seule.
+      include: { creePar: { select: { id: true, identifiant: true } } },
     }),
     prisma.mouvementStock.count({ where }),
   ]);
@@ -280,7 +282,8 @@ router.post("/:id/mouvements", idempotence, async (req, res) => {
         }
       }
 
-      return tx.mouvementStock.create({ data: { articleId, type, quantite, motif } });
+      // Toujours MANUEL ici : les entrées issues d'un achat passent uniquement par la réception (achats.routes.js).
+      return tx.mouvementStock.create({ data: { articleId, type, quantite, motif, source: "MANUEL", creeParId: req.user.id } });
     },
     { maxWait: 10_000, timeout: 15_000 },
   );
