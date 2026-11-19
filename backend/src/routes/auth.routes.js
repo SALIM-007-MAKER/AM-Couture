@@ -15,6 +15,8 @@ import { creerToken, consommerToken } from "../lib/tokenAction.js";
 import { envoyerEmail } from "../lib/resend.js";
 import { emailVerificationTemplate, emailReinitialisationTemplate } from "../lib/emailTemplates.js";
 import { rateLimitPersistant } from "../lib/rateLimiter.js";
+import { limiteConnexion } from "../lib/limiteConnexion.js";
+import { modeEmailLocal, afficherLienLocal, origineLienLocal } from "../lib/lienLocal.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
 
@@ -28,12 +30,12 @@ const DUMMY_HASH = "$2b$10$/4y/w0cvEjmIpLaIBO4xNOLAdvUoH3oNwzYFeJ7fUnPvdyqtJ22de
 
 // Rate limiting sur /login uniquement : 10 tentatives / 15 min / IP.
 // Réponse volontairement générique pour ne pas aider un attaquant à calibrer.
-// Persistant (Postgres, voir lib/rateLimiter.js) — un store en mémoire ne
+// Persistant (Postgres, voir lib/limiteConnexion.js) — un store en mémoire ne
 // suffit pas en serverless (plusieurs instances, chacune avec son propre
 // compteur).
 const loginLimiter = rateLimitPersistant({
   prefixe: "login",
-  limite: 10,
+  limite: limiteConnexion(), // 10 ; relevée en développement local seulement (voir lib/limiteConnexion.js)
   fenetreMs: 15 * 60 * 1000,
   message: "Trop de tentatives. Réessayez dans quelques minutes.",
 });
@@ -220,16 +222,18 @@ router.post("/inscription-atelier", inscriptionLimiter, rejectIfDejaConnecte, as
   // jamais l'action principale" (le .catch() reste local, jamais propagé).
   try {
     const verifToken = await creerToken({ userId: admin.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
-    const origin = origineApplication(req);
-    await envoyerEmail({
-      to: admin.email,
-      subject: traduire(admin.langue, "email.verification.sujet"),
-      html: emailVerificationTemplate({
-        langue: admin.langue,
-        prenom: admin.prenom,
-        lienVerification: `${origin}/verifier-email?token=${verifToken}`,
-      }),
-    });
+    const origin = origineLienLocal(req.get("origin"), origineApplication(req));
+    const lienVerification = `${origin}/verifier-email?token=${verifToken}`;
+    if (modeEmailLocal()) {
+      // Développement local sans Resend : le lien va dans le terminal du backend, jamais dans la réponse.
+      afficherLienLocal({ libelle: "Lien de vérification de l'email", identifiant: admin.identifiant, lien: lienVerification });
+    } else {
+      await envoyerEmail({
+        to: admin.email,
+        subject: traduire(admin.langue, "email.verification.sujet"),
+        html: emailVerificationTemplate({ langue: admin.langue, prenom: admin.prenom, lienVerification }),
+      });
+    }
   } catch (err) {
     log.error("erreur", { categorie: "email", operation: "verification_inscription", userId: admin.id, message: messageErreur(err) });
   }
@@ -265,17 +269,18 @@ router.post("/renvoyer-verification-email", requireAuth, renvoyerVerificationLim
     throw new HttpError(400, "Cet email est déjà vérifié.");
   }
   const verifToken = await creerToken({ userId: user.id, type: "VERIFICATION_EMAIL", dureeMs: 24 * 60 * 60 * 1000 });
-  const origin = origineApplication(req);
+  const origin = origineLienLocal(req.get("origin"), origineApplication(req));
+  const lienVerification = `${origin}/verifier-email?token=${verifToken}`;
   try {
-    await envoyerEmail({
-      to: user.email,
-      subject: traduire(user.langue, "email.verification.sujet"),
-      html: emailVerificationTemplate({
-        langue: user.langue,
-        prenom: user.prenom,
-        lienVerification: `${origin}/verifier-email?token=${verifToken}`,
-      }),
-    });
+    if (modeEmailLocal()) {
+      afficherLienLocal({ libelle: "Lien de vérification de l'email", identifiant: user.identifiant, lien: lienVerification });
+    } else {
+      await envoyerEmail({
+        to: user.email,
+        subject: traduire(user.langue, "email.verification.sujet"),
+        html: emailVerificationTemplate({ langue: user.langue, prenom: user.prenom, lienVerification }),
+      });
+    }
   } catch (err) {
     throw new HttpError(502, `Impossible d'envoyer l'email : ${err.message}`);
   }
@@ -308,15 +313,18 @@ router.post("/mot-de-passe-oublie", motDePasseOublieLimiter, async (req, res) =>
   if (user?.email) {
     try {
       const resetToken = await creerToken({ userId: user.id, type: "REINITIALISATION_MOT_DE_PASSE", dureeMs: 60 * 60 * 1000 });
-      const origin = origineApplication(req);
-      await envoyerEmail({
-        to: user.email,
-        subject: traduire(user.langue, "email.reinitialisation.sujet"),
-        html: emailReinitialisationTemplate({
-          langue: user.langue,
-          lienReinitialisation: `${origin}/reinitialiser-mot-de-passe?token=${resetToken}`,
-        }),
-      });
+      const origin = origineLienLocal(req.get("origin"), origineApplication(req));
+      const lienReinitialisation = `${origin}/reinitialiser-mot-de-passe?token=${resetToken}`;
+      if (modeEmailLocal()) {
+        // Développement local sans Resend : le lien va dans le terminal du backend, jamais dans la réponse.
+        afficherLienLocal({ libelle: "Lien de réinitialisation du mot de passe", identifiant: user.identifiant, lien: lienReinitialisation });
+      } else {
+        await envoyerEmail({
+          to: user.email,
+          subject: traduire(user.langue, "email.reinitialisation.sujet"),
+          html: emailReinitialisationTemplate({ langue: user.langue, lienReinitialisation }),
+        });
+      }
     } catch (err) {
       log.error("erreur", { categorie: "email", operation: "mot_de_passe_oublie", userId: user.id, message: messageErreur(err) });
     }
