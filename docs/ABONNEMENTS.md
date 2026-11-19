@@ -5,7 +5,7 @@ Ce document décrit le système d'abonnement tel qu'il est **dans le code** à l
 ## 1. Principes
 
 1. **Aucun paiement n'est confirmé sur la foi d'un navigateur.** Un atelier *déclare* un paiement ; seule la décision du SUPERADMIN (paiement manuel) ou la relecture d'un paiement chez Wave par le serveur l'active.
-2. **Le prix est toujours calculé par le serveur**, d'après la formule et la durée. Un montant envoyé par le client est refusé.
+2. **Le prix vient toujours du catalogue, lu par le serveur** (formule et période mensuelle ou annuelle), puis figé dans l'abonnement et la transaction. Un montant envoyé par le client est refusé. Aucun prix n'est écrit dans le code ni proposé par défaut (voir §13).
 3. **Rien ne se supprime.** Rejet, annulation, expiration et remboursement sont des changements d'état datés, signés, motivés et historisés.
 4. **Chaque décision n'agit qu'une fois**, même rejouée ou simultanée (verrous, états relus sous verrou, événements dédoublonnés).
 5. **Aucune donnée d'atelier n'est jamais supprimée ni masquée** parce qu'un abonnement se termine : l'atelier passe en lecture seule.
@@ -14,7 +14,7 @@ Ce document décrit le système d'abonnement tel qu'il est **dans le code** à l
 
 | Table | Rôle |
 |---|---|
-| `PlanAbonnement` | Formule : nom, prix mensuel, fonctionnalités (texte), remises par durée, `limites` (quotas, voir §12), actif |
+| `PlanAbonnement` | Formule : nom, description, prix mensuel et prix annuel **optionnels** (XOF, entiers), fonctionnalités (texte), `limites` (quotas, voir §12), actif, pays/devise (`NE`/`XOF`). `tarifsDuree` est conservé mais n'alimente plus les offres (voir §13) |
 | `Abonnement` | Période d'accès d'un atelier : formule et durée figées, prix figé, dates, statut (`EN_ATTENTE`, `CONFIRME`, `ANNULE`, `SUSPENDU`) |
 | `Transaction` | Un paiement d'abonnement : moyen, montant, statut, qui l'a déclaré et quand, qui l'a tranché et quand, motifs de rejet et de remboursement, référence chez le prestataire |
 | `FactureAbonnement` | Justificatif numéroté (`FAC-AAAA-NNNN`), **immuable** : instantané de l'atelier, de la formule, de la période et du montant au jour de l'émission |
@@ -48,7 +48,7 @@ Restent possibles en lecture seule : l'état « lu » des notifications, le comp
 
 ### 5.1 Paiement manuel vérifié (actif)
 
-1. L'atelier choisit une formule et une durée proposée (`/abonnement`), lit les **instructions de paiement** saisies par la plateforme, paie hors de l'application, puis déclare : moyen, opérateur, **référence** (obligatoire sauf espèces).
+1. L'atelier choisit une formule et une période, **mensuelle** (1 mois) ou **annuelle** (12 mois), proposée avec un prix dans le catalogue (`/abonnement`), lit les **instructions de paiement** saisies par la plateforme, paie hors de l'application, puis déclare : moyen, opérateur, **référence** (obligatoire sauf espèces).
 2. Une transaction `EN_ATTENTE` est créée ; **aucun accès n'est accordé**. Le SUPERADMIN est prévenu par courriel s'il a une adresse.
 3. Le SUPERADMIN ouvre **Paiements** (`/paiements-abonnement`), rapproche la référence et le montant de son relevé, puis **confirme** ou **rejette** (motif obligatoire).
 4. À la confirmation : l'abonnement devient `CONFIRME`, la facture est émise, l'atelier est prévenu par courriel. Le début est **maintenant**, ou **l'échéance de l'abonnement en cours** (voir §6).
@@ -117,7 +117,7 @@ Le PDF s'intitule « Justificatif de paiement d'abonnement » et ne porte **aucu
 - Les revenus ne comptent que les paiements enregistrés ; les activations manuelles sans paiement sont signalées à part.
 - Limites chiffrées par formule : **appliquées** depuis les quotas commerciaux (voir §12).
 - Pas de relance d'impayé au-delà des rappels d'échéance ; pas de pénalité ; pas de facturation récurrente automatique (chaque renouvellement est une démarche de l'atelier).
-- Durée de grâce unique pour toute la plateforme ; tout est en FCFA.
+- Durée de grâce unique pour toute la plateforme ; tout est en FCFA (Niger uniquement : pas de conversion ni de tarification internationale).
 - Textes de courriels en français uniquement.
 
 ## 12. Quotas commerciaux des formules
@@ -185,3 +185,32 @@ Un atelier qui a bénéficié de l'essai n'a **pas** de plancher : à la fin de 
 - **Atelier ancien ayant un abonnement activé avant les quotas** : à son premier renouvellement vers une formule limitée, aucun plancher n'est calculé (il a déjà eu un abonnement activé) ; ses limites sont celles de la formule, strictes. À arbitrer si ce cas existe en production : une exception « premier abonnement soumis à des limites » serait une modification d'une fonction (`estEligiblePlancher`).
 - **Montée en gamme immédiate** : non développée ; un nouvel abonnement prend effet à l'échéance de l'abonnement en cours.
 - Les formules inactives ne sont plus proposées, mais restent attachées aux abonnements déjà souscrits.
+
+## 13. Tarification Niger (XOF) : formules mensuelles et annuelles
+
+Périmètre : **Niger uniquement**, franc CFA BCEAO (`XOF`, affiché « FCFA »). Aucun taux de change, aucune conversion, aucune zone tarifaire ; les colonnes `pays`/`devise` ne servent qu'à garder l'architecture extensible. Règles pures : `backend/src/lib/tarifs.js`.
+
+### Catalogue (administré par le SUPERADMIN, « Formules et tarification »)
+
+- `prixMensuel` (1 mois) et `prixAnnuel` (12 mois) : entiers XOF strictement positifs, **tous deux optionnels**. Une période sans prix **n'est pas proposée** ; une formule sans aucun prix n'est pas proposée du tout. Aucun prix par défaut, aucune formule gratuite.
+- Le prix annuel est **saisi tel quel** (jamais calculé). L'**économie annuelle** (`mensuel × 12 − annuel`) est calculée automatiquement et affichée **à titre informatif** ; elle n'est jamais stockée ni appliquée.
+- Une formule créée est **inactive**. Elle ne peut être **activée** que si elle a au moins un prix valide **et** si ses **quatre quotas sont définis** (une limite entière, ou « illimité » choisi explicitement). Une limite non définie n'est **jamais** traitée comme illimitée pour décider de proposer une formule (409 `details.activation`).
+- Formules antérieures (limites `{}`) : non réévaluées tant qu'on ne les réactive pas ; un abonnement qui en dépend reste illimité (voir §12).
+- Les anciennes durées de 3 et 6 mois et les remises en pourcentage ne sont plus proposées. Les contrats existants gardent leur prix et leur durée figés.
+
+### Souscription et activation
+
+- **Déclaration par l'atelier** (`POST /api/abonnements/souscrire`) : `dureeMois` vaut 1 ou 12 et doit avoir un prix dans le catalogue, sinon 400. Le prix lu à ce moment est **figé** dans l'abonnement et la transaction (devise `XOF`). Modifier le catalogue ensuite ne change ni un paiement en attente, ni un abonnement actif.
+- **Un paiement en attente n'active rien** : ni accès, ni quotas, ni fonctionnalités, jusqu'à la confirmation du SUPERADMIN (ou, plus tard, de Wave).
+- **Activation manuelle SuperAdmin** (`POST /api/ateliers/:id/abonnement/activer`) : `mode: "CATALOGUE"` (période mensuelle ou annuelle, prix du catalogue) ou `mode: "EXCEPTIONNEL"` (durée ou date d'expiration **et** montant entier saisis, **motif obligatoire**). Prix et durée sont figés ; l'abonnement est marqué `tarifExceptionnel`. Aucun prix n'est déduit.
+- **Quotas** : inchangés. Un abonnement annuel est un abonnement de 12 mois ; ses limites sont figées comme celles d'un mensuel.
+
+### Paiements en XOF
+
+- Montants entiers uniquement. **Wave reste inactif** ; avant toute session, le montant doit être un entier strictement positif (sinon refus, sans appel réseau). Sa disponibilité au Niger n'est pas confirmée.
+- Paiements manuels : inchangés (déclaration, puis confirmation humaine).
+- Aucun prestataire de paiement local n'a d'API publique documentée.
+
+### Suivi par formule
+
+`GET /api/plans-abonnement/:id/abonnes` (SuperAdmin) : ateliers actuellement abonnés, prix figé, période, revenu mensuel récurrent. Les revenus globaux restent dans le tableau commercial.

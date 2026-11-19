@@ -151,22 +151,24 @@ test.describe("SuperAdmin : formules et utilisation", () => {
     const carte = page.getByTestId("quotas-formule").first();
     await expect(carte).toBeVisible();
 
-    await page.getByRole("button", { name: "Nouveau plan" }).click();
+    await page.getByRole("button", { name: "Nouvelle formule" }).click();
     await page.getByLabel(/^Nom/).first().fill("Pro E2E Quotas");
     await page.getByLabel(/^Prix mensuel/).fill("15000");
     await expect(page.getByTestId("champs-quotas")).toBeVisible();
     await page.getByTestId("quota-clientes").fill("500");
     await page.getByTestId("quota-employes").fill("5");
-    await page.getByRole("button", { name: "Créer le plan" }).click();
+    await page.getByRole("button", { name: "Créer la formule" }).click();
     const nouvelle = page.locator("div", { has: page.getByText("Pro E2E Quotas", { exact: true }) }).filter({ has: page.getByTestId("quotas-formule") }).last();
     await expect(nouvelle.getByTestId("quotas-formule")).toContainText("Clientes : 500");
     await expect(nouvelle.getByTestId("quotas-formule")).toContainText("Employés : 5");
-    await expect(nouvelle.getByTestId("quotas-formule")).toContainText("Modèles : Illimité");
+    // Une limite non décidée n'est JAMAIS « illimitée » par défaut : la formule reste non proposée.
+    await expect(nouvelle.getByTestId("etat-commercial")).toContainText("Non proposée aux ateliers");
+    await expect(nouvelle.getByTestId("quotas-formule")).toContainText("Modèles : Non défini");
   });
 
   test("valeurs refusées par l'API (zéro, trop grand) : 400, aucune formule créée", async ({ request }) => {
     for (const limites of [{ clientes: 0 }, { modeles: 1_000_001 }]) {
-      const res = await request.post("/api/plans-abonnement", { data: { nom: "Invalide E2E", prixMensuel: "1000", limites } });
+      const res = await request.post("/api/plans-abonnement", { data: { nom: "Invalide E2E", prixMensuel: 1000, limites } });
       expect(res.status()).toBe(400);
     }
   });
