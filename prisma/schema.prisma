@@ -849,6 +849,8 @@ model Abonnement {
   // antérieurs aux quotas) = illimité : aucun quota n'est attribué automatiquement.
   limites        Json               @default("{}")
   plancher       Json               @default("{}")
+  // Activation EXCEPTIONNELLE par le SUPERADMIN : durée et montant saisis explicitement (et figés ici), hors catalogue.
+  tarifExceptionnel Boolean           @default(false)
   statut         StatutAbonnement   @default(EN_ATTENTE)
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
@@ -873,6 +875,8 @@ model Transaction {
   // Notre clé d'idempotence — envoyée à Wave comme client_reference : permet
   // de retrouver la transaction depuis le webhook sans jamais en créer deux
   // pour un même paiement (rejeu webhook, double-clic sur "Payer"...).
+  // Devise de la transaction (figée) : XOF. Wave n'est jamais appelé pour une autre devise.
+  devise               String             @default("XOF")
   referenceInterne     String             @unique
   // Id de session Wave (cos-...), ou référence de transfert saisie
   // manuellement pour NITA/Amana (voir confirmeManuellement ci-dessous).
@@ -970,7 +974,15 @@ model PlanAbonnement {
   id              String   @id @default(cuid())
   nom             String   @unique
   description     String?
-  prixMensuel     Decimal  @db.Decimal(10, 2)
+  // Tarifs du catalogue, en FRANC CFA BCEAO (XOF), entiers, administrés par le SUPERADMIN (jamais codés en dur). Chacun est
+  // OPTIONNEL : une période sans prix n'est pas proposée, une formule sans aucun prix n'est pas proposée du tout. Aucun prix
+  // par défaut. Le prix annuel est saisi tel quel (jamais calculé) ; l'économie annuelle affichée est purement informative.
+  prixMensuel     Decimal? @db.Decimal(10, 2)
+  prixAnnuel      Decimal? @db.Decimal(10, 2)
+  // Périmètre commercial : Niger uniquement, pour l'instant (aucune conversion, aucune tarification par zone). Colonnes
+  // posées pour permettre d'autres pays plus tard ; non modifiables par l'API aujourd'hui.
+  pays            String   @default("NE")
+  devise          String   @default("XOF")
   fonctionnalites String[]
   // Limites chiffrées (ex. { "clientes": 500, "comptes": 3 }). Vide = aucune limite. Structure prévue ; aucune
   // limite n'est appliquée par le code tant qu'elle n'est pas définie par le SUPERADMIN (décision 15/11/2026).
