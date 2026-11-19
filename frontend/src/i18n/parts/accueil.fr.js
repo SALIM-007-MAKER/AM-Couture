@@ -1,0 +1,40 @@
+// Traductions FR — espaces de travail par métier (accueil d'un employé). Namespace « accueil ».
+export default {
+  accueil: {
+    titre: "Bonjour {{nom}}",
+    sousTitre: {
+      couturier: "Vos commandes à confectionner, de la plus proche échéance à la plus lointaine.",
+      receptionniste: "Les demandes à traiter, les commandes à remettre et celles en retard.",
+      magasinier: "Les matières à surveiller et les marchandises attendues.",
+      comptable: "Les indicateurs financiers, les derniers paiements et les dernières dépenses.",
+      general: "Votre espace de travail. Les écrans auxquels vous avez accès sont dans le menu.",
+    },
+    voirTout: "Tout voir",
+    raccourcis: "Raccourcis",
+    tableauDeBord: "Tableau de bord complet",
+    aucunEspace: "Aucune information à afficher pour le moment. Demandez au responsable de l'atelier de vous donner accès aux écrans dont vous avez besoin.",
+    actions: {
+      calendrier: "Calendrier des échéances",
+      nouvelleCliente: "Nouvelle cliente",
+      nouvelleCommande: "Nouvelle commande",
+      livraisons: "Livraisons",
+      nouvelArticle: "Nouvel article",
+      nouvelAchat: "Nouvel achat",
+      fournisseurs: "Fournisseurs",
+      nouvelleDepense: "Nouvelle dépense",
+      paiements: "Paiements",
+      rapports: "Rapports",
+    },
+    sections: {
+      mesTravaux: { titre: "Mes commandes à confectionner", vide: "Aucune commande ne vous est affectée pour le moment.", enRetard: "En retard", echeance: "Pour le {{date}}", sansDate: "Sans date" },
+      demandesAttente: { titre: "Demandes à traiter", vide: "Aucune demande en attente." },
+      commandesALivrer: { titre: "Commandes prêtes à livrer", vide: "Aucune commande terminée en attente de remise." },
+      commandesEnRetard: { titre: "Commandes en retard", vide: "Aucune commande en retard." },
+      alertesStock: { titre: "Stock sous le seuil", vide: "Aucun article sous son seuil d'alerte.", reste: "{{quantite}} (seuil {{seuil}})" },
+      achatsAttendus: { titre: "Marchandises attendues", vide: "Aucune réception en attente.", attendu: "Attendu le {{date}}" },
+      indicateursFinanciers: { titre: "Ce mois-ci", encaisse: "Encaissé", depenses: "Dépenses", resultat: "Résultat de trésorerie", impayees: "Commandes non soldées" },
+      paiementsRecents: { titre: "Derniers paiements", vide: "Aucun paiement enregistré." },
+      depensesRecentes: { titre: "Dernières dépenses", vide: "Aucune dépense enregistrée." },
+    },
+  },
+};

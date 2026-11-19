@@ -15,7 +15,9 @@ export function peut(user, permission) {
 
 /** Permission requise pour afficher chaque écran de l'atelier (aussi utilisée par la navigation). `null` = tout membre. */
 export const PERMISSION_PAR_CHEMIN = {
-  "/": "dashboard.lire",
+  // Accueil : ouvert à tout membre (le PDG y voit le tableau de bord, un employé son espace de travail, voir features/accueil).
+  "/": null,
+  "/tableau-de-bord": "dashboard.lire",
   "/clientes": "clientes.lire",
   "/modeles": "modeles.lire",
   "/stock": "stock.lire",
@@ -47,12 +49,9 @@ export function peutAcceder(user, chemin) {
   return requise === null ? Boolean(user) : peut(user, requise);
 }
 
-// Ordre de recherche de la page d'accueil d'un employé : la première à laquelle il a droit.
-const ORDRE_ACCUEIL = ["/", "/commandes", "/clientes", "/stock", "/modeles", "/demandes", "/livraisons", "/notifications", "/compte"];
-
-/** Page d'accueil d'un employé : tableau de bord s'il y a droit, sinon son premier écran autorisé ; « Mon compte » au pire. */
-export function cheminAccueilEmploye(user) {
-  return ORDRE_ACCUEIL.find((chemin) => peutAcceder(user, chemin)) ?? "/compte";
+/** Page d'accueil d'un employé : son espace de travail (« / »), qui n'affiche que ce que ses droits permettent. */
+export function cheminAccueilEmploye() {
+  return "/";
 }
 
 /** Retire des groupes de navigation les entrées auxquelles le compte n'a pas droit, et les groupes devenus vides. */

@@ -143,7 +143,11 @@ function NavContent({ collapsed, onNavigate, groups = NAV_GROUPS }) {
   const { t } = useTranslation();
   const { data: user } = useMeQuery();
   // Un employé ne voit que les écrans auxquels il a droit ; le PDG voit tout.
-  const visibles = filtrerNavigation(groups, user);
+  const visibles = filtrerNavigation(groups, user).map((groupe) => ({
+    ...groupe,
+    // L'entrée « / » est le tableau de bord du PDG mais l'espace de travail d'un employé : on la nomme en conséquence.
+    items: groupe.items.map((item) => (item.to === "/" && user?.role === "EMPLOYE" ? { ...item, labelKey: "nav.home" } : item)),
+  }));
   return (
     <nav className="flex flex-col gap-4 p-3">
       {visibles.map((group) => (

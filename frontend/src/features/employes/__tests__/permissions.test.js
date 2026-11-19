@@ -47,12 +47,18 @@ test("chaque écran d'administration est réservé au PDG", () => {
   for (const chemin of ["/parametres", "/abonnement", "/employes"]) assert.equal(PERMISSION_PAR_CHEMIN[chemin], ADMIN_SEUL, chemin);
 });
 
-test("cheminAccueilEmploye : premier écran autorisé, « Mon compte » à défaut", () => {
-  assert.equal(cheminAccueilEmploye(employe("dashboard.lire", "commandes.lire")), "/");
-  assert.equal(cheminAccueilEmploye(employe("commandes.lire")), "/commandes");
-  assert.equal(cheminAccueilEmploye(employe("stock.lire")), "/stock");
-  assert.equal(cheminAccueilEmploye(employe()), "/compte");
-  assert.equal(cheminAccueilEmploye(employe("depenses.lire")), "/compte", "un écran d'argent n'est jamais une page d'accueil par défaut");
+test("cheminAccueilEmploye : toujours l'espace de travail « / », ouvert à tout membre quels que soient ses droits", () => {
+  for (const droits of [[], ["commandes.lire"], ["stock.lire"], ["depenses.lire"], ["dashboard.lire", "commandes.lire"]]) {
+    const e = employe(...droits);
+    assert.equal(cheminAccueilEmploye(e), "/");
+    assert.equal(peutAcceder(e, "/"), true, "l'accueil est accessible : aucune redirection en boucle");
+  }
+});
+
+test("le tableau de bord complet reste réservé à « dashboard.lire » pour un employé", () => {
+  assert.equal(peutAcceder(employe("commandes.lire"), "/tableau-de-bord"), false);
+  assert.equal(peutAcceder(employe("dashboard.lire"), "/tableau-de-bord"), true);
+  assert.equal(peutAcceder(pdg, "/tableau-de-bord"), true);
 });
 
 test("filtrerNavigation : retire les entrées interdites et les groupes vides, sans modifier l'original", () => {
@@ -62,7 +68,7 @@ test("filtrerNavigation : retire les entrées interdites et les groupes vides, s
     { labelKey: "c", items: [{ to: "/parametres" }, { to: "/compte" }] },
   ];
   const filtre = filtrerNavigation(groupes, employe("clientes.lire"));
-  assert.deepEqual(filtre.map((g) => [g.labelKey, g.items.map((i) => i.to)]), [["a", ["/clientes"]], ["c", ["/compte"]]]);
+  assert.deepEqual(filtre.map((g) => [g.labelKey, g.items.map((i) => i.to)]), [["a", ["/", "/clientes"]], ["c", ["/compte"]]]);
   assert.equal(groupes[1].items.length, 2);
   assert.equal(filtrerNavigation(groupes, pdg).length, 3);
 });

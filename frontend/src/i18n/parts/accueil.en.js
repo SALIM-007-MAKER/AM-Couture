@@ -1,0 +1,40 @@
+// English translations — job-based workspaces (an employee's home screen). Namespace "accueil".
+export default {
+  accueil: {
+    titre: "Hello {{nom}}",
+    sousTitre: {
+      couturier: "Your orders to make, from the nearest deadline to the furthest.",
+      receptionniste: "Requests to handle, orders to hand over and late ones.",
+      magasinier: "Materials to watch and goods on their way.",
+      comptable: "Financial indicators, latest payments and latest expenses.",
+      general: "Your workspace. The screens you can access are in the menu.",
+    },
+    voirTout: "View all",
+    raccourcis: "Shortcuts",
+    tableauDeBord: "Full dashboard",
+    aucunEspace: "Nothing to show for now. Ask the workshop manager to give you access to the screens you need.",
+    actions: {
+      calendrier: "Deadline calendar",
+      nouvelleCliente: "New client",
+      nouvelleCommande: "New order",
+      livraisons: "Deliveries",
+      nouvelArticle: "New item",
+      nouvelAchat: "New purchase",
+      fournisseurs: "Suppliers",
+      nouvelleDepense: "New expense",
+      paiements: "Payments",
+      rapports: "Reports",
+    },
+    sections: {
+      mesTravaux: { titre: "My orders to make", vide: "No order is assigned to you right now.", enRetard: "Late", echeance: "Due {{date}}", sansDate: "No date" },
+      demandesAttente: { titre: "Requests to handle", vide: "No pending request." },
+      commandesALivrer: { titre: "Orders ready to hand over", vide: "No finished order waiting to be handed over." },
+      commandesEnRetard: { titre: "Late orders", vide: "No late order." },
+      alertesStock: { titre: "Stock below threshold", vide: "No item below its alert threshold.", reste: "{{quantite}} (threshold {{seuil}})" },
+      achatsAttendus: { titre: "Goods on their way", vide: "No pending receipt.", attendu: "Expected {{date}}" },
+      indicateursFinanciers: { titre: "This month", encaisse: "Collected", depenses: "Expenses", resultat: "Cash result", impayees: "Orders not fully paid" },
+      paiementsRecents: { titre: "Latest payments", vide: "No payment recorded." },
+      depensesRecentes: { titre: "Latest expenses", vide: "No expense recorded." },
+    },
+  },
+};

@@ -27,6 +27,7 @@ const GestionPlansPage = lazy(() => import("./pages/superadmin/GestionPlansPage.
 const PaiementsAbonnementPage = lazy(() => import("./pages/superadmin/PaiementsAbonnementPage.jsx"));
 const CommercePage = lazy(() => import("./pages/superadmin/CommercePage.jsx"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
+const AccueilPage = lazy(() => import("./features/accueil/AccueilPage.jsx"));
 const FinancesPage = lazy(() => import("./pages/FinancesPage.jsx"));
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 const ClientesListPage = lazy(() => import("./features/clientes/ClientesListPage.jsx"));
@@ -114,8 +115,10 @@ export default function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<RequireAtelier />}>
           <Route element={<AppLayout />}>
+            {/* Accueil ouvert à tout membre : le PDG y trouve le tableau de bord, un employé l'espace de son métier. */}
+            <Route path="/" element={<AccueilPage />} />
             <Route element={<RequirePermission permission="dashboard.lire" />}>
-              <Route path="/" element={<DashboardPage />} />
+              <Route path="/tableau-de-bord" element={<DashboardPage />} />
             </Route>
             <Route element={<RequirePermission permission="clientes.lire" />}>
               <Route path="/clientes" element={<ClientesListPage />} />
