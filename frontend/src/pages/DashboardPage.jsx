@@ -1,4 +1,5 @@
 import { useCan } from "../hooks/usePermissions.js";
+import { lienToutVoir } from "../features/dashboard/liens.js";
 import { useSearchParams, Link } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -82,7 +83,7 @@ function WatchList({ icon: Icon, tone, title, items, isPending, isError, error, 
           <Icon className="size-4" aria-hidden="true" />
           {title}
         </h3>
-        {!isPending && !isError && items.length > 0 && (
+        {viewAllTo && !isPending && !isError && items.length > 0 && (
           <Link to={viewAllTo} className="text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 inline-flex items-center gap-0.5">
             {t("common.viewAll")} <ArrowRight className="size-3" aria-hidden="true" />
           </Link>
@@ -115,7 +116,8 @@ function WatchList({ icon: Icon, tone, title, items, isPending, isError, error, 
 }
 
 export default function DashboardPage() {
-  const voirFinances = useCan()("finances.voir");
+  const can = useCan();
+  const voirFinances = can("finances.voir");
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const periodValue = {
@@ -235,7 +237,7 @@ export default function DashboardPage() {
             onRetry={enRetardQuery.refetch}
             renderMeta={(c) => t("dashboard.lateOrdersMeta", { jours: c.joursDeRetard })}
             emptyLabel={t("dashboard.lateOrdersEmpty")}
-            viewAllTo="/rapports"
+            viewAllTo={lienToutVoir(can, "enRetard")}
           />
           <WatchList
             icon={Truck}
@@ -248,7 +250,7 @@ export default function DashboardPage() {
             onRetry={aLivrerQuery.refetch}
             renderMeta={(c) => (isToday(c.dateLivraisonPrevue) ? t("common.today") : formatDate(c.dateLivraisonPrevue))}
             emptyLabel={t("dashboard.upcomingDeliveriesEmpty", { jours: HORIZON_JOURS })}
-            viewAllTo="/rapports"
+            viewAllTo={lienToutVoir(can, "aLivrer", { jours: HORIZON_JOURS })}
           />
         </div>
       </section>

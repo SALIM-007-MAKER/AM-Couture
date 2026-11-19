@@ -210,6 +210,8 @@ export default {
     allStatuts: "All statuses",
     allPriorites: "All priorities",
     emptyFiltered: "No order matches these criteria.",
+    filtreLivraison: "Delivery from {{du}} to {{au}}",
+    retirerFiltreLivraison: "Clear",
     emptyAll: "No orders yet.",
     colNumero: "No.",
     colClient: "Client",

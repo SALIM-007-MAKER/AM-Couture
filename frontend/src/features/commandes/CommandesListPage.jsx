@@ -33,10 +33,15 @@ export default function CommandesListPage() {
   const priorite = searchParams.get("priorite") ?? "";
   const assigneA = searchParams.get("assigneA") ?? "";
   const enRetard = searchParams.get("enRetard") === "true";
+  // Fenêtre de livraison (AAAA-MM-JJ), posée par les liens « Tout voir » du tableau de bord ; ignorée si elle n'a pas ce format.
+  const dateValide = (v) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : "");
+  const livraisonDu = dateValide(searchParams.get("livraisonDu"));
+  const livraisonAu = dateValide(searchParams.get("livraisonAu"));
+  const filtreLivraison = Boolean(livraisonDu || livraisonAu);
   const [qInput, setQInput] = useState(searchParams.get("q") ?? "");
   const q = useDebouncedValue(qInput, 300);
 
-  const params = { q, statut: statut || undefined, priorite: priorite || undefined, assigneA: assigneA || undefined, enRetard: enRetard ? "true" : undefined, page, pageSize: PAGE_SIZE };
+  const params = { q, statut: statut || undefined, priorite: priorite || undefined, assigneA: assigneA || undefined, enRetard: enRetard ? "true" : undefined, livraisonDu: livraisonDu || undefined, livraisonAu: livraisonAu || undefined, page, pageSize: PAGE_SIZE };
   const { data, isPending, isError, error, refetch, isFetching } = useCommandesQuery(params);
 
   function updateParams(patch) {
@@ -135,6 +140,19 @@ export default function CommandesListPage() {
           />
           {t("prod.filtreRetard")}
         </label>
+        {filtreLivraison && (
+          <span className="inline-flex items-center gap-2 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 text-xs px-3 py-1" data-testid="filtre-livraison">
+            {t("commandes.filtreLivraison", { du: livraisonDu ? formatDate(`${livraisonDu}T12:00:00`) : "…", au: livraisonAu ? formatDate(`${livraisonAu}T12:00:00`) : "…" })}
+            <button
+              type="button"
+              className="underline"
+              onClick={() => updateParams({ livraisonDu: undefined, livraisonAu: undefined, page: undefined })}
+              data-testid="retirer-filtre-livraison"
+            >
+              {t("commandes.retirerFiltreLivraison")}
+            </button>
+          </span>
+        )}
       </div>
 
       {isPending && <LoadingState label={t("common.loading")} />}
@@ -142,7 +160,7 @@ export default function CommandesListPage() {
 
       {data && data.data.length === 0 && (
         <EmptyState icon={ClipboardList}>
-          {q || statut || priorite || assigneA || enRetard ? t("commandes.emptyFiltered") : t("commandes.emptyAll")}
+          {q || statut || priorite || assigneA || enRetard || filtreLivraison ? t("commandes.emptyFiltered") : t("commandes.emptyAll")}
         </EmptyState>
       )}
 
