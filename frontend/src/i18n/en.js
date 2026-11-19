@@ -80,7 +80,7 @@ export default {
     calendar: "Calendar",
     settings: "Settings",
     myAccount: "My account",
-    subscription: "Subscription",
+    subscription: "Subscription and pricing",
     employees: "Employees",
     production: "Production",
     suppliers: "Suppliers",

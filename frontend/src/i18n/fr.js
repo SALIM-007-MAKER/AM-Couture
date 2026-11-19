@@ -81,7 +81,7 @@ export default {
     calendar: "Calendrier",
     settings: "Paramètres",
     myAccount: "Mon compte",
-    subscription: "Abonnement",
+    subscription: "Abonnement et tarifs",
     employees: "Employés",
     production: "Production",
     suppliers: "Fournisseurs",

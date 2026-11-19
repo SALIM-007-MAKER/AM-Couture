@@ -8,6 +8,7 @@ export default {
       modeles: "Modèles",
     },
     illimite: "Illimité",
+    nonDefini: "Non défini",
     // Message d'une création refusée (409, details.quota) — {{limite}} et {{usage}} viennent du serveur.
     atteint: {
       clientes: "Votre formule ne permet pas d'ajouter de cliente : la limite de {{limite}} est atteinte ({{usage}} en cours). Archivez une fiche ou changez de formule.",
@@ -40,7 +41,7 @@ export default {
     },
     admin: {
       limitsTitle: "Quotas de la formule",
-      limitsHint: "Laissez un champ vide pour « illimité ». Entiers de 1 à 1 000 000. Ces limites sont copiées dans chaque nouvel abonnement : les abonnements déjà souscrits ne changent pas.",
+      limitsHint: "Pour chaque ressource, saisissez une limite (entier de 1 à 1 000 000) ou cochez « Illimité ». Un champ laissé vide est NON DÉFINI : la formule ne peut pas être activée tant que les quatre quotas ne sont pas décidés. Ces limites sont copiées dans chaque nouvel abonnement : les abonnements déjà souscrits ne changent pas.",
       limitsPlaceholder: "Illimité",
       voirDepassements: "Ateliers au-dessus de ces limites",
       masquerDepassements: "Masquer",

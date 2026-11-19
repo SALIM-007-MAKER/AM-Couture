@@ -15,7 +15,8 @@ import { LoadingState, ErrorState, EmptyState } from "../../components/QueryStat
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import SectionTitle from "../../components/SectionTitle.jsx";
-import DureeSelector from "./components/DureeSelector.jsx";
+import PeriodeSelector from "./components/PeriodeSelector.jsx";
+import { periodesProposees, moisOffertsMax } from "./tarifs.js";
 import PlansIncluded from "./components/PlansIncluded.jsx";
 import PlansFaq from "./components/PlansFaq.jsx";
 import ContactBanner from "./components/ContactBanner.jsx";
@@ -30,7 +31,7 @@ function InfoRow({ label, value }) {
   );
 }
 
-// Page Abonnement du PDG : état, formules, souscription et historique des paiements.
+// Page « Abonnement et tarifs » du PDG : état, quotas, formules (mensuel / annuel), souscription et historique des paiements.
 // Souscrire = DÉCLARER un paiement fait hors de l'application (ou, si Wave est activé, l'ouvrir en ligne). Aucun clic
 // n'est jamais une confirmation : l'abonnement n'est activé qu'après vérification du paiement par le serveur, et
 // l'état affiché vient uniquement du serveur (GET /api/abonnements/etat, rafraîchi automatiquement).
@@ -43,7 +44,7 @@ export default function AbonnementPage() {
   const essai = etat?.essai;
   const whatsapp = etat?.contact?.whatsapp;
   const plans = plansQuery.data ?? [];
-  const [choix, setChoix] = useState(null); // { plan, tarif } : formule choisie pour souscrire
+  const [choix, setChoix] = useState(null); // { plan, offre } : formule et période choisies pour souscrire
   const [message, setMessage] = useState(null); // { type: "ok" | "info" | "erreur", cle }
   const location = useLocation();
   const navigate = useNavigate();
@@ -81,13 +82,12 @@ export default function AbonnementPage() {
     })();
   }, [location.search, navigate, verifier]);
 
-  // Durées proposées = union des tarifs de tous les plans (données serveur).
-  // Par défaut : la durée de l'abonnement actif si elle existe, sinon la plus courte.
-  const durees = [...new Set(plans.flatMap((p) => p.tarifs.map((x) => x.dureeMois)))].sort((a, b) => a - b);
-  const [dureeChoisie, setDureeChoisie] = useState(null);
-  const dureeParDefaut = etat?.statut === "ACTIF" && durees.includes(abonnement?.dureeMois) ? abonnement.dureeMois : durees[0];
-  const duree = durees.includes(dureeChoisie) ? dureeChoisie : dureeParDefaut;
-  const remiseMax = Math.max(0, ...plans.map((p) => p.tarifs.find((x) => x.dureeMois === duree)?.remisePourcent ?? 0));
+  // Périodes proposées = celles qui ont un prix dans au moins une formule (offres du catalogue, données serveur) : mensuel et/ou
+  // annuel. Par défaut : la période de l'abonnement actif si elle existe (12 mois = annuel), sinon la première proposée.
+  const periodes = periodesProposees(plans);
+  const [periodeChoisie, setPeriodeChoisie] = useState(null);
+  const periodeParDefaut = etat?.statut === "ACTIF" && abonnement?.dureeMois === 12 && periodes.includes("ANNUEL") ? "ANNUEL" : periodes[0];
+  const periode = periodes.includes(periodeChoisie) ? periodeChoisie : periodeParDefaut;
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -178,9 +178,9 @@ export default function AbonnementPage() {
 
       {choix && peutDeclarer(etat) && (
         <DeclarationPaiement
-          key={`${choix.plan.id}-${choix.tarif.dureeMois}`}
+          key={`${choix.plan.id}-${choix.offre.dureeMois}`}
           plan={choix.plan}
-          tarif={choix.tarif}
+          offre={choix.offre}
           instructions={etat?.instructionsPaiement}
           waveDisponible={Boolean(etat?.paiementsEnLigne?.wave)}
           onClose={() => setChoix(null)}
@@ -199,16 +199,16 @@ export default function AbonnementPage() {
         {plansQuery.data && plans.length === 0 && <EmptyState icon={Layers}>{t("sub.plansEmpty")}</EmptyState>}
         {plans.length > 0 && (
           <>
-            <DureeSelector durees={durees} value={duree} onChange={setDureeChoisie} remiseMax={remiseMax} />
+            <PeriodeSelector periodes={periodes} value={periode} onChange={setPeriodeChoisie} moisOffertsMax={moisOffertsMax(plans)} />
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
               {plans.map((plan) => (
                 <PlanCard
                   key={plan.id}
                   plan={plan}
-                  dureeMois={duree}
+                  periodicite={periode}
                   courant={etat?.statut === "ACTIF" && abonnement?.planNom === plan.nom}
                   whatsapp={whatsapp}
-                  onSouscrire={peutDeclarer(etat) ? (p, tarif) => setChoix({ plan: p, tarif }) : undefined}
+                  onSouscrire={peutDeclarer(etat) ? (p, offre) => setChoix({ plan: p, offre }) : undefined}
                 />
               ))}
             </div>

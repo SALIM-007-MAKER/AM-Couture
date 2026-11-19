@@ -8,6 +8,7 @@ export default {
       modeles: "Models",
     },
     illimite: "Unlimited",
+    nonDefini: "Not defined",
     atteint: {
       clientes: "Your plan does not allow adding a client: the limit of {{limite}} is reached ({{usage}} in use). Archive a record or change plan.",
       employes: "Your plan does not allow adding an employee: the limit of {{limite}} is reached ({{usage}} in use). Deactivate an account or change plan.",
@@ -39,7 +40,7 @@ export default {
     },
     admin: {
       limitsTitle: "Plan quotas",
-      limitsHint: "Leave a field empty for “unlimited”. Whole numbers from 1 to 1,000,000. These limits are copied into each new subscription: subscriptions already taken are not changed.",
+      limitsHint: "For each resource, enter a limit (whole number from 1 to 1,000,000) or tick “Unlimited”. An empty field is NOT DEFINED: the plan cannot be activated until all four quotas are decided. These limits are copied into each new subscription: subscriptions already taken are not changed.",
       limitsPlaceholder: "Unlimited",
       voirDepassements: "Workshops above these limits",
       masquerDepassements: "Hide",

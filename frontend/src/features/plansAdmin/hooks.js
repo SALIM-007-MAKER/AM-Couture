@@ -8,6 +8,10 @@ export function useDepassementsPlanQuery(id, enabled) {
   return useQuery({ queryKey: ["plans-abonnement", "depassements", id], queryFn: () => plansAdminApi.depassements(id), enabled: Boolean(id) && enabled });
 }
 
+export function useAbonnesPlanQuery(id, enabled) {
+  return useQuery({ queryKey: ["plans-abonnement", "abonnes", id], queryFn: () => plansAdminApi.abonnes(id), enabled: Boolean(id) && enabled });
+}
+
 export function usePlansTousQuery() {
   return useQuery({ queryKey: KEY, queryFn: () => plansAdminApi.tous() });
 }
