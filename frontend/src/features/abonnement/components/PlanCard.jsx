@@ -3,6 +3,7 @@ import { formatPrix, lienWhatsapp } from "../constants.js";
 import Card from "../../../components/Card.jsx";
 import Button from "../../../components/Button.jsx";
 import { useTranslation } from "../../../i18n/index.js";
+import { RESSOURCES, formaterLimite } from "../quotas.js";
 
 // Une formule (style « page de tarifs »). `courant` = la formule de
 // l'abonnement ACTIF du PDG : carte mise en avant, variante sombre (mêmes
@@ -73,6 +74,14 @@ export default function PlanCard({ plan, dureeMois, courant, whatsapp, onSouscri
         )}
       </div>
 
+      <ul className={`space-y-1 text-sm ${sombre ? "text-brand-100" : "text-neutral-700 dark:text-neutral-300"}`} data-testid="quotas-formule">
+        {RESSOURCES.map((cle) => (
+          <li key={cle} className="flex items-center justify-between gap-3">
+            <span>{t(`quotas.ressources.${cle}`)}</span>
+            <span className="font-medium tabular-nums">{formaterLimite(plan.limites?.[cle]) ?? t("quotas.illimite")}</span>
+          </li>
+        ))}
+      </ul>
       {plan.fonctionnalites.length > 0 ? (
         <ul className={`flex-1 space-y-2 text-sm ${sombre ? "text-brand-100" : "text-neutral-600 dark:text-neutral-400"}`}>
           {plan.fonctionnalites.map((f) => (

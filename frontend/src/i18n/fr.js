@@ -19,6 +19,7 @@ import demandesVitrine from "./parts/demandesVitrine.fr.js";
 import donnees from "./parts/donnees.fr.js";
 import rapportsAvances from "./parts/rapportsAvances.fr.js";
 import accueil from "./parts/accueil.fr.js";
+import quotas from "./parts/quotas.fr.js";
 
 export default {
   ...shared,
@@ -38,6 +39,7 @@ export default {
   ...donnees,
   ...rapportsAvances,
   ...accueil,
+  ...quotas,
   common: {
     save: "Enregistrer",
     cancel: "Annuler",

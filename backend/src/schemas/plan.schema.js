@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { normalizeText } from "../lib/zodHelpers.js";
 import { decimalField } from "../lib/decimalField.js";
+import { LIMITE_MIN, LIMITE_MAX } from "../lib/quotas.js";
 
 // Plans d'abonnement de la plateforme (Essentiel, Professionnel...), gérés
 // par le SUPERADMIN — voir plans.routes.js. Prix MENSUEL ; la durée d'un
@@ -32,6 +33,22 @@ const tarifsDureeField = z
   .max(8, "8 durées maximum.")
   .refine((l) => new Set(l.map((t) => t.dureeMois)).size === l.length, "Chaque durée ne peut apparaître qu'une fois.");
 
+// Quotas de la formule : une clé absente = illimité ; entiers de LIMITE_MIN à LIMITE_MAX (1 à 1 000 000, zéro interdit). Copiés dans chaque nouvel
+// abonnement (Abonnement.limites) : modifier une formule ne touche que les futures souscriptions.
+const limiteField = z
+  .number({ error: "Nombre entier requis." })
+  .int("Nombre entier requis.")
+  .min(LIMITE_MIN, `Au moins ${LIMITE_MIN}.`)
+  .max(LIMITE_MAX, `${LIMITE_MAX.toLocaleString("fr-FR")} maximum.`);
+export const limitesField = z
+  .object({
+    clientes: limiteField.optional(),
+    employes: limiteField.optional(),
+    commandesActives: limiteField.optional(),
+    modeles: limiteField.optional(),
+  })
+  .strict();
+
 export const creerPlanSchema = z
   .object({
     nom: nomField,
@@ -39,6 +56,7 @@ export const creerPlanSchema = z
     prixMensuel: prixField,
     fonctionnalites: fonctionnalitesField.optional().default([]),
     tarifsDuree: tarifsDureeField.optional().default([]),
+    limites: limitesField.optional().default({}),
     ordre: z.number().int().min(0).max(999).optional().default(0),
   })
   .strict();
@@ -50,6 +68,7 @@ export const patchPlanSchema = z
     prixMensuel: prixField.optional(),
     fonctionnalites: fonctionnalitesField.optional(),
     tarifsDuree: tarifsDureeField.optional(),
+    limites: limitesField.optional(),
     ordre: z.number().int().min(0).max(999).optional(),
     actif: z.boolean().optional(),
   })

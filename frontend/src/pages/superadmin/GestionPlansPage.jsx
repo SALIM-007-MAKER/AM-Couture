@@ -14,6 +14,7 @@ import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
 import { ApiError } from "../../lib/apiClient.js";
 import { useTranslation } from "../../i18n/index.js";
+import { RESSOURCES, formaterLimite } from "../../features/abonnement/quotas.js";
 
 const MAX_DUREES = 8;
 
@@ -96,6 +97,10 @@ function PlanForm({ plan, onCancel, onDone }) {
     fonctionnalites: (plan?.fonctionnalites ?? []).join("\n"),
     ordre: String(plan?.ordre ?? 0),
   });
+  // Quotas : un champ par ressource, vide = illimité (clé absente).
+  const [limites, setLimites] = useState(
+    Object.fromEntries(RESSOURCES.map((cle) => [cle, plan?.limites?.[cle] != null ? String(plan.limites[cle]) : ""])),
+  );
   // Durées proposées : lignes { dureeMois, remisePourcent } saisies en texte.
   const [durees, setDurees] = useState(
     (plan?.tarifsDuree ?? []).map((d) => ({ dureeMois: String(d.dureeMois), remisePourcent: String(d.remisePourcent) })),
@@ -118,6 +123,7 @@ function PlanForm({ plan, onCancel, onDone }) {
       fonctionnalites: lignes(form.fonctionnalites),
       ordre: Number(form.ordre) || 0,
       tarifsDuree: durees.map((d) => ({ dureeMois: Number(d.dureeMois), remisePourcent: Number(d.remisePourcent) || 0 })),
+      limites: Object.fromEntries(RESSOURCES.filter((cle) => limites[cle].trim() !== "").map((cle) => [cle, Number(limites[cle])])),
     };
     if (plan) modifier.mutate({ id: plan.id, data: { ...data, description: form.description || null } }, { onSuccess: onDone });
     else creer.mutate({ ...data, ...(form.description ? { description: form.description } : {}) }, { onSuccess: onDone });
@@ -148,6 +154,29 @@ function PlanForm({ plan, onCancel, onDone }) {
         <textarea rows={5} value={form.fonctionnalites} onChange={(e) => update("fonctionnalites", e.target.value)} className={inputClass} />
         <FieldError messages={details?.fonctionnalites} />
       </Field>
+      <div className="space-y-2" data-testid="champs-quotas">
+        <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t("quotas.admin.limitsTitle")}</p>
+        <p className="text-xs text-neutral-500">{t("quotas.admin.limitsHint")}</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {RESSOURCES.map((cle) => (
+            <Field key={cle} label={t(`quotas.ressources.${cle}`)}>
+              <input
+                type="number"
+                min="1"
+                max="1000000"
+                step="1"
+                inputMode="numeric"
+                placeholder={t("quotas.admin.limitsPlaceholder")}
+                value={limites[cle]}
+                onChange={(e) => setLimites((l) => ({ ...l, [cle]: e.target.value }))}
+                className={inputClass}
+                data-testid={`quota-${cle}`}
+              />
+            </Field>
+          ))}
+        </div>
+        <FieldError messages={details?.limites} />
+      </div>
       <div className="space-y-2">
         <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{t("saSub.plans.durationsTitle")}</p>
         <p className="text-xs text-neutral-500">{t("saSub.plans.durationsHint")}</p>
@@ -220,6 +249,13 @@ function PlanCard({ plan }) {
           </span>
         ))}
       </div>
+      <ul className="flex flex-wrap gap-1.5 text-xs" data-testid="quotas-formule">
+        {RESSOURCES.map((cle) => (
+          <li key={cle} className="rounded-full bg-brand-50 dark:bg-brand-950 text-brand-800 dark:text-brand-300 px-2 py-0.5">
+            {t(`quotas.ressources.${cle}`)} : {formaterLimite(plan.limites?.[cle]) ?? t("quotas.illimite")}
+          </li>
+        ))}
+      </ul>
       {plan.fonctionnalites.length > 0 && (
         <ul className="list-disc pl-5 text-sm text-neutral-600 dark:text-neutral-400 space-y-0.5">
           {plan.fonctionnalites.map((f) => (
