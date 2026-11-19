@@ -76,12 +76,23 @@ export function instantaneUtilisable(snap, maintenant = Date.now()) {
   return age >= 0 && age <= DUREE_MAX_MS;
 }
 
-/** Recharge l'instantané dans le cache des requêtes, avec leur date d'origine (elles sont donc « périmées » : rafraîchies dès le retour du réseau). */
+/**
+ * Recharge l'instantané dans le cache des requêtes, avec leur date d'origine (utile à l'expiration et au classement).
+ *
+ * Les données restaurées sont ensuite marquées PÉRIMÉES (invalidées, sans rechargement immédiat) : elles s'affichent tout de
+ * suite, y compris sans réseau, mais la première page qui les utilise les redemande au serveur. Leur date d'origine ne suffit
+ * pas : avec un `staleTime` de 30 s, une donnée de moins de 30 s serait jugée fraîche et ne serait jamais redemandée, alors
+ * qu'elle peut précéder une écriture (affectation, paiement…) faite juste avant un rechargement de la page.
+ */
 export function restaurer(queryClient, snap) {
+  const restaurees = [CLE_ME];
   queryClient.setQueryData(CLE_ME, snap.me, { updatedAt: snap.verifieLe });
   for (const r of snap.requetes) {
-    if (conservable(r.key)) queryClient.setQueryData(r.key, r.data, { updatedAt: r.updatedAt });
+    if (!conservable(r.key)) continue;
+    queryClient.setQueryData(r.key, r.data, { updatedAt: r.updatedAt });
+    restaurees.push(r.key);
   }
+  queryClient.invalidateQueries({ predicate: (q) => restaurees.some((k) => memeCle(k, q.queryKey)), refetchType: "none" });
 }
 
 /**

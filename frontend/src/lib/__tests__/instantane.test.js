@@ -128,6 +128,36 @@ test("restaurer : recharge le cache avec les dates d'origine ; périmé ou illis
   assert.equal(await restaurerDepuis(adaptateurMemoire(null), nouveauClient()), false);
 });
 
+test("restaurer : les requêtes restaurées sont périmées (même récentes) mais gardent leurs données et leur date", async () => {
+  const STALE_TIME = 30_000; // celui de l'application (lib/queryClient.js)
+  const maintenant = Date.now();
+  const recente = maintenant - 1000; // 1 s : fraîche pour un staleTime de 30 s si rien ne l'invalide
+  const snap = construireInstantane([
+    me(PDG, recente),
+    req(["commandes", "production"], { employes: [{ id: "e1", ouvertes: 0 }] }, recente),
+    req(["clientes", "list"], { data: ["Awa"] }, recente),
+  ]);
+  const qc = new QueryClient({ defaultOptions: { queries: { gcTime: Infinity, staleTime: STALE_TIME } } });
+  assert.equal(await restaurerDepuis(adaptateurMemoire(snap), qc, maintenant), true);
+
+  for (const cle of [["auth", "me"], ["commandes", "production"], ["clientes", "list"]]) {
+    const q = qc.getQueryCache().find({ queryKey: cle });
+    assert.equal(q.isStaleByTime(STALE_TIME), true, `${cle.join("/")} doit être périmée : sans cela une page ouverte juste après un rechargement n'est pas rafraîchie`);
+    assert.equal(q.state.isInvalidated, true);
+    assert.equal(q.state.dataUpdatedAt, recente, "la date d'origine est conservée (expiration à 7 jours, classement)");
+  }
+  // Les données restent disponibles pour un affichage immédiat, notamment sans réseau.
+  assert.deepEqual(qc.getQueryData(["commandes", "production"]), { employes: [{ id: "e1", ouvertes: 0 }] });
+  assert.deepEqual(qc.getQueryData(["clientes", "list"]), { data: ["Awa"] });
+  assert.equal(qc.getQueryData(["auth", "me"]).id, "u1");
+  // Aucun rechargement n'est lancé par la restauration elle-même.
+  assert.equal(qc.isFetching(), 0);
+
+  // Témoin : une donnée qui vient d'être récupérée normalement n'est PAS périmée (la correction ne touche que la restauration).
+  qc.setQueryData(["commandes", "autre"], { x: 1 });
+  assert.equal(qc.getQueryCache().find({ queryKey: ["commandes", "autre"] }).isStaleByTime(STALE_TIME), false);
+});
+
 test("restaurer : n'injecte jamais une clé hors liste blanche, même si l'instantané en contient", async () => {
   const snap = {
     ...construireInstantane([me()]),
