@@ -4,6 +4,7 @@ import { User, Save, X } from "lucide-react";
 import { useClienteQuery, useCreateClienteMutation, useUpdateClienteMutation } from "./hooks.js";
 import { SEXE_OPTIONS } from "./constants.js";
 import { LoadingState, ErrorState, FieldError, GlobalFormError } from "../../components/QueryState.jsx";
+import AvertissementQuota from "../abonnement/components/AvertissementQuota.jsx";
 import { Field, inputClass } from "../../components/FormField.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
@@ -92,6 +93,7 @@ function ClienteForm({ mode, initial }) {
       <PageHeader icon={User} title={isEdit ? t("cli.form.editTitle") : t("clientes.newCliente")} />
 
       <Card as="form" onSubmit={handleSubmit} className="space-y-4">
+        {!isEdit && <AvertissementQuota ressource="clientes" />}
         <GlobalFormError error={mutation.error} />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -6,6 +6,7 @@ import { requireValidIdParam } from "../lib/idParam.js";
 import { formatZodError } from "../lib/validation.js";
 import { creerPlanSchema, patchPlanSchema } from "../schemas/plan.schema.js";
 import { planAvecTarifs } from "../lib/abonnement.js";
+import { depassementsPourLimites } from "../lib/quotasServeur.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -25,6 +26,14 @@ router.get("/", async (req, res) => {
 router.get("/tous", requireSuperadmin, async (req, res) => {
   const plans = await prisma.planAbonnement.findMany({ orderBy: ORDRE });
   res.json(plans.map(planAvecTarifs));
+});
+
+// GET /api/plans-abonnement/:id/depassements (SUPERADMIN) — ateliers dont l'usage actuel dépasse déjà les limites de cette
+// formule. Aide à la décision, lecture seule : aucun atelier n'est modifié ni bloqué.
+router.get("/:id/depassements", requireSuperadmin, async (req, res) => {
+  const plan = await prisma.planAbonnement.findUnique({ where: { id: req.params.id } });
+  if (!plan) throw new HttpError(404, "Plan introuvable.");
+  res.json({ limites: plan.limites, ateliers: await depassementsPourLimites(prisma, plan.limites) });
 });
 
 router.post("/", requireSuperadmin, async (req, res) => {

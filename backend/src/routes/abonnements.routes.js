@@ -12,6 +12,7 @@ import { souscrire, annulerParAtelier } from "../lib/souscription.js";
 import { streamFacturePdf } from "../lib/facturePdf.js";
 import { origineApplication } from "../lib/appUrl.js";
 import { notifierDeclaration } from "../lib/notificationsAbonnement.js";
+import { utilisationAtelier } from "../lib/quotasServeur.js";
 import { souscrireSchema, payerWaveSchema } from "../schemas/abonnementPaiement.schema.js";
 import { paiementWaveActif, ErreurWave } from "../lib/wave.js";
 import { demarrerPaiementWave, reconcilierTransactionWave } from "../lib/paiementEnLigne.js";
@@ -56,6 +57,13 @@ const TRANSACTION_SELECT = {
   abonnement: { select: { planNom: true, dureeMois: true, dateDebut: true, dateExpiration: true } },
   facture: { select: { id: true, numero: true, emisLe: true, annuleeLe: true } },
 };
+
+// GET /api/abonnements/utilisation — consommation des quotas de la formule (PDG seulement, comme tout ce qui n'est pas
+// /etat) : une jauge par ressource (usage, limite ou null si illimitée, état), la formule et la raison pour laquelle les
+// quotas s'appliquent ou non (essai, abonnement, grâce, aucun). Lecture seule.
+router.get("/utilisation", async (req, res) => {
+  res.json(await utilisationAtelier(prisma, req.user.atelierId));
+});
 
 // GET /api/abonnements/etat — l'état à afficher sur la page Abonnement du PDG :
 // ACTIF | EN_ATTENTE | ESSAI | EXPIRE | AUCUN, avec le plan et les dates de

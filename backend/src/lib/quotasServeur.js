@@ -8,7 +8,7 @@
 import { HttpError } from "../middlewares/error.middleware.js";
 import { verrouillerCle } from "./verrous.js";
 import { STATUTS_OUVERTS } from "./production.js";
-import { RESSOURCES, limitesApplicables, peutAjouter, figerLimites, estEligiblePlancher, jauges } from "./quotas.js";
+import { RESSOURCES, limitesApplicables, peutAjouter, figerLimites, estEligiblePlancher, jauges, normaliserLimites } from "./quotas.js";
 
 const RESSOURCES_TRIEES = [...RESSOURCES].sort();
 
@@ -59,7 +59,7 @@ export async function limitesEnVigueur(tx, atelierId, now = new Date()) {
     tx.atelier.findUnique({ where: { id: atelierId }, select: { trialEndsAt: true } }),
     tx.abonnement.findMany({
       where: { atelierId, statut: { in: ["CONFIRME", "SUSPENDU"] } },
-      select: { statut: true, dateDebut: true, dateExpiration: true, limites: true, plancher: true },
+      select: { statut: true, dateDebut: true, dateExpiration: true, limites: true, plancher: true, planNom: true },
     }),
   ]);
   return { ...limitesApplicables({ trialEndsAt: atelier?.trialEndsAt ?? null }, abonnements, now), abonnements };
@@ -112,6 +112,35 @@ export async function calculerFigeage(tx, { atelierId, limitesFormule, exclureAb
   return figerLimites({ limitesFormule, atelier: atelier ?? { trialEndsAt: null }, autres, usages });
 }
 
+/**
+ * Ateliers dont l'usage ACTUEL dépasse les limites données (celles d'une formule du catalogue) : aide à la décision avant
+ * d'attribuer une formule. Lecture seule, aucun effet sur les ateliers. Seuls les ateliers non suspendus sont listés.
+ */
+export async function depassementsPourLimites(db, limitesFormule) {
+  const limites = normaliserLimites(limitesFormule);
+  const cles = Object.keys(limites);
+  if (cles.length === 0) return [];
+  const requetes = {
+    clientes: () => db.cliente.groupBy({ by: ["atelierId"], where: { archivedAt: null }, _count: { _all: true } }),
+    employes: () => db.user.groupBy({ by: ["atelierId"], where: { role: "EMPLOYE", actif: true, atelierId: { not: null } }, _count: { _all: true } }),
+    commandesActives: () => db.commande.groupBy({ by: ["atelierId"], where: { statut: { in: STATUTS_OUVERTS } }, _count: { _all: true } }),
+    modeles: () => db.modele.groupBy({ by: ["atelierId"], where: { archivedAt: null }, _count: { _all: true } }),
+  };
+  const parAtelier = new Map();
+  for (const cle of cles) {
+    for (const ligne of await requetes[cle]()) {
+      if (ligne._count._all > limites[cle]) {
+        const liste = parAtelier.get(ligne.atelierId) ?? [];
+        liste.push({ ressource: cle, usage: ligne._count._all, limite: limites[cle] });
+        parAtelier.set(ligne.atelierId, liste);
+      }
+    }
+  }
+  if (parAtelier.size === 0) return [];
+  const ateliers = await db.atelier.findMany({ where: { id: { in: [...parAtelier.keys()] }, actif: true }, select: { id: true, nom: true }, orderBy: { nom: "asc" } });
+  return ateliers.map((a) => ({ atelierId: a.id, nom: a.nom, depassements: parAtelier.get(a.id) }));
+}
+
 /** Utilisation d'un atelier : une jauge par ressource, avec la raison pour laquelle les quotas s'appliquent (ou non). */
 export async function utilisationAtelier(db, atelierId, now = new Date()) {
   const { limites, raison, abonnement, abonnements } = await limitesEnVigueur(db, atelierId, now);
@@ -120,6 +149,7 @@ export async function utilisationAtelier(db, atelierId, now = new Date()) {
   return {
     quotasAppliques: limites != null,
     raison,
+    formule: abonnement?.planNom ?? null,
     jauges: jauges(usages, limites, plancher),
     abonnementsPrisEnCompte: abonnements.length,
   };

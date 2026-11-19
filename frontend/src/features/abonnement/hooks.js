@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { abonnementsApi, plansApi } from "./api.js";
+import { useMeQuery } from "../../hooks/useAuth.js";
 
 const ETAT_KEY = ["abonnements", "etat"];
 const TRANSACTIONS_KEY = ["abonnements", "transactions"];
@@ -12,6 +13,20 @@ export function useEtatAbonnementQuery() {
     queryFn: () => abonnementsApi.etat(),
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,
+  });
+}
+
+// Consommation des quotas (PDG seulement : un employé reçoit 403). Rafraîchie à chaque retour sur l'onglet et après chaque
+// création réussie (les formulaires invalident la clé ["abonnements", "utilisation"]).
+export function useUtilisationQuery() {
+  const { data: user } = useMeQuery();
+  return useQuery({
+    queryKey: ["abonnements", "utilisation"],
+    queryFn: () => abonnementsApi.utilisation(),
+    enabled: user?.role === "ADMIN",
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
+    retry: false,
   });
 }
 

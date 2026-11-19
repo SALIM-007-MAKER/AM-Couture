@@ -7,6 +7,7 @@ const enteteIdempotence = (cle) => ({ headers: { "Idempotency-Key": cle } });
 
 export const abonnementsApi = {
   etat: () => api.get("/abonnements/etat"),
+  utilisation: () => api.get("/abonnements/utilisation"),
   souscrire: (corps, cle) => api.post("/abonnements/souscrire", corps, enteteIdempotence(cle)),
   payerWave: (corps, cle) => api.post("/abonnements/payer-wave", corps, enteteIdempotence(cle)),
   transactions: () => api.get("/abonnements/transactions"),

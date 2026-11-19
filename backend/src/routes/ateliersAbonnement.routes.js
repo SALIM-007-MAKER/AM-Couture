@@ -10,7 +10,7 @@ import { activerAbonnementSchema, modifierAbonnementSchema, noteSchema } from ".
 import { suspensionSchema } from "../schemas/abonnementPaiement.schema.js";
 import { suspendreAbonnement, reactiverAbonnement } from "../lib/souscription.js";
 import { recalculerLimites } from "../lib/quotas.js";
-import { calculerFigeage } from "../lib/quotasServeur.js";
+import { calculerFigeage, utilisationAtelier } from "../lib/quotasServeur.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
 import { calculerDateExpiration, etatAbonnementAtelier, statutEffectif, prixPourDuree } from "../lib/abonnement.js";
 
@@ -87,6 +87,12 @@ function dureeEntre(debut, fin) {
   const mois = (fin.getUTCFullYear() - debut.getUTCFullYear()) * 12 + (fin.getUTCMonth() - debut.getUTCMonth());
   return Math.max(1, mois);
 }
+
+// GET /api/ateliers/:atelierId/utilisation — consommation des quotas d'un atelier (lecture seule, SUPERADMIN).
+router.get("/:atelierId/utilisation", async (req, res) => {
+  const atelier = await chargerAtelier(req.params.atelierId);
+  res.json(await utilisationAtelier(prisma, atelier.id));
+});
 
 // GET /api/ateliers/:atelierId/abonnement — état courant, abonnements et
 // historique complet des changements.

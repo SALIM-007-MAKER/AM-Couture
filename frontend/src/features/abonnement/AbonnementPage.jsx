@@ -10,6 +10,7 @@ import HistoriquePaiements from "./components/HistoriquePaiements.jsx";
 import { formatDateFr, formatPrix } from "./constants.js";
 import StatutAbonnementBadge from "./components/StatutAbonnementBadge.jsx";
 import PlanCard from "./components/PlanCard.jsx";
+import UtilisationCard from "./components/UtilisationCard.jsx";
 import { LoadingState, ErrorState, EmptyState } from "../../components/QueryState.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
@@ -151,6 +152,8 @@ export default function AbonnementPage() {
           </Card>
         )}
       </div>
+
+      <UtilisationCard />
 
       {essai && (
         <div className="space-y-2">

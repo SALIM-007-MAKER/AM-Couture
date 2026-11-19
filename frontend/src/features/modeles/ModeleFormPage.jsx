@@ -4,6 +4,7 @@ import { Shirt, Save, X } from "lucide-react";
 import { useModeleQuery, useCreateModeleMutation, useUpdateModeleMutation } from "./hooks.js";
 import { CATEGORIES_VETEMENT } from "./constants.js";
 import { LoadingState, ErrorState, FieldError, GlobalFormError } from "../../components/QueryState.jsx";
+import AvertissementQuota from "../abonnement/components/AvertissementQuota.jsx";
 import { Field, inputClass } from "../../components/FormField.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
@@ -80,6 +81,7 @@ function ModeleForm({ mode, initial }) {
       <PageHeader icon={Shirt} title={isEdit ? t("modele.form.editTitle") : t("modele.list.new")} />
 
       <Card as="form" onSubmit={handleSubmit} className="space-y-4">
+        {!isEdit && <AvertissementQuota ressource="modeles" />}
         <GlobalFormError error={mutation.error} />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

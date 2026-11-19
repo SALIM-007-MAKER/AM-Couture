@@ -15,6 +15,7 @@ import { nouvelleCleIdempotence } from "../abonnement/paiement.js";
 import { formatDateFr } from "../abonnement/constants.js";
 import { BadgeActif } from "./EmployesPage.jsx";
 import { LoadingState, ErrorState, FieldError, GlobalFormError } from "../../components/QueryState.jsx";
+import AvertissementQuota from "../abonnement/components/AvertissementQuota.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
 import Button from "../../components/Button.jsx";
@@ -244,6 +245,7 @@ function EmployeForm({ id, catalogue: catalogueData, employe }) {
       <form onSubmit={handleSubmit} className="space-y-6" noValidate={false}>
         <Card variant="outlined" className="space-y-4">
           <SectionTitle>{t("emp.sectionIdentity")}</SectionTitle>
+          {!employe && <AvertissementQuota ressource="employes" />}
           <GlobalFormError error={mutation.error} />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label={t("emp.firstName")} required>

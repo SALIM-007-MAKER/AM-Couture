@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 202 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 205 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -306,6 +306,7 @@ Périodes : `period=today\|week\|month\|quarter\|year`, ou `from` et `to` (dates
 | `PUT /api/parametres` | Atelier | Remplacement : `{ nom, devise }` + `logoUrl?, telephone?, adresse?, slogan?, recuConfig?`. |
 | `PATCH /api/parametres` | Atelier | Mêmes champs, tous optionnels. |
 | `GET /api/abonnements/etat` | Atelier¹ | État d'abonnement : `statut` (`ACTIF`, `EN_ATTENTE`, `ESSAI`, `EXPIRE`, `SUSPENDU`, `AUCUN`), essai, abonnement courant, `acces` (`mode` : `COMPLET`, `GRACE` ou `LECTURE_SEULE`, avec la fin de grâce) et `paiementEnAttente` (déclaration non encore tranchée, ou `null`). |
+| `GET /api/abonnements/utilisation` | Atelier (PDG) | Consommation des quotas de la formule : `quotasAppliques`, `raison` (`ESSAI`, `ABONNEMENT`, `GRACE`, `SUSPENDU`, `AUCUN`), `formule`, `jauges` (une par ressource : `cle`, `usage`, `limite` ou `null` si illimitée, `etat` : `illimite`, `ok`, `proche`, `atteint`, `depasse`, `plancherApplique`). |
 | `POST /api/abonnements/souscrire` | Atelier¹, idempotente | `{ planId, dureeMois, moyenPaiement ("MOBILE_MONEY" \| "NITA" \| "AMANA" \| "VIREMENT" \| "ESPECES" \| "AUTRE") }` + `operateur?, reference` (obligatoire sauf espèces), `preuveNote?`. Déclare un paiement fait hors plateforme ; **n'accorde aucun accès** avant confirmation. Le montant est calculé par le serveur (un champ `montant` est refusé). La durée doit être proposée par la formule. 409 si une déclaration est déjà en attente. → `201 { id, numero, statut, montant }`. |
 | `POST /api/abonnements/payer-wave` | Atelier¹, idempotente | `{ planId, dureeMois }` — ouvre un paiement Wave et renvoie `201 { id, numero, statut, montant, checkoutUrl }` (adresse où envoyer l'utilisateur). **503 tant que Wave n'est pas activé** (`paiementsEnLigne.wave` de `/etat`). N'active rien : l'abonnement n'est activé que lorsque le serveur a relu le paiement chez Wave. |
 | `POST /api/abonnements/transactions/:id/verifier` | Atelier¹ | Demande au serveur de relire un paiement Wave chez Wave (à appeler au retour du navigateur). Le corps est ignoré : aucune affirmation du client n'est prise en compte. 503 si Wave est injoignable ou inactif. |
@@ -371,6 +372,7 @@ Aucune de ces routes ne donne accès aux données métier d'un atelier (clientes
 | `POST /api/ateliers/:id/comptes/:userId/impersonation` | SuperAdmin | Ouvre une session limitée dans le temps sous l'identité du compte ; journalisée. |
 | `DELETE /api/ateliers/:id` | SuperAdmin | Supprime un atelier **vide** (aucune cliente, modèle, commande, dépense ni abonnement), sinon 409 : suspendre plutôt → `204`. |
 | `GET /api/ateliers/:atelierId/abonnement` | SuperAdmin | Abonnements de l'atelier. |
+| `GET /api/ateliers/:atelierId/utilisation` | SuperAdmin | Consommation des quotas d'un atelier (même forme que `/api/abonnements/utilisation`). |
 | `POST /api/ateliers/:atelierId/abonnement/activer` | SuperAdmin, idempotente | `{ planId }` + `dateDebut?`, et `dureeMois` (1–60) **ou** `dateExpiration`, `note?`. Activation manuelle. |
 | `PATCH /api/ateliers/:atelierId/abonnement/:abonnementId` | SuperAdmin | `{ planId?, dateDebut?, dateExpiration?, note? }` |
 | `POST /api/ateliers/:atelierId/abonnement/:abonnementId/expirer` | SuperAdmin | `{ note? }` — met fin à l'abonnement maintenant. |
@@ -378,6 +380,7 @@ Aucune de ces routes ne donne accès aux données métier d'un atelier (clientes
 | `POST /api/ateliers/:atelierId/abonnement/:abonnementId/suspendre` | SuperAdmin | `{ note }` (motif obligatoire) — pause : l'abonnement garde ses dates mais l'atelier passe en lecture seule immédiatement, sans grâce. Répétable. |
 | `POST /api/ateliers/:atelierId/abonnement/:abonnementId/reactiver` | SuperAdmin | `{ note }` — remet un abonnement suspendu en service. Répétable. |
 | `GET /api/plans-abonnement/tous` | SuperAdmin | Tous les plans, actifs ou non. |
+| `GET /api/plans-abonnement/:id/depassements` | SuperAdmin | Ateliers dont l'usage actuel dépasse déjà les limites de cette formule (aide à la décision, lecture seule). |
 | `POST /api/plans-abonnement` | SuperAdmin | `{ nom, prixMensuel }` + `description?, fonctionnalites? (20 max), tarifsDuree? (8 max : { dureeMois, remisePourcent }), ordre?` |
 | `PATCH /api/plans-abonnement/:id` | SuperAdmin | Mêmes champs + `actif?`. |
 | `GET /api/plateforme/contact` | SuperAdmin | Numéro WhatsApp de contact de la plateforme. |
