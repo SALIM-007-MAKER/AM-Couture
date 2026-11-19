@@ -26,6 +26,7 @@ import { origineApplication } from "../lib/appUrl.js";
 import { emailInvitationClientTemplate } from "../lib/emailTemplates.js";
 import { anonymiserCliente } from "../lib/donneesCliente.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
+import { verrouillerQuota, verifierQuota } from "../lib/quotasServeur.js";
 
 const router = Router();
 
@@ -84,8 +85,12 @@ router.post("/", idempotence, async (req, res) => {
   // créations simultanées passaient toutes les deux la vérification (anomalie 5 : 2 clientes sur 8).
   const cliente = await prisma.$transaction(
     async (tx) => {
+      // Quota d'abord (ordre unique des verrous : quota, puis verrou métier), contrôle juste avant la création : un téléphone
+      // déjà pris est signalé en premier, un quota atteint ensuite (409, details.quota).
+      await verrouillerQuota(tx, req.user.atelierId, "clientes");
       await verrouillerCle(tx, `cliente:${req.user.atelierId}:${data.telephone}`);
       await assertPhoneAvailable(tx, req.user.atelierId, data.telephone);
+      await verifierQuota(tx, { atelierId: req.user.atelierId, ressource: "clientes" });
       return tx.cliente.create({ data: { ...data, atelierId: req.user.atelierId } });
     },
     { maxWait: 10_000, timeout: 15_000 },
@@ -323,10 +328,19 @@ router.post("/:id/anonymiser", async (req, res) => {
 // POST /api/clientes/:id/restaurer — réactivation d'une fiche archivée
 router.post("/:id/restaurer", async (req, res) => {
   const { id } = req.params;
-  const result = await prisma.cliente.updateMany({
-    where: { id, atelierId: req.user.atelierId, archivedAt: { not: null }, anonymiseeLe: null },
-    data: { archivedAt: null },
-  });
+  // Restaurer une fiche archivée l'ajoute au quota : même verrou et même contrôle que la création (sinon on contournerait la
+  // limite en archivant puis en restaurant). Le contrôle n'a lieu que si une fiche va réellement être réactivée.
+  const aRestaurer = { id, atelierId: req.user.atelierId, archivedAt: { not: null }, anonymiseeLe: null };
+  const result = await prisma.$transaction(
+    async (tx) => {
+      await verrouillerQuota(tx, req.user.atelierId, "clientes");
+      if (await tx.cliente.findFirst({ where: aRestaurer, select: { id: true } })) {
+        await verifierQuota(tx, { atelierId: req.user.atelierId, ressource: "clientes" });
+      }
+      return tx.cliente.updateMany({ where: aRestaurer, data: { archivedAt: null } });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
 
   if (result.count === 0) {
     const existing = await prisma.cliente.findFirst({

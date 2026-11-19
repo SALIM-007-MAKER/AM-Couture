@@ -18,6 +18,7 @@ import {
   decisionEmployeSchema,
   listEmployesQuerySchema,
 } from "../schemas/employe.schema.js";
+import { exigerQuota, verrouillerQuota, verifierQuota } from "../lib/quotasServeur.js";
 
 // Gestion des employés de l'atelier — RÉSERVÉE AU PDG (compte ADMIN) : un employé reçoit toujours 403 ici, quelles que
 // soient ses permissions (l'administration de l'atelier n'est jamais déléguable). Toute requête est cloisonnée à
@@ -151,10 +152,16 @@ router.post("/", idempotence, async (req, res) => {
   const passwordHash = await bcrypt.hash(password, 12);
   let employe;
   try {
-    employe = await prisma.user.create({
-      data: { identifiant, passwordHash, role: "EMPLOYE", atelierId: req.user.atelierId, prenom, nom, email, telephone, poste, permissions },
-      select: EMPLOYE_SELECT,
-    });
+    employe = await prisma.$transaction(
+      async (tx) => {
+        await exigerQuota(tx, { atelierId: req.user.atelierId, ressource: "employes" });
+        return tx.user.create({
+          data: { identifiant, passwordHash, role: "EMPLOYE", atelierId: req.user.atelierId, prenom, nom, email, telephone, poste, permissions },
+          select: EMPLOYE_SELECT,
+        });
+      },
+      { maxWait: 10_000, timeout: 15_000 },
+    );
   } catch (err) {
     throw traduireConflit(err);
   }
@@ -230,11 +237,20 @@ router.post("/:id/reactiver", async (req, res) => {
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
   const existant = await chargerEmploye(req);
   if (existant.actif) return res.json({ ...existant, dejaTraite: true });
-  const employe = await prisma.user.update({
-    where: { id: existant.id },
-    data: { actif: true, desactiveLe: null },
-    select: EMPLOYE_SELECT,
-  });
+  // Réactiver un compte l'ajoute au quota d'employés : même verrou et même contrôle que la création. L'état est relu sous
+  // le verrou : deux réactivations simultanées du même compte n'en comptent qu'une.
+  const { employe, deja } = await prisma.$transaction(
+    async (tx) => {
+      await verrouillerQuota(tx, req.user.atelierId, "employes");
+      const courant = await tx.user.findFirst({ where: { id: existant.id, atelierId: req.user.atelierId, role: "EMPLOYE" }, select: EMPLOYE_SELECT });
+      if (courant?.actif) return { employe: courant, deja: true };
+      await verifierQuota(tx, { atelierId: req.user.atelierId, ressource: "employes" });
+      const maj = await tx.user.update({ where: { id: existant.id }, data: { actif: true, desactiveLe: null }, select: EMPLOYE_SELECT });
+      return { employe: maj, deja: false };
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
+  if (deja) return res.json({ ...employe, dejaTraite: true });
   await journaliserSecurite("EMPLOYE_REACTIVE", { req, userId: req.user.id, atelierId: req.user.atelierId, details: { compteId: employe.id } });
   res.json({ ...employe, dejaTraite: false });
 });

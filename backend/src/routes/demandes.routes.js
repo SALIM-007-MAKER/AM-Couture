@@ -8,6 +8,7 @@ import { formatZodError } from "../lib/validation.js";
 import { requireValidIdParam } from "../lib/idParam.js";
 import { refuserDemandeSchema, accepterDemandeSchema, listDemandesQuerySchema } from "../schemas/demandeCommande.schema.js";
 import { creerNotificationClient } from "../lib/notificationsClient.js";
+import { verrouillerQuota, verifierQuota } from "../lib/quotasServeur.js";
 
 // Demandes de commande envoyées par des clients USER (§ plan rôle client,
 // voir routes/moi.routes.js POST /api/moi/demandes) — gestion côté ADMIN.
@@ -131,13 +132,17 @@ router.post("/:id/cliente", requirePermission("clientes.ecrire"), async (req, re
       if (demande.clienteId) return { demandeId: id, deja: true };
       if (demande.statut !== "EN_ATTENTE") throw new HttpError(409, "Cette demande a déjà été traitée.");
 
-      // Même verrou que la création d'une cliente (clientes.routes.js) : pas de doublon de téléphone en concurrence.
+      // Quota d'abord (ordre unique des verrous), puis même verrou que la création d'une cliente (clientes.routes.js) : pas de
+      // doublon de téléphone en concurrence.
+      await verrouillerQuota(tx, atelierId, "clientes");
       await verrouillerCle(tx, `cliente:${atelierId}:${demande.contactTelephone}`);
       let cliente = await tx.cliente.findFirst({ where: { atelierId, telephone: demande.contactTelephone }, select: { id: true, archivedAt: true } });
       let existante = Boolean(cliente);
       if (cliente?.archivedAt) {
         throw new HttpError(409, "Une cliente archivée porte déjà ce numéro : restaurez-la, puis rattachez la demande.", { clienteId: cliente.id });
       }
+      // Le quota ne s'applique que si une fiche est réellement créée (réutiliser une fiche existante n'ajoute rien).
+      if (!cliente) await verifierQuota(tx, { atelierId, ressource: "clientes" });
       cliente ??= await tx.cliente.create({
         data: { atelierId, prenom: demande.contactPrenom, nom: demande.contactNom, telephone: demande.contactTelephone },
         select: { id: true },
