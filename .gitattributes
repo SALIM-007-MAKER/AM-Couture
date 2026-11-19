@@ -1,2 +1,8 @@
 # Les scripts shell doivent rester en LF, même sous Windows (autocrlf) : un CRLF casse bash.
 *.sh text eol=lf
+
+# Le hash CSP de vercel.json est celui du script inline de index.html, octet pour octet (Vite le recopie tel quel).
+# Un CRLF (core.autocrlf=true sous Windows) changerait le hash et la CSP bloquerait le script. LF partout, y compris
+# sur un poste Windows (et pour un déploiement lancé depuis ce poste).
+frontend/index.html text eol=lf
+vercel.json text eol=lf

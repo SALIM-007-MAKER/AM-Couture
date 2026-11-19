@@ -2,6 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
+import os from "node:os";
+import path from "node:path";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
@@ -61,4 +65,41 @@ test("vercel.json : le hash CSP correspond au script inline de index.html", () =
   const vercel = JSON.parse(fs.readFileSync(new URL("../../../../vercel.json", import.meta.url), "utf8"));
   const csp = vercel.headers.flatMap((h) => h.headers).find((h) => h.key === "Content-Security-Policy").value;
   assert.ok(csp.includes(`'${hash}'`), "CSP désynchronisée : recalculer le hash du script inline");
+});
+
+// ── CSP : le hash testé doit être celui du script réellement servi ─────────────────────────────────────────────
+// Vite recopie le script inline octet pour octet : le hash servi dépend des fins de ligne de la source au moment du build.
+const racine = fileURLToPath(new URL("../../../../", import.meta.url));
+const hashScriptInline = (html) => {
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.equal(scripts.length, 1, "un seul script inline attendu (sinon mettre à jour la CSP)");
+  return "sha256-" + crypto.createHash("sha256").update(scripts[0]).digest("base64");
+};
+const cspVercel = () => {
+  const vercel = JSON.parse(fs.readFileSync(path.join(racine, "vercel.json"), "utf8"));
+  return vercel.headers.flatMap((h) => h.headers).find((h) => h.key === "Content-Security-Policy").value;
+};
+
+test("CSP : frontend/index.html et vercel.json sont en LF sur le disque (.gitattributes)", () => {
+  for (const f of ["frontend/index.html", "vercel.json"]) {
+    const contenu = fs.readFileSync(path.join(racine, f), "utf8");
+    assert.ok(
+      !contenu.includes(String.fromCharCode(13)),
+      `${f} contient des CR : le hash CSP du script inline serait faux. Vérifier la règle « text eol=lf » de .gitattributes, puis re-extraire le fichier (git rm --cached + git checkout, ou supprimer le fichier puis git checkout -- ${f}).`,
+    );
+  }
+});
+
+test("CSP : le script inline du build réel (dist/index.html) a un hash présent dans la CSP de vercel.json", () => {
+  const sortie = fs.mkdtempSync(path.join(os.tmpdir(), "tailora-csp-"));
+  try {
+    execFileSync(process.execPath, [path.join(racine, "node_modules/vite/bin/vite.js"), "build", "--outDir", sortie, "--emptyOutDir"], {
+      cwd: path.join(racine, "frontend"),
+      stdio: "pipe",
+    });
+    const hash = hashScriptInline(fs.readFileSync(path.join(sortie, "index.html"), "utf8"));
+    assert.ok(cspVercel().includes(`'${hash}'`), "CSP désynchronisée : le script inline réellement servi n'a pas le hash déclaré dans vercel.json");
+  } finally {
+    fs.rmSync(sortie, { recursive: true, force: true });
+  }
 });
