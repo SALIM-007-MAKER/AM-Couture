@@ -133,7 +133,7 @@ export default function SuperadminLayout() {
       <LocaleSync />
       {/* Sidebar desktop — même comportement réductible que AppLayout.jsx */}
       <aside
-        className={`hidden md:flex flex-col shrink-0 sticky top-0 h-svh self-start border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 transition-[width] duration-150 ${
+        className={`hidden md:flex flex-col shrink-0 border-r border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 transition-[width] duration-150 ${
           sidebarCollapsed ? "w-16" : "w-56 lg:w-64"
         }`}
       >
