@@ -35,8 +35,28 @@ test.describe("formule : de la préconfiguration à l'offre", () => {
     await expect(carte.getByTestId("etat-commercial")).toContainText("inactive");
     await expect(carte.getByTestId("etat-commercial")).toContainText("quotas non définis");
     await expect(carte.getByTestId("quotas-formule")).toContainText("Clientes : Non défini");
+    // Formule INACTIVE : le blocage d'activation suffit, pas d'avertissement « illimité » (rien n'est encore proposé).
+    await expect(carte.getByTestId("avertissement-quotas")).toHaveCount(0);
     await expect(carte.getByTestId("activation-bloquee")).toBeVisible();
     await expect(carte.getByTestId("basculer-activation")).toBeDisabled();
+    await ctx.close();
+  });
+
+  test("SUPERADMIN : une formule ACTIVE aux quotas non définis affiche l'avertissement, sans qu'aucune limite soit attribuée", async ({ browser }) => {
+    const ctx = await browser.newContext({ storageState: ETATS.superadmin });
+    const page = await ctx.newPage();
+    await page.goto("/tarifs-abonnement");
+    // « Plan E2E » (jeu de données) est active, a des tarifs et AUCUN quota défini : situation des formules d'avant les quotas.
+    const carte = page.getByTestId("formule-admin-Plan E2E");
+    await expect(carte.getByTestId("etat-commercial")).toContainText("Proposée aux ateliers");
+    const avertissement = carte.getByTestId("avertissement-quotas");
+    await expect(avertissement).toBeVisible();
+    await expect(avertissement).toContainText("actuellement illimités");
+    await expect(avertissement).toContainText("AUCUNE limite");
+    for (const ressource of ["Clientes", "Employés", "Commandes actives", "Modèles"]) await expect(avertissement).toContainText(ressource);
+    // Aucune limite attribuée automatiquement : les quotas restent « Non défini ».
+    await expect(carte.getByTestId("quotas-formule")).toContainText("Clientes : Non défini");
+    await expect(carte.getByTestId("quotas-formule")).toContainText("Modèles : Non défini");
     await ctx.close();
   });
 
@@ -68,6 +88,7 @@ test.describe("formule : de la préconfiguration à l'offre", () => {
     await expect(apres.getByTestId("basculer-activation")).toBeEnabled();
     await apres.getByTestId("basculer-activation").click();
     await expect(apres.getByTestId("etat-commercial")).toContainText("Proposée aux ateliers");
+    await expect(apres.getByTestId("avertissement-quotas")).toHaveCount(0); // quotas décidés : plus d'avertissement
 
     // Section « abonnés » : aucun atelier abonné à cette formule.
     await apres.getByTestId("voir-abonnes").click();

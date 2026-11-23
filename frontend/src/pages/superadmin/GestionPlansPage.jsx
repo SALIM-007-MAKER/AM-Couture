@@ -18,7 +18,7 @@ import Button from "../../components/Button.jsx";
 import { ApiError } from "../../lib/apiClient.js";
 import { useTranslation } from "../../i18n/index.js";
 import { RESSOURCES, formaterLimite } from "../../features/abonnement/quotas.js";
-import { economieAnnuelle, moisOfferts, prixEntier, raisonsNonProposee } from "../../features/abonnement/tarifs.js";
+import { avertissementQuotas, economieAnnuelle, moisOfferts, prixEntier, raisonsNonProposee } from "../../features/abonnement/tarifs.js";
 import { formatPrix } from "../../features/abonnement/constants.js";
 
 // Contact WhatsApp affiché aux PDG (voir GET /api/abonnements/etat) : réglage
@@ -332,6 +332,7 @@ function PlanCard({ plan }) {
   if (editing) return <PlanForm plan={plan} onCancel={() => setEditing(false)} onDone={() => setEditing(false)} />;
 
   const raisons = raisonsNonProposee(plan);
+  const quotasAvertis = avertissementQuotas(plan);
   const raisonsActivation = plan.activationPossible?.raisons ?? [];
   const offreMensuelle = plan.offres.find((o) => o.periodicite === "MENSUEL");
   const offreAnnuelle = plan.offres.find((o) => o.periodicite === "ANNUEL");
@@ -390,6 +391,17 @@ function PlanCard({ plan }) {
       </div>
 
       {plan.tarifsDuree?.length > 0 && <p className="text-xs text-neutral-500">{t("saSub.plans.legacyDurations")}</p>}
+
+      {quotasAvertis.length > 0 && (
+        <div
+          role="note"
+          data-testid="avertissement-quotas"
+          className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-900 dark:text-amber-200 space-y-0.5"
+        >
+          <p className="font-semibold">{t("saSub.plans.quotasWarningTitle")}</p>
+          <p>{t("saSub.plans.quotasWarning", { ressources: quotasAvertis.map((cle) => t(`quotas.ressources.${cle}`)).join(", ") })}</p>
+        </div>
+      )}
 
       <ul className="flex flex-wrap gap-1.5 text-xs" data-testid="quotas-formule">
         {RESSOURCES.map((cle) => {

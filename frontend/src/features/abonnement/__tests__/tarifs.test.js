@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PERIODICITES, offreDe, periodesProposees, prixEntier, economieAnnuelle, moisOfferts, moisOffertsMax, raisonsNonProposee } from "../tarifs.js";
+import { PERIODICITES, offreDe, periodesProposees, prixEntier, economieAnnuelle, moisOfferts, moisOffertsMax, raisonsNonProposee, avertissementQuotas } from "../tarifs.js";
 
 // Montants de test uniquement : le module de production ne contient aucun tarif.
 const plan = (offres, extra = {}) => ({ actif: true, offres, quotasNonDefinis: [], ...extra });
@@ -47,4 +47,21 @@ test("raisons d'une formule non proposée : inactive, sans tarif, quotas non dé
   assert.deepEqual(raisonsNonProposee(plan([MENSUEL])), []);
   assert.deepEqual(raisonsNonProposee(plan([MENSUEL], { actif: false })), ["INACTIVE"]);
   assert.deepEqual(raisonsNonProposee(plan([], { actif: false, quotasNonDefinis: ["clientes"] })), ["INACTIVE", "AUCUN_TARIF", "QUOTAS_NON_DEFINIS"]);
+});
+
+test("avertissement quotas : seulement pour une formule ACTIVE dont des limites ne sont pas décidées", () => {
+  const actives = { actif: true, quotasNonDefinis: ["employes", "modeles"] };
+  assert.deepEqual(avertissementQuotas(actives), ["employes", "modeles"]);
+  assert.deepEqual(avertissementQuotas({ ...actives, actif: false }), [], "formule inactive : rien à signaler");
+  assert.deepEqual(avertissementQuotas({ actif: true, quotasNonDefinis: [] }), [], "quotas décidés (même illimités explicites)");
+  assert.deepEqual(avertissementQuotas({ actif: true }), [], "donnée absente : pas d'avertissement inventé");
+  assert.deepEqual(avertissementQuotas({ actif: true, quotasNonDefinis: "x" }), []);
+  assert.deepEqual(avertissementQuotas(undefined), []);
+  assert.deepEqual(avertissementQuotas(null), []);
+});
+
+test("avertissement quotas : lecture seule, l'objet formule n'est jamais modifié", () => {
+  const formule = Object.freeze({ actif: true, quotasNonDefinis: Object.freeze(["clientes"]), limites: Object.freeze({}) });
+  assert.deepEqual(avertissementQuotas(formule), ["clientes"]);
+  assert.deepEqual(formule.limites, {});
 });

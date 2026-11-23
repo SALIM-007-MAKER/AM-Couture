@@ -117,6 +117,8 @@ export default {
       },
       activationBlocked: "Cannot be activated yet: {{raisons}}.",
       legacyDurations: "Former durations are kept for existing contracts; they are no longer offered.",
+      quotasWarningTitle: "Quotas not defined: currently unlimited",
+      quotasWarning: "This plan is active but some limits have not been decided ({{ressources}}). Until they are configured, workshops that subscribe have NO limit on these resources. Edit the plan to set each limit, or explicitly choose \"Unlimited\".",
       deactivate: "Deactivate",
       activate: "Activate",
       showSubscribers: "Subscribed workshops",

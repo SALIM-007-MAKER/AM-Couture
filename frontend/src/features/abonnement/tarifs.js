@@ -44,6 +44,16 @@ export function moisOffertsMax(plans) {
   return Math.max(0, ...(plans ?? []).map((p) => p.moisOffertsAnnuel ?? 0));
 }
 
+/**
+ * Avertissement SuperAdmin : ressources dont la limite n'est PAS décidée sur une formule ACTIVE. Tant qu'une clé est absente, les
+ * ateliers qui souscrivent n'ont aucune limite sur cette ressource (le moteur de quotas lit une clé absente comme illimitée). Purement
+ * informatif : rien n'est défini ni modifié automatiquement. Liste vide = pas d'avertissement (formule inactive ou quotas décidés).
+ */
+export function avertissementQuotas(plan) {
+  if (!plan?.actif) return [];
+  return Array.isArray(plan.quotasNonDefinis) ? plan.quotasNonDefinis : [];
+}
+
 /** Raisons pour lesquelles une formule n'est pas (ou ne peut pas être) proposée, dans un ordre stable, pour l'affichage SuperAdmin. */
 export function raisonsNonProposee(plan) {
   const raisons = [];

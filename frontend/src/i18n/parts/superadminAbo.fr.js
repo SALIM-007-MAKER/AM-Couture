@@ -118,6 +118,8 @@ export default {
       },
       activationBlocked: "Activation impossible pour l'instant : {{raisons}}.",
       legacyDurations: "Anciennes durées conservées pour les contrats existants ; elles ne sont plus proposées.",
+      quotasWarningTitle: "Quotas non définis : actuellement illimités",
+      quotasWarning: "Cette formule est active mais certaines limites ne sont pas décidées ({{ressources}}). Tant qu'elles ne sont pas configurées, les ateliers qui souscrivent n'ont AUCUNE limite sur ces ressources. Modifiez la formule pour fixer chaque limite, ou choisissez « Illimité » explicitement.",
       deactivate: "Désactiver",
       activate: "Activer",
       showSubscribers: "Ateliers abonnés",
