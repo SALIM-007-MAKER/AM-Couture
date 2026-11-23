@@ -40,6 +40,8 @@ export const PERMISSION_PAR_CHEMIN = {
   "/abonnement": ADMIN_SEUL,
   "/employes": ADMIN_SEUL,
   "/compte": null,
+  // Guide d'utilisation : ouvert à tout membre ; le contenu dépend du rôle et des permissions (features/guide).
+  "/aide": null,
 };
 
 /** Le compte peut-il afficher cet écran ? Les chemins inconnus sont refusés (jamais ouverts par défaut). */

@@ -18,7 +18,9 @@
     "test": "npm run test -w backend && npm run test -w frontend && node --test scripts/__tests__/*.test.mjs",
     "test:integration": "npm run test:integration -w backend",
     "test:e2e": "playwright test -c e2e",
-    "perf": "node scripts/perf/mesure.mjs"
+    "perf": "node scripts/perf/mesure.mjs",
+    "guides:md": "node scripts/guides-markdown.mjs",
+    "guides:captures": "GUIDE_CAPTURES=1 playwright test -c e2e specs/guide-captures.spec.js"
   },
   "devDependencies": {
     "@playwright/test": "~1.55.1",

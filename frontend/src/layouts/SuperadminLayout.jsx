@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { Bell, LayoutDashboard, Building2, CreditCard, Tag, TrendingUp, Banknote, UserCircle, Menu, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { BookOpen, Bell, LayoutDashboard, Building2, CreditCard, Tag, TrendingUp, Banknote, UserCircle, Menu, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { useUiStore } from "../stores/uiStore.js";
 import { useTranslation } from "../i18n/index.js";
@@ -121,9 +121,27 @@ function Logo({ collapsed }) {
 // La page des notifications n'est pas dans le menu (on y va par la cloche) : elle garde pourtant son titre dans l'en-tête.
 const PAGE_NOTIFICATIONS = { labelKey: "nav.notifications", to: "/notifications-plateforme", icon: Bell };
 
+// Le guide est ouvert par un bouton de l'en-tête (la barre du bas mobile n'a pas de place pour un 8e onglet).
+const PAGE_GUIDE = { labelKey: "nav.guide", to: "/aide-plateforme", icon: BookOpen };
+
 function useCurrentNavItem(pathname) {
   if (pathname.startsWith(PAGE_NOTIFICATIONS.to)) return PAGE_NOTIFICATIONS;
+  if (pathname.startsWith(PAGE_GUIDE.to)) return PAGE_GUIDE;
   return NAV_ITEMS.find((item) => (item.end ? pathname === item.to : pathname.startsWith(item.to)));
+}
+
+function GuideLink() {
+  const { t } = useTranslation();
+  return (
+    <NavLink
+      to="/aide-plateforme"
+      className="flex size-10 sm:size-auto items-center justify-center rounded-lg sm:p-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+      aria-label={t("nav.guide")}
+      title={t("nav.guide")}
+    >
+      <BookOpen className="size-4" aria-hidden="true" />
+    </NavLink>
+  );
 }
 
 // Cloche de l'en-tête du SUPERADMIN — pastille = ce qui demande une action : paiements déclarés à valider, abonnements
@@ -233,6 +251,7 @@ export default function SuperadminLayout() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <GuideLink />
             <NotificationBell />
             {user && (
               <div className="hidden sm:flex items-center gap-2">

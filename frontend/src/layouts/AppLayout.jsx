@@ -26,6 +26,7 @@ import {
   Store,
   ShoppingCart,
   Globe,
+  BookOpen,
 } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { peutAcceder, filtrerNavigation } from "../features/employes/permissions.js";
@@ -90,6 +91,7 @@ const NAV_GROUPS = [
       { labelKey: "nav.storefront", to: "/vitrine", icon: Globe },
       { labelKey: "nav.settings", to: "/parametres", icon: Settings },
       { labelKey: "nav.myAccount", to: "/compte", icon: UserCircle },
+      { labelKey: "nav.guide", to: "/aide", icon: BookOpen },
       { labelKey: "nav.subscription", to: "/abonnement", icon: CreditCard },
     ],
   },
@@ -135,6 +137,7 @@ const MOBILE_DRAWER_GROUPS = [
       { labelKey: "nav.storefront", to: "/vitrine", icon: Globe },
       { labelKey: "nav.settings", to: "/parametres", icon: Settings },
       { labelKey: "nav.myAccount", to: "/compte", icon: UserCircle },
+      { labelKey: "nav.guide", to: "/aide", icon: BookOpen },
       { labelKey: "nav.subscription", to: "/abonnement", icon: CreditCard },
     ],
   },
