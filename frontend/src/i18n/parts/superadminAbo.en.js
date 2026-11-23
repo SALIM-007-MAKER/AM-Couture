@@ -138,7 +138,7 @@ export default {
     },
     estimate: {
       label: "Price recorded",
-      fromCatalogue: "catalogue price, {{mois}} months",
+      fromCatalogue: "catalogue price, {{mois}} month(s)",
     },
 
   },

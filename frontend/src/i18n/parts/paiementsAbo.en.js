@@ -91,7 +91,7 @@ export default {
     colReference: "Reference",
     colStatus: "Status",
     colActions: "Actions",
-    plan: "{{plan}} — {{duree}} months",
+    plan: "{{plan}} — {{duree}} month(s)",
     operator: "Operator: {{operateur}}",
     noteLabel: "Workshop note: {{note}}",
     declaredBy: "by {{par}}",
