@@ -30,6 +30,7 @@ import {
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { peutAcceder, filtrerNavigation } from "../features/employes/permissions.js";
 import { useParametresQuery } from "../features/parametres/hooks.js";
+import { useUpdatePreferencesMutation } from "../features/compte/hooks.js";
 import { useNombreNonLuesQuery } from "../features/notifications/hooks.js";
 import { useUiStore } from "../stores/uiStore.js";
 import { useTranslation } from "../i18n/index.js";
@@ -299,6 +300,8 @@ export default function AppLayout() {
   const { t } = useTranslation();
   const { data: user } = useMeQuery();
   const logoutMutation = useLogoutMutation();
+  // Le bouton FR/EN de l'en-tête enregistre aussi la langue sur le compte (sinon elle ne survit pas à un rechargement).
+  const preferencesMutation = useUpdatePreferencesMutation();
   const { sidebarOpen, closeSidebar, toggleSidebar, sidebarCollapsed, toggleSidebarCollapsed } = useUiStore();
   const location = useLocation();
   // « / » : tableau de bord pour le PDG, « Accueil » pour un employé ; « /tableau-de-bord » reste le tableau de bord.
@@ -396,7 +399,7 @@ export default function AppLayout() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
-            <LanguageSwitcher className="hidden sm:inline-flex" />
+            <LanguageSwitcher className="hidden sm:inline-flex" onChange={(langue) => preferencesMutation.mutate({ langue })} />
             <NotificationBell />
             {user && (
               <div className="hidden sm:flex items-center gap-2">
