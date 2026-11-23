@@ -24,7 +24,7 @@
       Applique le theme clair/sombre AVANT le premier rendu React, pour
       eviter un flash du mauvais theme au chargement (ex: preference
       "sombre" mais l'app affiche le clair une fraction de seconde le temps
-      que React demarre). Doit rester un <script> classique synchrone (pas
+      que React demarre). Doit rester un script classique synchrone (pas
       type="module", pas defere) et dupliquer volontairement la logique de
       src/lib/theme.js : un module ES est charge de facon differee, donc
       inutilisable ici pour ce role precis.

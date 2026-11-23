@@ -57,22 +57,34 @@ test("jeton d'action : stocké haché (SHA-256), déterministe", () => {
   assert.notEqual(hacherToken("abc"), "abc");
 });
 
+// Scripts inline RÉELS d'une page HTML : les commentaires sont retirés d'abord. Un « <script> » cité dans un commentaire n'est pas
+// une balise : le prendre pour le début du script donnait le hash d'un faux texte, la CSP bloquait alors le vrai script (le thème
+// sombre n'était plus appliqué au chargement) alors que ce test restait vert.
+const scriptsInline = (html) => [...html.replace(/<!--[\s\S]*?-->/g, "").matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+
 test("vercel.json : le hash CSP correspond au script inline de index.html", () => {
   const html = fs.readFileSync(new URL("../../../../frontend/index.html", import.meta.url), "utf8");
-  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const scripts = scriptsInline(html);
   assert.equal(scripts.length, 1, "un seul script inline attendu (sinon mettre à jour la CSP)");
+  assert.ok(scripts[0].includes("am-couture-theme") && scripts[0].trimStart().startsWith("(function"), "le script inline lu n'est pas celui du thème : extraction erronée");
   const hash = "sha256-" + crypto.createHash("sha256").update(scripts[0]).digest("base64");
   const vercel = JSON.parse(fs.readFileSync(new URL("../../../../vercel.json", import.meta.url), "utf8"));
   const csp = vercel.headers.flatMap((h) => h.headers).find((h) => h.key === "Content-Security-Policy").value;
   assert.ok(csp.includes(`'${hash}'`), "CSP désynchronisée : recalculer le hash du script inline");
 });
 
+test("scriptsInline ignore une balise citée dans un commentaire HTML (régression : thème sombre bloqué par la CSP)", () => {
+  const html = '<!-- Doit rester un <script> classique -->\n<script>(function () { /* vrai */ })();</script>';
+  assert.deepEqual(scriptsInline(html), ["(function () { /* vrai */ })();"]);
+});
+
 // ── CSP : le hash testé doit être celui du script réellement servi ─────────────────────────────────────────────
 // Vite recopie le script inline octet pour octet : le hash servi dépend des fins de ligne de la source au moment du build.
 const racine = fileURLToPath(new URL("../../../../", import.meta.url));
 const hashScriptInline = (html) => {
-  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const scripts = scriptsInline(html);
   assert.equal(scripts.length, 1, "un seul script inline attendu (sinon mettre à jour la CSP)");
+  assert.ok(scripts[0].includes("am-couture-theme") && scripts[0].trimStart().startsWith("(function"), "le script inline lu n'est pas celui du thème : extraction erronée");
   return "sha256-" + crypto.createHash("sha256").update(scripts[0]).digest("base64");
 };
 const cspVercel = () => {
