@@ -9,8 +9,11 @@ import { nextNumero } from "../lib/numero.js";
 import { activerAbonnementSchema, modifierAbonnementSchema, noteSchema } from "../schemas/abonnement.schema.js";
 import { suspensionSchema } from "../schemas/abonnementPaiement.schema.js";
 import { suspendreAbonnement, reactiverAbonnement } from "../lib/souscription.js";
+import { recalculerLimites } from "../lib/quotas.js";
+import { calculerFigeage, utilisationAtelier } from "../lib/quotasServeur.js";
 import { journaliserSecurite } from "../lib/securityLog.js";
-import { calculerDateExpiration, etatAbonnementAtelier, statutEffectif, prixPourDuree } from "../lib/abonnement.js";
+import { calculerDateExpiration, etatAbonnementAtelier, statutEffectif } from "../lib/abonnement.js";
+import { offrePourDuree, PERIODICITES } from "../lib/tarifs.js";
 
 // Gestion MANUELLE de l'abonnement d'un atelier par le SUPERADMIN (§
 // abonnement sans paiement en ligne). Monté sous /api/ateliers — chemins
@@ -31,8 +34,12 @@ const ABONNEMENT_SELECT = {
   planNom: true,
   dureeMois: true,
   prix: true,
+  tarifExceptionnel: true,
   dateDebut: true,
   dateExpiration: true,
+  // Quotas figés (voir lib/quotas.js) : limites appliquées et plancher d'usage.
+  limites: true,
+  plancher: true,
   creePar: true,
   createdAt: true,
 };
@@ -83,6 +90,12 @@ function dureeEntre(debut, fin) {
   return Math.max(1, mois);
 }
 
+// GET /api/ateliers/:atelierId/utilisation — consommation des quotas d'un atelier (lecture seule, SUPERADMIN).
+router.get("/:atelierId/utilisation", async (req, res) => {
+  const atelier = await chargerAtelier(req.params.atelierId);
+  res.json(await utilisationAtelier(prisma, atelier.id));
+});
+
 // GET /api/ateliers/:atelierId/abonnement — état courant, abonnements et
 // historique complet des changements.
 router.get("/:atelierId/abonnement", async (req, res) => {
@@ -113,34 +126,56 @@ router.get("/:atelierId/abonnement", async (req, res) => {
 // POST /api/ateliers/:atelierId/abonnement/activer — crée un abonnement
 // CONFIRME pour cet atelier. dateDebut par défaut = maintenant ; une date de
 // début future donne un abonnement "En attente d'activation" jusqu'à cette
-// date. Le prix est figé à l'activation : prix mensuel × durée, avec la remise
-// de la durée si elle fait partie des durées proposées du plan (prixPourDuree).
+// date. Deux modes : CATALOGUE (période mensuelle ou annuelle, prix du catalogue) ou EXCEPTIONNEL (durée et montant saisis
+// explicitement, motif obligatoire). Dans les deux cas le prix et la durée sont figés dans l'abonnement ; rien n'est déduit.
 router.post("/:atelierId/abonnement/activer", idempotence, async (req, res) => {
   const parsed = activerAbonnementSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, "Champs invalides.", formatZodError(parsed.error));
-  const { planId, note } = parsed.data;
+  const { planId, note, mode } = parsed.data;
   const atelier = await chargerAtelier(req.params.atelierId);
   const plan = await chargerPlanActif(planId);
 
+  let prixFige;
+  let dureeDemandee;
+  let dateExpirationDemandee;
+  if (mode === "CATALOGUE") {
+    dureeDemandee = PERIODICITES[parsed.data.periodicite].dureeMois;
+    const offre = offrePourDuree(plan, dureeDemandee);
+    if (!offre) {
+      throw new HttpError(400, "Champs invalides.", { periodicite: ["Cette période n'a pas de tarif dans le catalogue pour cette formule."] });
+    }
+    prixFige = offre.prix;
+  } else {
+    prixFige = parsed.data.prix;
+    dureeDemandee = parsed.data.dureeMois;
+    dateExpirationDemandee = parsed.data.dateExpiration;
+  }
+
   const dateDebut = parsed.data.dateDebut ?? new Date();
-  const dateExpiration = parsed.data.dateExpiration ?? calculerDateExpiration(dateDebut, parsed.data.dureeMois);
+  const dateExpiration = dateExpirationDemandee ?? calculerDateExpiration(dateDebut, dureeDemandee);
   if (dateExpiration <= dateDebut) {
     throw new HttpError(400, "Champs invalides.", {
       dateExpiration: ["La date d'expiration doit être postérieure à la date de début."],
     });
   }
-  const dureeMois = parsed.data.dureeMois ?? dureeEntre(dateDebut, dateExpiration);
+  const dureeMois = dureeDemandee ?? dureeEntre(dateDebut, dateExpiration);
 
   const abonnement = await prisma.$transaction(
     async (tx) => {
+      // Quotas figés à l'activation : limites de la formule relevées par le plancher d'usage (atelier ancien, première
+      // activation) ou plancher reporté des abonnements précédents (lib/quotas.js).
+      const { limites, plancher } = await calculerFigeage(tx, { atelierId: atelier.id, limitesFormule: plan.limites });
       const cree = await tx.abonnement.create({
         data: {
+          limites,
+          plancher,
           numero: await nextNumero(tx, "ABN"),
           atelierId: atelier.id,
           planId: plan.id,
           planNom: plan.nom,
           dureeMois,
-          prix: prixPourDuree(plan, dureeMois),
+          prix: prixFige,
+          tarifExceptionnel: mode === "EXCEPTIONNEL",
           statut: "CONFIRME",
           dateDebut,
           dateExpiration,
@@ -165,10 +200,12 @@ router.patch("/:atelierId/abonnement/:abonnementId", async (req, res) => {
   if (abonnement.statut !== "CONFIRME") throw new HttpError(409, "Seul un abonnement activé peut être modifié.");
 
   const data = {};
+  let planCorrige = null;
   if (parsed.data.planId) {
     const plan = await chargerPlanActif(parsed.data.planId);
     data.planId = plan.id;
     data.planNom = plan.nom;
+    planCorrige = plan;
   }
   if (parsed.data.dateDebut) data.dateDebut = parsed.data.dateDebut;
   if (parsed.data.dateExpiration) data.dateExpiration = parsed.data.dateExpiration;
@@ -181,6 +218,15 @@ router.patch("/:atelierId/abonnement/:abonnementId", async (req, res) => {
   }
 
   const maj = await prisma.$transaction(async (tx) => {
+    if (planCorrige) {
+      // CORRECTION de formule : limites recalculées depuis la nouvelle formule, plancher historique conservé intégralement
+      // (aucune nouvelle mesure de l'usage). Le prix, lui, reste inchangé. Les quotas des autres écritures ne bougent pas.
+      const autres = await tx.abonnement.findMany({ where: { atelierId: abonnement.atelierId, id: { not: abonnement.id } }, select: { plancher: true } });
+      const courant = await tx.abonnement.findUnique({ where: { id: abonnement.id }, select: { plancher: true } });
+      const { limites, plancher } = recalculerLimites({ limitesFormule: planCorrige.limites, abonnement: courant, autres });
+      data.limites = limites;
+      data.plancher = plancher;
+    }
     const m = await tx.abonnement.update({ where: { id: abonnement.id }, data, select: ABONNEMENT_SELECT });
     await ecrireHistorique(tx, { abonnement: m, action: "MODIFICATION", req, note: parsed.data.note });
     return m;

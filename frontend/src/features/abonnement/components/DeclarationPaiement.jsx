@@ -15,14 +15,14 @@ import { useTranslation } from "../../../i18n/index.js";
  * l'application (ou, si Wave est activé, l'ouvre en ligne). Rien ici ne fixe un prix ni n'active un abonnement : le prix
  * est celui du serveur, l'abonnement n'est activé qu'après vérification du paiement.
  */
-export default function DeclarationPaiement({ plan, tarif, instructions, waveDisponible, onClose, onDeclare }) {
+export default function DeclarationPaiement({ plan, offre, instructions, waveDisponible, onClose, onDeclare }) {
   const { t } = useTranslation();
   const souscrire = useSouscrireMutation();
   const payerWave = usePayerWaveMutation();
   const [valeurs, setValeurs] = useState({ moyenPaiement: "MOBILE_MONEY", operateur: "", reference: "", preuveNote: "" });
   const [tentative, setTentative] = useState(0);
   const [cle, setCle] = useState(() => nouvelleCleIdempotence());
-  const erreursLocales = tentative > 0 ? validerDeclaration({ ...valeurs, dureeMois: tarif.dureeMois }) : {};
+  const erreursLocales = tentative > 0 ? validerDeclaration({ ...valeurs, dureeMois: offre.dureeMois }) : {};
   const details = souscrire.error instanceof ApiError ? souscrire.error.details : undefined;
 
   // Une saisie modifiée est une nouvelle tentative : nouvelle clé, sans quoi le serveur rejouerait l'ancienne réponse.
@@ -34,9 +34,9 @@ export default function DeclarationPaiement({ plan, tarif, instructions, waveDis
   function handleSubmit(e) {
     e.preventDefault();
     setTentative((n) => n + 1);
-    if (Object.keys(validerDeclaration({ ...valeurs, dureeMois: tarif.dureeMois })).length > 0) return;
+    if (Object.keys(validerDeclaration({ ...valeurs, dureeMois: offre.dureeMois })).length > 0) return;
     souscrire.mutate(
-      { corps: corpsDeclaration({ planId: plan.id, dureeMois: tarif.dureeMois, ...valeurs }), cle },
+      { corps: corpsDeclaration({ planId: plan.id, dureeMois: offre.dureeMois, ...valeurs }), cle },
       {
         onSuccess: () => {
           setCle(nouvelleCleIdempotence());
@@ -48,7 +48,7 @@ export default function DeclarationPaiement({ plan, tarif, instructions, waveDis
 
   function handleWave() {
     payerWave.mutate(
-      { corps: { planId: plan.id, dureeMois: tarif.dureeMois }, cle: nouvelleCleIdempotence() },
+      { corps: { planId: plan.id, dureeMois: offre.dureeMois }, cle: nouvelleCleIdempotence() },
       {
         onSuccess: (res) => {
           // Redirection vers la page de paiement Wave. On ne suit qu'une adresse https.
@@ -66,7 +66,7 @@ export default function DeclarationPaiement({ plan, tarif, instructions, waveDis
         <div>
           <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{t("subPay.sectionTitle")}</h3>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            {t("subPay.selected", { plan: plan.nom, duree: t("sub.months", { mois: tarif.dureeMois }), prix: formatPrix(tarif.total) })}
+            {t("subPay.selected", { plan: plan.nom, duree: t(offre.periodicite === "ANNUEL" ? "sub.periodYearly" : "sub.periodMonthly"), prix: formatPrix(offre.prix) })}
           </p>
         </div>
         <Button type="button" variant="secondary" size="sm" icon={X} onClick={onClose}>

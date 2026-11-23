@@ -2,11 +2,11 @@
 
 | Niveau | Où | Outil | Commande | Effectif (15/11/2026) | Dans la CI |
 |---|---|---|---|---|---|
-| Unitaires backend | `backend/src/**/__tests__` | `node --test` | `npm test` | 344 (dont 4 de cohérence de `docs/API.md`) | oui (`verifier`) |
-| Unitaires frontend | `frontend/src/**/__tests__` | `node --test` | `npm test` | 124 | oui (`verifier`) |
-| Déploiement | `scripts/__tests__` | `node --test` | `npm test` | 7 | oui (`verifier`) |
-| Intégration (API + Prisma + Postgres) | `backend/src/integration-tests` | `node --test` | `npm run test:integration` | 461 (460 + 1 `TODO` volontaire) | oui (`tests-integration`) |
-| End-to-end (navigateur réel → frontend → API → Postgres) | `e2e/specs` | Playwright | `npm run test:e2e` | 123 | job `tests-e2e`, **non bloquant** (jamais exécuté sur GitHub) |
+| Unitaires backend | `backend/src/**/__tests__` | `node --test` | `npm test` | 390 (dont 4 de cohérence de `docs/API.md`) | oui (`verifier`) |
+| Unitaires frontend | `frontend/src/**/__tests__` | `node --test` | `npm test` | 171 | oui (`verifier`) |
+| Déploiement | `scripts/__tests__` | `node --test` | `npm test` | 23 | oui (`verifier`) |
+| Intégration (API + Prisma + Postgres) | `backend/src/integration-tests` | `node --test` | `npm run test:integration` | 565 (564 + 1 `TODO` volontaire) | oui (`tests-integration`) |
+| End-to-end (navigateur réel → frontend → API → Postgres) | `e2e/specs` | Playwright | `npm run test:e2e` | 140 | job `tests-e2e`, **non bloquant** (jamais exécuté sur GitHub) |
 | Cohérence schéma Prisma / migrations | `prisma/` | `prisma migrate diff` | voir `.github/workflows/ci.yml` | 1 contrôle | oui (`tests-integration`) |
 | Vulnérabilités des dépendances d'exécution | `package-lock.json` | `npm audit --omit=dev` | `npm audit --omit=dev --audit-level=high` | 0 constaté le 15/11/2026 | job `audit-dependances`, non bloquant |
 
@@ -75,6 +75,8 @@ captures et traces dans `e2e-resultats/` (`npx playwright show-trace <trace.zip>
 | `tout-voir-tableau-de-bord.spec.js` | liens « Tout voir » du tableau de bord : réceptionniste vers `/commandes` filtré (retard, fenêtre de livraison), jamais vers `/rapports` ; PDG et comptable vers `/rapports` |
 | `employes-libelles.spec.js` | page des permissions d'un employé : 28 libellés lisibles en français et en anglais, aucune clé technique `emp.perm.*`, droits par défaut d'un poste inchangés |
 | `superadmin-vue-ensemble.spec.js` | vue d'ensemble de la plateforme : état vide des graphiques, devise FCFA, infobulle par mois, six indicateurs (tendances simulées) |
+| `tarification.spec.js` | tarification Niger : formule créée inactive, économie annuelle informative, activation bloquée sans quotas définis, bascule Mensuel/Annuel du PDG, formule sans tarif non proposée, modes d'activation manuelle |
+| `quotas.spec.js` | quotas des formules : jauges de la page Abonnement, création jusqu'à la limite puis refus traduit (sans bannière de lecture seule), archivage qui libère, restauration refusée au quota, employés, commandes actives, modèles, atelier sans quota, vues SuperAdmin (formules, utilisation d'un atelier) |
 | `espaces-metier.spec.js` | un employé de chaque poste (couturier, réceptionniste, magasinier, comptable, autre) : accueil et sections de son métier, aucune erreur d'API, écrans d'un autre métier fermés |
 | `stock-tracabilite.spec.js` | sortie sans motif refusée (formulaire et API), motif/origine/auteur dans l'historique, double envoi sans doublon, stock jamais négatif, entrée |
 | `auth-locale.spec.js` | inscription puis lien de vérification (dans le journal, vers l'écran), mot de passe oublié sans fuite ni énumération, nouveau mot de passe, lien à usage unique |

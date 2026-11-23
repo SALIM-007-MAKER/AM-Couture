@@ -19,7 +19,7 @@ describe("Souscription et paiements d'abonnement", () => {
   const declarer = (api, extra = {}, entetes) =>
     api.post(
       "/api/abonnements/souscrire",
-      { planId: plan.id, dureeMois: 3, moyenPaiement: "MOBILE_MONEY", operateur: "Airtel Money", reference: "AIR-12345", ...extra },
+      { planId: plan.id, dureeMois: 12, moyenPaiement: "MOBILE_MONEY", operateur: "Airtel Money", reference: "AIR-12345", ...extra },
       entetes,
     );
   const etat = async (api) => (await api.get("/api/abonnements/etat")).body;
@@ -49,11 +49,8 @@ describe("Souscription et paiements d'abonnement", () => {
     plan = await prisma.planAbonnement.create({
       data: {
         nom: `Plan souscription ${process.pid}`,
-        prixMensuel: "10000",
-        tarifsDuree: [
-          { dureeMois: 1, remisePourcent: 0 },
-          { dureeMois: 3, remisePourcent: 10 },
-        ],
+        prixMensuel: 10000,
+        prixAnnuel: 100000,
       },
     });
   });
@@ -76,11 +73,11 @@ describe("Souscription et paiements d'abonnement", () => {
       const res = await declarer(apiA);
       assert.equal(res.status, 201);
       assert.equal(res.body.statut, "EN_ATTENTE");
-      assert.equal(res.body.montant, "27000"); // 10 000 × 3 mois − 10 %
+      assert.equal(res.body.montant, "100000"); // prix ANNUEL du catalogue, saisi tel quel (pas 12 × 10 000)
       const apres = await etat(apiA);
       assert.equal(apres.statut, avant.statut, "déclarer un paiement ne change pas l'état d'abonnement");
       assert.equal(apres.paiementEnAttente.numero, res.body.numero);
-      assert.equal(apres.paiementEnAttente.montant, "27000");
+      assert.equal(apres.paiementEnAttente.montant, "100000");
     });
 
     test("un montant envoyé par le client est refusé, jamais pris en compte", async () => {
@@ -94,7 +91,7 @@ describe("Souscription et paiements d'abonnement", () => {
     });
 
     test("durée non proposée, moyen Wave, référence manquante : refusés", async () => {
-      assert.equal((await declarer(apiB, { dureeMois: 5 })).status, 400);
+      for (const d of [2, 3, 5, 6, 24]) assert.equal((await declarer(apiB, { dureeMois: d })).status, 400, `${d} mois : seules 1 et 12 sont proposées`);
       assert.equal((await declarer(apiB, { moyenPaiement: "WAVE" })).status, 400);
       assert.equal((await declarer(apiB, { reference: undefined })).status, 400);
     });
@@ -148,7 +145,7 @@ describe("Souscription et paiements d'abonnement", () => {
       assert.equal(e.statut, "ACTIF");
       assert.equal(e.acces.mode, "COMPLET");
       assert.equal(e.paiementEnAttente, null);
-      assert.equal(e.abonnement.prix, "27000");
+      assert.equal(e.abonnement.prix, "100000");
 
       const histo = await prisma.historiqueAbonnement.findMany({ where: { atelierId: A.id } });
       assert.ok(histo.some((h) => h.action === "SOUSCRIPTION"));

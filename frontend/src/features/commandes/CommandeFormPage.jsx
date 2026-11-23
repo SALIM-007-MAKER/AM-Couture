@@ -10,6 +10,7 @@ import { CATEGORIES_VETEMENT } from "../modeles/constants.js";
 import ClientePicker from "./components/ClientePicker.jsx";
 import ModelePicker from "./components/ModelePicker.jsx";
 import { LoadingState, ErrorState, FieldError, GlobalFormError } from "../../components/QueryState.jsx";
+import AvertissementQuota from "../abonnement/components/AvertissementQuota.jsx";
 import { Field, inputClass } from "../../components/FormField.jsx";
 import PageHeader from "../../components/PageHeader.jsx";
 import Card from "../../components/Card.jsx";
@@ -167,6 +168,7 @@ function CommandeForm({ mode, initial }) {
       <PageHeader icon={ClipboardList} title={isEdit ? t("cmd.formEditTitle") : t("cmd.formNewTitle")} />
 
       <Card as="form" onSubmit={handleSubmit} className="space-y-4">
+        {!isEdit && <AvertissementQuota ressource="commandesActives" />}
         <GlobalFormError error={mutation.error} />
 
         {!isEdit && (

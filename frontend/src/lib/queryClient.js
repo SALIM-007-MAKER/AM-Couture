@@ -1,7 +1,14 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, MutationCache } from "@tanstack/react-query";
 import { ApiError } from "./apiError.js";
 
 export const queryClient = new QueryClient({
+  // Après toute écriture réussie (création, archivage, restauration, désactivation…), la consommation des quotas affichée
+  // (page Abonnement, avertissement des formulaires) est redemandée au serveur : elle n'est jamais devinée côté navigateur.
+  mutationCache: new MutationCache({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["abonnements", "utilisation"] });
+    },
+  }),
   defaultOptions: {
     // Une écriture faite sans réseau doit ÉCHOUER tout de suite, avec un message. Par défaut TanStack la mettrait en
     // attente et la rejouerait au retour du réseau : un paiement ou un changement de statut partirait alors à l'insu de

@@ -248,13 +248,13 @@ describe("Idempotence — en-tête Idempotency-Key", () => {
   });
 
   it("activation d'abonnement (SuperAdmin) : 5 requêtes simultanées avec la même clé → UN seul abonnement (sans clé : 5, mesuré)", async () => {
-    const plan = (await S.post("/api/plans-abonnement", { nom: `Plan Idem ${process.pid}`, prixMensuel: "15000", fonctionnalites: ["x"] })).body;
+    const plan = await prisma.planAbonnement.create({ data: { nom: `Plan Idem ${process.pid}`, prixMensuel: 15000, fonctionnalites: ["x"], actif: true } });
     const cle = cleUnique();
     const avant = await prisma.abonnement.count({ where: { atelierId: A.atelier.id } });
-    const reponses = await enParallele(5, () => S.post(`/api/ateliers/${A.atelier.id}/abonnement/activer`, { planId: plan.id, dureeMois: 3 }, H(cle)));
+    const reponses = await enParallele(5, () => S.post(`/api/ateliers/${A.atelier.id}/abonnement/activer`, { mode: "CATALOGUE", planId: plan.id, periodicite: "MENSUEL" }, H(cle)));
     for (const r of reponses) assert.ok([201, 409].includes(r.status), `statut ${r.status}`);
     assert.equal(await prisma.abonnement.count({ where: { atelierId: A.atelier.id } }), avant + 1);
-    const sansCle = await enParallele(3, () => S.post(`/api/ateliers/${B.atelier.id}/abonnement/activer`, { planId: plan.id, dureeMois: 1 }));
+    const sansCle = await enParallele(3, () => S.post(`/api/ateliers/${B.atelier.id}/abonnement/activer`, { mode: "CATALOGUE", planId: plan.id, periodicite: "MENSUEL" }));
     assert.deepEqual(repartition(sansCle), { 201: 3 }, "sans clé le comportement reste inchangé (non protégé)");
   });
 

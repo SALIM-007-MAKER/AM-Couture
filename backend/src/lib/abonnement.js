@@ -84,40 +84,9 @@ export async function activerAbonnement(tx, { abonnementId, dureeMois }, mainten
   return dateExpiration;
 }
 
-// ── Tarification par durée ────────────────────────────────────────────────
-// Un plan a un prix MENSUEL et une liste de durées proposées avec remise :
-// [{ dureeMois, remisePourcent }]. Vide = durées standard sans remise.
-// SEULE règle de calcul du prix d'une durée — utilisée pour l'affichage (liste
-// des plans, PDG et SuperAdmin) ET pour le prix figé à l'activation, afin que
-// les deux ne divergent jamais.
-export const DUREES_STANDARD = [1, 3, 6, 12];
-
-export function tarifsDuree(plan) {
-  const configures = Array.isArray(plan.tarifsDuree) ? plan.tarifsDuree : [];
-  const base = configures.length > 0 ? configures : DUREES_STANDARD.map((dureeMois) => ({ dureeMois, remisePourcent: 0 }));
-  return base
-    .map((t) => ({ dureeMois: t.dureeMois, remisePourcent: Number(t.remisePourcent) || 0 }))
-    .sort((a, b) => a.dureeMois - b.dureeMois);
-}
-
-/** Prix total (Decimal, 2 décimales) d'un plan pour `dureeMois` mois ; remise appliquée si la durée est proposée. */
-export function prixPourDuree(plan, dureeMois) {
-  const tarif = tarifsDuree(plan).find((t) => t.dureeMois === dureeMois);
-  const remise = tarif?.remisePourcent ?? 0;
-  return plan.prixMensuel
-    .mul(dureeMois)
-    .mul(100 - remise)
-    .div(100)
-    .toDecimalPlaces(2);
-}
-
-/** Plan tel qu'exposé par l'API : tarifs par durée avec total calculé par le serveur. */
-export function planAvecTarifs(plan) {
-  return {
-    ...plan,
-    tarifs: tarifsDuree(plan).map((t) => ({ ...t, total: prixPourDuree(plan, t.dureeMois) })),
-  };
-}
+// ── Tarification ────────────────────────────────────────────────────────────
+// Les prix du catalogue (mensuel / annuel, en XOF) et les offres proposées sont calculés dans lib/tarifs.js. Les anciennes durées
+// (3, 6 mois, remises en %) ne sont plus proposées : les contrats existants gardent leur prix et leur durée figés.
 
 // ── Accès selon l'état d'abonnement ───────────────────────────────────────
 // Règle (décision du 15/11/2026) : à la fin d'un essai ou d'un abonnement, l'atelier garde l'accès COMPLET pendant

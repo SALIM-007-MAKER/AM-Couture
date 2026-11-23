@@ -33,6 +33,7 @@ import paiementsRouter from "./paiements.routes.js";
 import livraisonsRouter from "./livraisons.routes.js";
 import { recusCommandeRouter } from "./recus.routes.js";
 import { STATUTS_OUVERTS, debutDuJour, estEnRetard, estAffectable } from "../lib/production.js";
+import { exigerQuota } from "../lib/quotasServeur.js";
 
 const router = Router();
 
@@ -113,6 +114,8 @@ router.post("/", requirePermission("commandes.ecrire"), idempotence, async (req,
   // le défaut — voir le test de concurrence de numérotation.
   const result = await prisma.$transaction(
     async (tx) => {
+      // Quota de commandes actives : verrou et contrôle AVANT le compteur de numéros (ordre unique des verrous).
+      await exigerQuota(tx, { atelierId: req.user.atelierId, ressource: "commandesActives" });
       const numero = await nextNumero(tx, "CMD");
       const commande = await tx.commande.create({
         data: { ...commandeInput, numero, atelierId: req.user.atelierId },

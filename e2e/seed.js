@@ -17,6 +17,7 @@ export const COMPTES = {
   clientAlpha: "e2e-client-alpha",
   pdgGamma: "e2e-pdg-gamma",
   pdgDelta: "e2e-pdg-delta",
+  pdgQuota: "e2e-pdg-quota",
 };
 
 function verifierBase(url) {
@@ -94,15 +95,40 @@ export async function reinitialiserEtSemer() {
   await prisma.user.create({
     data: { identifiant: COMPTES.pdgDelta, passwordHash, role: "ADMIN", atelierId: delta.id, prenom: "Didier", nom: "Delta" },
   });
+  // Atelier QUOTA : essai terminé depuis longtemps, abonnement actif dont les limites sont petites (formule INACTIVE : elle
+  // n'apparaît pas dans la liste des formules proposées, qui ne doit pas changer pour les autres parcours). 1 cliente sur 2.
+  const limitesQuota = { clientes: 2, employes: 1, commandesActives: 2, modeles: 2 };
+  const planQuota = await prisma.planAbonnement.create({
+    data: { nom: "Starter E2E", prixMensuel: 5000, actif: false, limites: limitesQuota, fonctionnalites: ["Quotas de test"] },
+  });
+  const quota = await prisma.atelier.create({ data: { nom: "Atelier E2E Quota", devise: "FCFA", trialEndsAt: jours(-60) } });
+  await prisma.user.create({
+    data: { identifiant: COMPTES.pdgQuota, passwordHash, role: "ADMIN", atelierId: quota.id, prenom: "Quentin", nom: "Quota" },
+  });
+  await prisma.abonnement.create({
+    data: {
+      numero: "ABN-E2E-QUOTA",
+      atelierId: quota.id,
+      planId: planQuota.id,
+      planNom: planQuota.nom,
+      dureeMois: 12,
+      prix: "60000",
+      statut: "CONFIRME",
+      dateDebut: jours(-5),
+      dateExpiration: jours(360),
+      limites: limitesQuota,
+    },
+  });
+  const clienteQuota = await prisma.cliente.create({ data: { atelierId: quota.id, prenom: "Prem", nom: "Quota", telephone: "90000101" } });
+  await prisma.mesure.create({ data: { clienteId: clienteQuota.id, poitrine: "90", taille: "70", hanches: "95" } });
+
   await prisma.planAbonnement.create({
     data: {
       nom: "Plan E2E",
-      prixMensuel: "10000",
+      // Montants de TEST (aucun tarif réel n'est écrit dans le code de l'application).
+      prixMensuel: 10000,
+      prixAnnuel: 100000,
       fonctionnalites: ["Clientes illimitées"],
-      tarifsDuree: [
-        { dureeMois: 1, remisePourcent: 0 },
-        { dureeMois: 3, remisePourcent: 10 },
-      ],
     },
   });
   await prisma.parametresPlateforme.upsert({
