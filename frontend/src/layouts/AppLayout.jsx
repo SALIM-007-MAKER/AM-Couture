@@ -398,8 +398,8 @@ export default function AppLayout() {
             )}
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
-            <LanguageSwitcher className="hidden sm:inline-flex" onChange={(langue) => preferencesMutation.mutate({ langue })} />
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <LanguageSwitcher onChange={(langue) => preferencesMutation.mutate({ langue })} />
             <NotificationBell />
             {user && (
               <div className="hidden sm:flex items-center gap-2">
