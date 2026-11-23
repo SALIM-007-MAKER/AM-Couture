@@ -12,8 +12,11 @@ const LANGUES = [
  * connue). Couleurs en paire clair/sombre standard : LoginPage force
  * `.dark` sur sa racine (voir son commentaire), donc la variante ambrée
  * s'y applique automatiquement sans code séparé.
+ *
+ * `onChange(code)` : appelé après le changement local, pour enregistrer le choix sur le compte quand l'utilisateur est connecté
+ * (sans lui, la langue ne survivait pas à un rechargement : LocaleSync remettait celle du compte). Absent avant connexion.
  */
-export default function LanguageSwitcher({ className = "" }) {
+export default function LanguageSwitcher({ className = "", onChange }) {
   const { locale, setLocale } = useTranslation();
   return (
     <div className={`inline-flex rounded-lg border border-neutral-200 dark:border-white/10 bg-neutral-100 dark:bg-white/5 p-0.5 text-xs ${className}`}>
@@ -21,7 +24,11 @@ export default function LanguageSwitcher({ className = "" }) {
         <button
           key={l.code}
           type="button"
-          onClick={() => setLocale(l.code)}
+          onClick={() => {
+            if (l.code === locale) return;
+            setLocale(l.code);
+            onChange?.(l.code);
+          }}
           className={`px-2.5 py-1 rounded-md transition-colors ${
             locale === l.code
               ? "bg-brand-600 text-white dark:bg-amber-500 dark:text-neutral-950 font-medium"

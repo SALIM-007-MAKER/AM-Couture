@@ -2,7 +2,8 @@ import { test, expect } from "@playwright/test";
 import { ETATS } from "../global-setup.js";
 
 // Interface : logo Tailora sur les écrans d'accès, menu latéral fixe (atelier et SuperAdmin) avec défilement interne,
-// comportement mobile, et changement de langue du SuperAdmin qui ne le renvoie pas vers un écran d'atelier vide.
+// comportement mobile, changement de langue du SuperAdmin qui ne le renvoie pas vers un écran d'atelier vide, et bouton FR/EN de
+// l'en-tête du PDG (le choix tenait 26 ms puis était annulé par la langue du compte, et ne survivait pas à un rechargement).
 
 test.describe("écrans d'accès", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -99,6 +100,41 @@ test.describe("SuperAdmin : menu fixe et langue", () => {
       // Remet le français : la langue est enregistrée sur le compte, les autres tests la supposent en français.
       const res = await request.patch("/api/compte", { data: { langue: "fr" } });
       if (!res.ok()) await page.goto("/mon-compte").then(() => page.getByRole("combobox").first().selectOption("fr"));
+    }
+  });
+});
+
+test.describe("PDG : bouton FR/EN de l'en-tête", () => {
+  test.use({ storageState: ETATS.pdg, viewport: { width: 1280, height: 700 } });
+
+  test("le choix tient (il n'est plus annulé par la langue du compte), est enregistré, et survit à un rechargement", async ({ page, request }) => {
+    try {
+      await page.goto("/");
+      await expect(page.getByRole("heading", { name: "Tableau de bord" }).first()).toBeVisible();
+      const en = page.getByRole("button", { name: "EN", exact: true });
+      await en.click();
+      await expect(page.getByRole("heading", { name: "Dashboard" }).first()).toBeVisible();
+      // Régression : la langue du compte (FR) était remise ~25 ms plus tard. On laisse largement le temps à l'annulation de se produire.
+      await page.waitForTimeout(1500);
+      await expect(page.getByRole("heading", { name: "Dashboard" }).first()).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Tableau de bord" })).toHaveCount(0);
+      await expect(en).toHaveAttribute("aria-pressed", "true");
+
+      // Le choix est enregistré sur le compte : il survit à un rechargement complet.
+      await page.reload();
+      await expect(page.getByRole("heading", { name: "Dashboard" }).first()).toBeVisible();
+      await expect(page.getByRole("button", { name: "EN", exact: true })).toHaveAttribute("aria-pressed", "true");
+
+      // Et on peut revenir au français par le même bouton.
+      await page.getByRole("button", { name: "FR", exact: true }).click();
+      await expect(page.getByRole("heading", { name: "Tableau de bord" }).first()).toBeVisible();
+      await page.waitForTimeout(800);
+      await expect(page.getByRole("heading", { name: "Tableau de bord" }).first()).toBeVisible();
+      await page.reload();
+      await expect(page.getByRole("heading", { name: "Tableau de bord" }).first()).toBeVisible();
+    } finally {
+      // Remet le français : la langue est enregistrée sur le compte, les autres tests la supposent en français.
+      await request.patch("/api/compte", { data: { langue: "fr" } });
     }
   });
 });
