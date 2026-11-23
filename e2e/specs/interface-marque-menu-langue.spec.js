@@ -72,6 +72,26 @@ test.describe("mobile, atelier (PDG)", () => {
     const debordement = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(debordement).toBeLessThanOrEqual(0);
   });
+
+  test("le bouton FR/EN de l'en-tête est présent, change la langue, et la page ne déborde pas", async ({ page, request }) => {
+    try {
+      await page.goto("/tableau-de-bord");
+      await expect(page.getByRole("heading", { name: "Tableau de bord" }).first()).toBeVisible();
+      const en = page.getByRole("button", { name: "EN", exact: true });
+      await expect(en).toBeVisible();
+      await en.click();
+      await expect(page.getByRole("heading", { name: "Dashboard" }).first()).toBeVisible();
+      await page.waitForTimeout(1000);
+      await expect(page.getByRole("heading", { name: "Dashboard" }).first()).toBeVisible();
+      const debordement = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      expect(debordement).toBeLessThanOrEqual(0);
+      // Les boutons de l'en-tête restent entièrement dans l'écran (le bouton de déconnexion est le dernier à droite).
+      const droite = await page.getByRole("button", { name: /Log out|Déconnexion/ }).evaluate((b) => b.getBoundingClientRect().right);
+      expect(droite).toBeLessThanOrEqual(390);
+    } finally {
+      await request.patch("/api/compte", { data: { langue: "fr" } });
+    }
+  });
 });
 
 test.describe("SuperAdmin : menu fixe et langue", () => {
