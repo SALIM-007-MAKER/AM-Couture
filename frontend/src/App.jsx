@@ -24,6 +24,7 @@ const VitrineReglagesPage = lazy(() => import("./features/vitrine/VitrineReglage
 const EmployesPage = lazy(() => import("./features/employes/EmployesPage.jsx"));
 const EmployeFormPage = lazy(() => import("./features/employes/EmployeFormPage.jsx"));
 const GestionPlansPage = lazy(() => import("./pages/superadmin/GestionPlansPage.jsx"));
+const NotificationsPlateformePage = lazy(() => import("./pages/superadmin/NotificationsPlateformePage.jsx"));
 const PaiementsAbonnementPage = lazy(() => import("./pages/superadmin/PaiementsAbonnementPage.jsx"));
 const CommercePage = lazy(() => import("./pages/superadmin/CommercePage.jsx"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage.jsx"));
@@ -265,6 +266,7 @@ export default function App() {
             <Route path="/ateliers/:id" element={<AtelierDetailPage />} />
             <Route path="/gestion-abonnements" element={<GestionAbonnementsPage />} />
             <Route path="/paiements-abonnement" element={<PaiementsAbonnementPage />} />
+            <Route path="/notifications-plateforme" element={<NotificationsPlateformePage />} />
             <Route path="/commerce" element={<CommercePage />} />
             <Route path="/tarifs-abonnement" element={<GestionPlansPage />} />
             <Route path="/mon-compte" element={<ComptePage />} />

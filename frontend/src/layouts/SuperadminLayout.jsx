@@ -1,9 +1,11 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
-import { LayoutDashboard, Building2, CreditCard, Tag, TrendingUp, Banknote, UserCircle, Menu, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Bell, LayoutDashboard, Building2, CreditCard, Tag, TrendingUp, Banknote, UserCircle, Menu, LogOut, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useMeQuery, useLogoutMutation } from "../hooks/useAuth.js";
 import { useUiStore } from "../stores/uiStore.js";
 import { useTranslation } from "../i18n/index.js";
 import LocaleSync from "../components/LocaleSync.jsx";
+import { usePaiementsAValiderQuery } from "../features/commerce/hooks.js";
+import { useAteliersAlertesQuery } from "../features/ateliers/hooks.js";
 
 // Shell dédié au SUPERADMIN — délibérément distinct d'AppLayout (Phase 8) :
 // AppLayout suppose partout un atelier courant (cloche de notifications,
@@ -116,8 +118,37 @@ function Logo({ collapsed }) {
   );
 }
 
+// La page des notifications n'est pas dans le menu (on y va par la cloche) : elle garde pourtant son titre dans l'en-tête.
+const PAGE_NOTIFICATIONS = { labelKey: "nav.notifications", to: "/notifications-plateforme", icon: Bell };
+
 function useCurrentNavItem(pathname) {
+  if (pathname.startsWith(PAGE_NOTIFICATIONS.to)) return PAGE_NOTIFICATIONS;
   return NAV_ITEMS.find((item) => (item.end ? pathname === item.to : pathname.startsWith(item.to)));
+}
+
+// Cloche de l'en-tête du SUPERADMIN — pastille = ce qui demande une action : paiements déclarés à valider, abonnements
+// expirés ou qui expirent sous 7 jours. Les ateliers suspendus (décision du SUPERADMIN) et les nouveaux ateliers (information)
+// restent listés sur la page mais ne comptent pas : sans « lu / non lu », ils garderaient la pastille allumée en permanence.
+// Rafraîchie à la minute ; un compteur absent ou en erreur reste un détail décoratif, jamais bloquant.
+function NotificationBell() {
+  const { t } = useTranslation();
+  const paiements = usePaiementsAValiderQuery();
+  const alertes = useAteliersAlertesQuery();
+  const count = (paiements.data?.total ?? 0) + (alertes.data?.abonnementsAlerte?.length ?? 0);
+  return (
+    <NavLink
+      to="/notifications-plateforme"
+      className="relative flex size-10 sm:size-auto items-center justify-center rounded-lg sm:p-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+      aria-label={count > 0 ? t("nav.unreadNotifications", { count }) : t("nav.notifications")}
+    >
+      <Bell className="size-4" aria-hidden="true" />
+      {count > 0 && (
+        <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-4 h-4 px-0.5 rounded-full bg-red-600 text-white text-[10px] font-semibold leading-none">
+          {count > 9 ? "9+" : count}
+        </span>
+      )}
+    </NavLink>
+  );
 }
 
 export default function SuperadminLayout() {
@@ -201,7 +232,8 @@ export default function SuperadminLayout() {
             )}
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <NotificationBell />
             {user && (
               <div className="hidden sm:flex items-center gap-2">
                 <span className="flex size-7 items-center justify-center rounded-full bg-brand-100 dark:bg-brand-950 text-xs font-semibold text-brand-700 dark:text-brand-300">

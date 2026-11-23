@@ -41,6 +41,27 @@ router.put("/contact", async (req, res) => {
   res.json({ whatsapp: p.contactWhatsapp });
 });
 
+// GET /api/plateforme/paiements-a-valider — paiements manuels DÉCLARÉS par un atelier et en attente de décision du
+// SUPERADMIN (cloche de l'en-tête). Recalculé à chaque appel : rien n'est stocké, la ligne disparaît dès qu'une décision est prise.
+router.get("/paiements-a-valider", async (req, res) => {
+  const where = { statut: "EN_ATTENTE", declareLe: { not: null } };
+  const [total, rows] = await Promise.all([
+    prisma.transaction.count({ where }),
+    prisma.transaction.findMany({
+      where,
+      orderBy: [{ declareLe: "asc" }, { id: "asc" }],
+      take: 20,
+      select: { id: true, numero: true, atelierId: true, montant: true, moyenPaiement: true, operateur: true, declareLe: true },
+    }),
+  ]);
+  const ateliers = await prisma.atelier.findMany({
+    where: { id: { in: [...new Set(rows.map((r) => r.atelierId).filter(Boolean))] } },
+    select: { id: true, nom: true },
+  });
+  const nomParId = new Map(ateliers.map((a) => [a.id, a.nom]));
+  res.json({ total, data: rows.map((r) => ({ ...r, atelierNom: nomParId.get(r.atelierId) ?? null })) });
+});
+
 // GET /api/plateforme/journal-securite?evenement=&atelierId=&userId=&page=&pageSize=
 // — consultation (lecture seule) du journal de sécurité persistant, plus récent
 // d'abord. Réservé SUPERADMIN (router.use ci-dessus).

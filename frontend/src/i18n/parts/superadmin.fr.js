@@ -19,6 +19,16 @@ export default {
       platformName: "Tailora",
       role: "Superadmin",
     },
+    notifications: {
+      title: "Notifications",
+      subtitle: "Ce qui demande votre attention sur la plateforme.",
+      paymentsTitle: "Paiements à valider",
+      paymentsLoading: "Chargement des paiements…",
+      paymentLine: "paiement {{numero}} de {{montant}} à valider (déclaré le {{date}})",
+      paymentsMore: "{{count}} autres paiements en attente — voir la page Paiements.",
+      noPayments: "Aucun paiement en attente de validation.",
+      alertsTitle: "Alertes sur les ateliers",
+    },
     dashboard: {
       title: "Vue d'ensemble",
       subtitle: "Totaux de la plateforme Tailora, tous ateliers confondus.",

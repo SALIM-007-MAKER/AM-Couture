@@ -181,6 +181,28 @@ describe("Souscription et paiements d'abonnement", () => {
     });
   });
 
+  describe("cloche du SUPERADMIN : paiements à valider", () => {
+    test("un paiement déclaré apparaît avec le nom de l'atelier, et disparaît dès qu'une décision est prise", async () => {
+      const dec = await declarer(apiB, { reference: "CLOCHE-1" });
+      assert.equal(dec.status, 201);
+      const avant = await superApi.get("/api/plateforme/paiements-a-valider");
+      assert.equal(avant.status, 200);
+      const ligne = avant.body.data.find((p) => p.id === dec.body.id);
+      assert.ok(ligne, "le paiement déclaré est listé");
+      assert.equal(ligne.atelierNom, B.nom);
+      assert.ok(avant.body.total >= 1);
+
+      assert.equal((await superApi.post(`/api/plateforme/transactions/${dec.body.id}/rejeter`, { motif: "Test cloche" })).status, 200);
+      const apres = await superApi.get("/api/plateforme/paiements-a-valider");
+      assert.ok(!apres.body.data.some((p) => p.id === dec.body.id), "une fois rejeté, il n'est plus à valider");
+      assert.equal(apres.body.total, avant.body.total - 1);
+    });
+
+    test("réservé au SUPERADMIN : un PDG d'atelier reçoit 403", async () => {
+      assert.equal((await apiA.get("/api/plateforme/paiements-a-valider")).status, 403);
+    });
+  });
+
   describe("renouvellement anticipé : aucun jour perdu", () => {
     test("un nouvel abonnement confirmé commence à l'échéance de celui en cours", async () => {
       const courant = await prisma.abonnement.findFirst({ where: { atelierId: A.id, statut: "CONFIRME" } });

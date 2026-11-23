@@ -12,6 +12,7 @@ const requete = (params) => {
 
 export const paiementsAdminApi = {
   liste: (params) => api.get(`/plateforme/transactions${requete(params)}`),
+  aValider: () => api.get("/plateforme/paiements-a-valider"),
   confirmer: (id) => api.post(`/plateforme/transactions/${id}/confirmer`, {}),
   rejeter: (id, motif) => api.post(`/plateforme/transactions/${id}/rejeter`, { motif }),
   rembourser: (id, motif) => api.post(`/plateforme/transactions/${id}/rembourser`, { motif }),
