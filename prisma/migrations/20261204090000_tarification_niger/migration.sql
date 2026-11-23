@@ -5,6 +5,8 @@
 --    annuel n'est proposé que lorsque le SUPERADMIN le saisit. "tarifsDuree" est conservé (durées historiques des contrats
 --    existants) mais n'alimente plus les offres.
 --  - "pays" = 'NE' et "devise" = 'XOF' : constantes techniques, pas des données commerciales.
+-- Transaction explicite : un échec en cours de route n'en laisse rien (Prisma n'enveloppe pas lui-même un script multi-instructions).
+BEGIN;
 ALTER TABLE "PlanAbonnement" ALTER COLUMN "prixMensuel" DROP NOT NULL;
 ALTER TABLE "PlanAbonnement" ADD COLUMN "prixAnnuel" DECIMAL(10,2);
 ALTER TABLE "PlanAbonnement" ADD COLUMN "pays" TEXT NOT NULL DEFAULT 'NE';
@@ -12,3 +14,4 @@ ALTER TABLE "PlanAbonnement" ADD COLUMN "devise" TEXT NOT NULL DEFAULT 'XOF';
 ALTER TABLE "PlanAbonnement" ADD CONSTRAINT "PlanAbonnement_prixAnnuel_positif_chk" CHECK ("prixAnnuel" IS NULL OR "prixAnnuel" > 0);
 ALTER TABLE "Transaction" ADD COLUMN "devise" TEXT NOT NULL DEFAULT 'XOF';
 ALTER TABLE "Abonnement" ADD COLUMN "tarifExceptionnel" BOOLEAN NOT NULL DEFAULT false;
+COMMIT;
