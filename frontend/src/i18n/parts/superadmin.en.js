@@ -18,6 +18,16 @@ export default {
       platformName: "Tailora",
       role: "Superadmin",
     },
+    notifications: {
+      title: "Notifications",
+      subtitle: "What needs your attention on the platform.",
+      paymentsTitle: "Payments to validate",
+      paymentsLoading: "Loading payments…",
+      paymentLine: "payment {{numero}} of {{montant}} to validate (declared on {{date}})",
+      paymentsMore: "{{count}} more payments pending — see the Payments page.",
+      noPayments: "No payment waiting for validation.",
+      alertsTitle: "Workshop alerts",
+    },
     dashboard: {
       title: "Overview",
       subtitle: "Totals for the Tailora platform, across all workshops.",

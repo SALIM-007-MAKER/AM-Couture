@@ -57,7 +57,7 @@ function formatDate(iso) {
 // PAS un nouveau système de notifications persistées (pas de "lu/non lu",
 // rien stocké, recalculé à chaque chargement) : même décision que le fil
 // "Activité récente" de la fiche atelier (voir AtelierDetailPage.jsx).
-function AlertesSection() {
+export function AlertesSection() {
   const { t } = useTranslation();
   const { data, isPending, isError, error, refetch } = useAteliersAlertesQuery();
 

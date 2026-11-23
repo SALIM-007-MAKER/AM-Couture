@@ -13,6 +13,15 @@ export function usePaiementsAdminQuery(params) {
   });
 }
 
+// Cloche du SUPERADMIN : paiements déclarés en attente de décision, rafraîchis à la minute (pas de websocket dans ce projet).
+export function usePaiementsAValiderQuery() {
+  return useQuery({
+    queryKey: [...PAIEMENTS_KEY, "a-valider"],
+    queryFn: () => paiementsAdminApi.aValider(),
+    refetchInterval: 60_000,
+  });
+}
+
 /** Une décision change le paiement, le tableau de bord commercial et la fiche d'abonnement de l'atelier. */
 function useDecision(mutationFn) {
   const queryClient = useQueryClient();

@@ -1,6 +1,6 @@
 # Documentation de l'API
 
-Référence des 206 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
+Référence des 207 routes de l'API REST (`/api/*`). Elle est écrite à la main à partir du code et **vérifiée automatiquement** : le test `backend/src/routes/__tests__/documentationApi.test.js` échoue si une route du code n'est pas listée ici, ou si une route listée n'existe plus. Il ne vérifie pas le contenu des colonnes « Corps / paramètres » : en cas de doute, la source de vérité est le schéma de validation cité (`backend/src/schemas/`).
 
 Documents liés : formats d'erreur → [ERREURS.md](ERREURS.md) · idempotence → [IDEMPOTENCE.md](IDEMPOTENCE.md) · sécurité → [SECURITE.md](SECURITE.md) · journaux → [JOURNALISATION.md](JOURNALISATION.md).
 
@@ -386,6 +386,7 @@ Aucune de ces routes ne donne accès aux données métier d'un atelier (clientes
 | `PATCH /api/plans-abonnement/:id` | SuperAdmin | Mêmes champs. Passer `actif` à `true` exige un tarif ET quatre quotas définis (409). |
 | `GET /api/plateforme/contact` | SuperAdmin | Numéro WhatsApp de contact de la plateforme. |
 | `PUT /api/plateforme/contact` | SuperAdmin | `{ whatsapp }` (8 à 15 chiffres avec indicatif). |
+| `GET /api/plateforme/paiements-a-valider` | SuperAdmin | Aucun paramètre. Paiements manuels **déclarés** par un atelier et encore en attente de décision : `{ total, data }` (20 plus anciens, avec `atelierNom`). Alimente la cloche de l'en-tête SuperAdmin ; recalculé à chaque appel, rien n'est stocké. |
 | `GET /api/plateforme/transactions` | SuperAdmin | `?statut=EN_ATTENTE\|REUSSIE\|ECHOUEE\|ANNULEE\|EXPIREE\|REMBOURSEE`, `atelierId=`, pagination. Paiements d'abonnement de tous les ateliers, avec le nom de l'atelier. |
 | `POST /api/plateforme/transactions/:id/confirmer` | SuperAdmin | `{ note? }` — après rapprochement avec le relevé : active l'abonnement (début à l'échéance en cours s'il y en a une, aucun jour perdu) et émet la facture. Répéter l'appel renvoie `dejaTraitee: true` sans rien refaire. 409 si la transaction n'est plus en attente ou si le moyen est Wave. |
 | `POST /api/plateforme/transactions/:id/rejeter` | SuperAdmin | `{ motif }` — transaction `ECHOUEE`, abonnement annulé. Répétable. |
