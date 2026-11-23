@@ -196,7 +196,13 @@ Périmètre : **Niger uniquement**, franc CFA BCEAO (`XOF`, affiché « FCFA »)
 - Le prix annuel est **saisi tel quel** (jamais calculé). L'**économie annuelle** (`mensuel × 12 − annuel`) est calculée automatiquement et affichée **à titre informatif** ; elle n'est jamais stockée ni appliquée.
 - Une formule créée est **inactive**. Elle ne peut être **activée** que si elle a au moins un prix valide **et** si ses **quatre quotas sont définis** (une limite entière, ou « illimité » choisi explicitement). Une limite non définie n'est **jamais** traitée comme illimitée pour décider de proposer une formule (409 `details.activation`).
 - Formules antérieures (limites `{}`) : non réévaluées tant qu'on ne les réactive pas ; un abonnement qui en dépend reste illimité (voir §12).
+- **Avertissement SuperAdmin** : une formule **active** dont des quotas ne sont pas définis affiche un encadré « Quotas non définis : actuellement illimités » (écran « Formules et tarification », `data-testid="avertissement-quotas"`). Tant qu'une limite n'est pas décidée, les ateliers qui souscrivent n'ont **aucune limite** sur cette ressource. L'encadré est informatif : aucune limite n'est jamais attribuée automatiquement.
 - Les anciennes durées de 3 et 6 mois et les remises en pourcentage ne sont plus proposées. Les contrats existants gardent leur prix et leur durée figés.
+- **Rétro-remplissage du prix annuel** (migration `20261205090000_retro_remplissage_prix_annuel`, données seulement). Avant la tarification Niger, le prix d'une durée était calculé : `prixMensuel × durée × (100 − remise) / 100`, avec `tarifsDuree` = `[{ dureeMois, remisePourcent }]` (vide = durées standard 1, 3, 6, 12 mois sans remise). La migration recopie une fois, dans `prixAnnuel`, ce que cette règle donnait pour 12 mois :
+  - jamais d'écrasement : seules les formules à `prixAnnuel` vide sont traitées, donc un second passage ne change rien ;
+  - aucun prix inventé : si le prix mensuel est absent, nul ou non entier, si la remise est illisible ou hors 0–90 %, si le calcul ne donne pas un entier de 1 à 99 999 999 (aucun arrondi), la formule reste vide ; si `tarifsDuree` est rempli sans entrée « 12 », l'annuel n'était pas proposé et reste non proposé ;
+  - `tarifsDuree`, les quotas, le prix mensuel et le statut ne sont pas touchés.
+  - **Liste des formules à traiter à la main** : Prisma n'affiche pas les messages `NOTICE` de la migration. Après le déploiement, lister les formules sans offre annuelle avec (lecture seule) : `SELECT nom, "prixMensuel", "tarifsDuree" FROM "PlanAbonnement" WHERE "prixAnnuel" IS NULL ORDER BY nom;` puis saisir le tarif dans « Formules et tarification » si une offre annuelle est voulue.
 
 ### Souscription et activation
 
