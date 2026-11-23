@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Scissors, User, Ruler, ClipboardList, Wallet, FileText, Inbox, Bell, Menu, LogOut } from "lucide-react";
+import { Scissors, User, Ruler, ClipboardList, Wallet, FileText, Inbox, Bell, Menu, LogOut, BookOpen } from "lucide-react";
 import { useLogoutMutation } from "../hooks/useAuth.js";
 import { useMonProfilQuery, useMesNombreNonLuesQuery } from "../features/moi/hooks.js";
 import { useTranslation } from "../i18n/index.js";
@@ -20,7 +20,10 @@ const NAV_ITEMS = [
   { labelKey: "nav.requests", to: "/client/demandes", icon: Inbox },
 ];
 
-const DRAWER_ITEMS = [{ labelKey: "nav.receipts", to: "/client/recus", icon: FileText }];
+const DRAWER_ITEMS = [
+  { labelKey: "nav.receipts", to: "/client/recus", icon: FileText },
+  { labelKey: "nav.guide", to: "/client/aide", icon: BookOpen },
+];
 
 // `nom`/`logoUrl` viennent de l'atelier DONT LE CLIENT CONNECTÉ EST CLIENT —
 // exposés via GET /api/moi (voir moi.routes.js), le seul endpoint accessible

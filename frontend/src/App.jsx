@@ -61,6 +61,7 @@ const RapportsAvancesPage = lazy(() => import("./features/rapports/RapportsAvanc
 const ParametresPage = lazy(() => import("./features/parametres/ParametresPage.jsx"));
 const NotificationsPage = lazy(() => import("./features/notifications/NotificationsPage.jsx"));
 const CalendrierPage = lazy(() => import("./features/calendrier/CalendrierPage.jsx"));
+const GuidePage = lazy(() => import("./features/guide/GuidePage.jsx"));
 const ComptePage = lazy(() => import("./features/compte/ComptePage.jsx"));
 const AbonnementPage = lazy(() => import("./features/abonnement/AbonnementPage.jsx"));
 const DemandesListPage = lazy(() => import("./features/demandes/DemandesListPage.jsx"));
@@ -227,6 +228,7 @@ export default function App() {
               <Route path="/parametres" element={<ParametresPage />} />
             </Route>
             <Route path="/compte" element={<ComptePage />} />
+            <Route path="/aide" element={<GuidePage />} />
             <Route element={<RequirePermission permission="@admin" />}>
               <Route path="/vitrine" element={<VitrineReglagesPage />} />
               <Route path="/employes" element={<EmployesPage />} />
@@ -256,6 +258,7 @@ export default function App() {
             <Route path="/client/notifications" element={<ClientNotificationsPage />} />
             <Route path="/client/demandes" element={<ClientDemandesPage />} />
             <Route path="/client/demandes/nouvelle" element={<ClientDemandeFormPage />} />
+            <Route path="/client/aide" element={<GuidePage />} />
           </Route>
         </Route>
 
@@ -270,6 +273,7 @@ export default function App() {
             <Route path="/commerce" element={<CommercePage />} />
             <Route path="/tarifs-abonnement" element={<GestionPlansPage />} />
             <Route path="/mon-compte" element={<ComptePage />} />
+            <Route path="/aide-plateforme" element={<GuidePage />} />
           </Route>
         </Route>
       </Route>

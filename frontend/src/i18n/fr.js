@@ -20,6 +20,7 @@ import donnees from "./parts/donnees.fr.js";
 import rapportsAvances from "./parts/rapportsAvances.fr.js";
 import accueil from "./parts/accueil.fr.js";
 import quotas from "./parts/quotas.fr.js";
+import guide from "./parts/guide.fr.js";
 
 export default {
   ...shared,
@@ -40,6 +41,7 @@ export default {
   ...rapportsAvances,
   ...accueil,
   ...quotas,
+  ...guide,
   common: {
     save: "Enregistrer",
     cancel: "Annuler",
@@ -87,6 +89,7 @@ export default {
     suppliers: "Fournisseurs",
     purchases: "Achats",
     storefront: "Vitrine",
+    guide: "Guide d'utilisation",
     finances: "Finances",
     notifications: "Notifications",
     unreadNotifications: "{{count}} notification(s) non lue(s)",

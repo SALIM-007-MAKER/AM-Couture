@@ -97,6 +97,23 @@ d'impersonation (couverts seulement par les tests d'intégration).
 Les calculs financiers (totaux, soldes, statut de paiement) sont **côté serveur** (`backend/src/lib/money.js`, testés
 en unitaire et en intégration) ; le frontend n'en refait aucun, il affiche les montants reçus.
 
+## Guides d'utilisation intégrés (`/aide`, `/client/aide`, `/aide-plateforme`)
+
+Le contenu des quatre guides (PDG, employé, client, SUPERADMIN) est **structuré** : `frontend/src/features/guide/structure.js` (sections, étapes,
+permissions, pages, captures) et `frontend/src/i18n/guides/<guide>.<fr|en>.js` (textes). Les libellés d'écran y sont écrits `[[cle.i18n]]` et résolus au
+rendu : aucun bouton ne peut être recopié ou inventé. Le guide affiché dépend uniquement du rôle du compte (`guideDe`) ; un employé ne voit que les
+sections et étapes que ses permissions ouvrent (`sectionsVisibles`).
+
+- `npm run guides:md` régénère `docs/guides/*.md` (français) et `docs/guides/en/*.md` (anglais) depuis ce contenu : **ne jamais les modifier à la main**.
+  `scripts/__tests__/guides.test.mjs` échoue si un fichier est périmé.
+- Test unitaire `frontend/src/features/guide/__tests__/guide.test.js` : textes FR/EN complets et alignés, chaque libellé cité existe dans les deux
+  dictionnaires, chaque page citée est une route de `App.jsx`, chaque permission existe dans le catalogue du serveur, l'écran d'une étape est accessible
+  avec les seules permissions de sa section, et le contenu visible de chaque poste (couturier, réceptionniste, magasinier, comptable, autre).
+- E2E `e2e/specs/guide.spec.js` : chaque rôle (PDG, un employé par poste, client, SUPERADMIN) ouvre son guide depuis son menu, ne voit pas les autres,
+  parcourt chaque étape sur la vraie page (libellés cités réellement affichés), en français et en anglais, sur ordinateur et à 390 px sans débordement.
+- `npm run guides:captures` (base E2E locale **uniquement**, données fictives de `e2e/seed.js`) régénère les captures annotées
+  `frontend/public/guide/<fr|en>/<id>-<desktop|mobile>.jpg`. À relancer, puis à commiter, quand un écran photographié change.
+
 ## CSP : le hash du script inline et les fins de ligne (Windows)
 
 La CSP de `vercel.json` autorise le script inline de `frontend/index.html` par son hash SHA-256. Vite recopie ce script **octet pour octet** dans
