@@ -15,6 +15,7 @@ import {
   ordrePhotosSchema,
   MAX_PHOTOS_MODELE,
 } from "../schemas/modele.schema.js";
+import { verrouillerQuota, verifierQuota } from "../lib/quotasServeur.js";
 
 const router = Router();
 
@@ -72,8 +73,11 @@ router.post("/", async (req, res) => {
   // créés sur 8 requêtes simultanées avant correction).
   const modele = await prisma.$transaction(
     async (tx) => {
+      // Quota d'abord (ordre unique des verrous), contrôle juste avant la création (un doublon est signalé en premier).
+      await verrouillerQuota(tx, req.user.atelierId, "modeles");
       await verrouillerCle(tx, cleModele(req.user.atelierId, data.categorie, data.nom));
       await assertNoDuplicateNomCategorie(tx, req.user.atelierId, data.nom, data.categorie);
+      await verifierQuota(tx, { atelierId: req.user.atelierId, ressource: "modeles" });
       return tx.modele.create({ data: { ...data, atelierId: req.user.atelierId } });
     },
     { maxWait: 10_000, timeout: 15_000 },
@@ -209,10 +213,18 @@ router.post("/:id/archiver", async (req, res) => {
 // POST /api/modeles/:id/restaurer — réactivation d'un modèle archivé
 router.post("/:id/restaurer", async (req, res) => {
   const { id } = req.params;
-  const result = await prisma.modele.updateMany({
-    where: { id, atelierId: req.user.atelierId, archivedAt: { not: null } },
-    data: { archivedAt: null },
-  });
+  // Restaurer un modèle archivé l'ajoute au quota : même verrou et même contrôle que la création.
+  const aRestaurer = { id, atelierId: req.user.atelierId, archivedAt: { not: null } };
+  const result = await prisma.$transaction(
+    async (tx) => {
+      await verrouillerQuota(tx, req.user.atelierId, "modeles");
+      if (await tx.modele.findFirst({ where: aRestaurer, select: { id: true } })) {
+        await verifierQuota(tx, { atelierId: req.user.atelierId, ressource: "modeles" });
+      }
+      return tx.modele.updateMany({ where: aRestaurer, data: { archivedAt: null } });
+    },
+    { maxWait: 10_000, timeout: 15_000 },
+  );
 
   if (result.count === 0) {
     const existing = await prisma.modele.findFirst({

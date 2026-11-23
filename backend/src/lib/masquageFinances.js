@@ -50,6 +50,7 @@ export const CLASSEMENT_DECIMAL = {
   "Transaction.montant": false,
   "FactureAbonnement.montant": false,
   "PlanAbonnement.prixMensuel": false,
+  "PlanAbonnement.prixAnnuel": false,
 };
 
 function masquer(valeur) {

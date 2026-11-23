@@ -25,8 +25,17 @@ export function messageUtilisateur(error, t) {
       return { message: t("ui.errorTooLarge"), reference: null };
     case "server":
       return { message: t("ui.errorServer"), reference: error.requestId };
-    default:
+    default: {
+      // Refus de création par quota (409, details.quota) : message traduit avec la limite et l'usage, jamais la bannière de
+      // lecture seule (402).
+      const quota = error.details?.quota;
+      if (error.status === 409 && quota && typeof quota === "object" && quota.ressource) {
+        const cle = `quotas.atteint.${quota.ressource}`;
+        const texte = t(cle, { limite: Number(quota.limite).toLocaleString(), usage: Number(quota.usage).toLocaleString() });
+        if (texte !== cle) return { message: texte, reference: null };
+      }
       return { message: error.message, reference: null };
+    }
   }
 }
 

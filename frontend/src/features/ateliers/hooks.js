@@ -35,6 +35,11 @@ export function useAtelierQuery(id) {
   return useQuery({ queryKey: detailKey(id), queryFn: () => ateliersApi.get(id), enabled: Boolean(id) });
 }
 
+// Consommation des quotas d'un atelier (SUPERADMIN, lecture seule).
+export function useAtelierUtilisationQuery(id) {
+  return useQuery({ queryKey: ["ateliers", "utilisation", id], queryFn: () => ateliersApi.utilisation(id), enabled: Boolean(id) });
+}
+
 export function useAtelierActiviteQuery(id) {
   return useQuery({ queryKey: activiteKey(id), queryFn: () => ateliersApi.activite(id), enabled: Boolean(id) });
 }

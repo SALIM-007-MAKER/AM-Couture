@@ -135,7 +135,9 @@ test.describe("tableau de bord commercial", () => {
     await expect(page.getByText(/erreur est survenue/i)).toHaveCount(0);
     // Le seul paiement du jeu de données : 10 000 FCFA confirmés ce mois-ci par le test précédent.
     await expect(page.getByTestId("net-mois")).toContainText(new RegExp(`10${ESPACE.source}000`));
-    await expect(page.getByTestId("mrr")).toContainText(new RegExp(`10${ESPACE.source}000`));
+    // Revenu mensuel récurrent : 10 000 (abonnement confirmé par le test précédent) + 5 000 (abonnement actif de l'atelier « Quota »,
+    // 60 000 FCFA sur 12 mois, du jeu de données des quotas).
+    await expect(page.getByTestId("mrr")).toContainText(new RegExp(`15${ESPACE.source}000`));
     await expect(page.getByTestId("carte-ateliers")).toContainText(/actif\(s\)/);
     await expect(page.getByTestId("table-revenus")).toBeVisible();
     await page.getByTestId("horizon").selectOption("60");

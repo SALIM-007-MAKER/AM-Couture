@@ -74,10 +74,15 @@ async function waveFetch(path, options = {}) {
  * dépendre de l'identifiant de session Wave seul.
  */
 export async function creerSessionCheckout({ montant, referenceInterne, successUrl, errorUrl }) {
+  // Le franc CFA n'a pas de centimes : Wave attend un montant ENTIER en XOF. Jamais de session pour un autre montant.
+  const entier = Number(montant);
+  if (!Number.isInteger(entier) || entier < 1) {
+    throw new ErreurWave("Montant invalide pour un paiement en XOF (entier strictement positif requis).", { corps: { montant: String(montant) } });
+  }
   return waveFetch("/checkout/sessions", {
     method: "POST",
     body: JSON.stringify({
-      amount: String(montant),
+      amount: String(entier),
       currency: WAVE_CURRENCY,
       client_reference: referenceInterne,
       success_url: successUrl,

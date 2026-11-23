@@ -39,7 +39,10 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
 
     const creation = await superApi.post("/api/plans-abonnement", {
       nom: `Professionnel ${process.pid}`,
-      prixMensuel: "15000",
+      prixMensuel: 15000,
+      prixAnnuel: 150000,
+      limites: { clientes: null, employes: null, commandesActives: null, modeles: null },
+      actif: true,
       fonctionnalites: ["Clients illimités", "Rapports"],
     });
     assert.equal(creation.status, 201);
@@ -83,8 +86,9 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
 
   test("ADMIN ne peut ni activer un abonnement ni gérer les plans (403)", async () => {
     const activer = await adminApi.post(`/api/ateliers/${atelier.id}/abonnement/activer`, {
+      mode: "CATALOGUE",
       planId: plan.id,
-      dureeMois: 1,
+      periodicite: "MENSUEL",
     });
     assert.equal(activer.status, 403);
     assert.equal((await adminApi.post("/api/plans-abonnement", { nom: "X", prixMensuel: "1" })).status, 403);
@@ -101,7 +105,7 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
     // Et sans être connecté : refus net.
     const anonyme = client(baseUrl);
     assert.equal((await anonyme.get("/api/abonnements/etat")).status, 401);
-    assert.equal((await anonyme.post(`/api/ateliers/${atelier.id}/abonnement/activer`, { planId: plan.id, dureeMois: 1 })).status, 401);
+    assert.equal((await anonyme.post(`/api/ateliers/${atelier.id}/abonnement/activer`, { mode: "CATALOGUE", planId: plan.id, periodicite: "MENSUEL" })).status, 401);
   });
 
   test("SOURCE UNIQUE : un plan modifié/désactivé dans Tarification est reflété côté PDG", async () => {
@@ -120,41 +124,58 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
     await superApi.patch(`/api/plans-abonnement/${plan.id}`, { actif: true, nom: `Professionnel ${process.pid}` });
   });
 
-  test("TARIFS PAR DURÉE : sans config -> 1/3/6/12 sans remise ; avec config -> total remisé calculé par le serveur", async () => {
-    const standard = (await adminApi.get("/api/plans-abonnement")).body.find((p) => p.id === plan.id);
-    assert.deepEqual(standard.tarifs.map((t) => t.dureeMois), [1, 3, 6, 12]);
-    assert.ok(standard.tarifs.every((t) => t.remisePourcent === 0));
-
-    const maj = await superApi.patch(`/api/plans-abonnement/${plan.id}`, {
-      tarifsDuree: [
-        { dureeMois: 12, remisePourcent: 10 },
-        { dureeMois: 3, remisePourcent: 0 },
-      ],
-    });
-    assert.equal(maj.status, 200);
+  test("OFFRES : seulement mensuelle (1 mois) et annuelle (12 mois), prix du catalogue ; l'économie annuelle est informative", async () => {
     const vu = (await adminApi.get("/api/plans-abonnement")).body.find((p) => p.id === plan.id);
-    assert.deepEqual(vu.tarifs.map((t) => t.dureeMois), [3, 12]);
-    assert.equal(Number(vu.tarifs.find((t) => t.dureeMois === 12).total), 162000); // 15000 x 12 x 0,90
-    assert.equal(Number(vu.tarifs.find((t) => t.dureeMois === 3).total), 45000);
+    assert.deepEqual(vu.offres.map((o) => [o.periodicite, o.dureeMois, o.prix, o.devise]), [
+      ["MENSUEL", 1, 15000, "XOF"],
+      ["ANNUEL", 12, 150000, "XOF"],
+    ]);
+    assert.equal(vu.economieAnnuelle, 30000, "15 000 × 12 − 150 000");
+    assert.equal(vu.tarifs, undefined, "plus de durées 1/3/6/12 ni de remises");
 
-    // Le prix figé à l'activation applique la MÊME remise.
-    const activation = await superApi.post(`/api/ateliers/${autreAtelier.id}/abonnement/activer`, { planId: plan.id, dureeMois: 12 });
-    assert.equal(activation.status, 201);
-    assert.equal(Number(activation.body.prix), 162000);
-    // Une durée non proposée : prix mensuel x durée, sans remise.
-    const horsGrille = await superApi.post(`/api/ateliers/${autreAtelier.id}/abonnement/activer`, { planId: plan.id, dureeMois: 2 });
-    assert.equal(Number(horsGrille.body.prix), 30000);
-
-    // Validation : durées en double / remise hors bornes refusées.
-    const doublon = await superApi.patch(`/api/plans-abonnement/${plan.id}`, {
-      tarifsDuree: [{ dureeMois: 6, remisePourcent: 5 }, { dureeMois: 6, remisePourcent: 8 }],
+    // Activation CATALOGUE annuelle : prix et durée du catalogue, figés ; pas un tarif exceptionnel.
+    const annuelle = await superApi.post(`/api/ateliers/${autreAtelier.id}/abonnement/activer`, {
+      mode: "CATALOGUE",
+      planId: plan.id,
+      periodicite: "ANNUEL",
     });
-    assert.equal(doublon.status, 400);
-    assert.equal((await superApi.patch(`/api/plans-abonnement/${plan.id}`, { tarifsDuree: [{ dureeMois: 6, remisePourcent: 95 }] })).status, 400);
-    // Un PDG ne peut pas modifier les tarifs.
-    assert.equal((await adminApi.patch(`/api/plans-abonnement/${plan.id}`, { tarifsDuree: [] })).status, 403);
+    assert.equal(annuelle.status, 201);
+    assert.equal(Number(annuelle.body.prix), 150000);
+    assert.equal(annuelle.body.dureeMois, 12);
+    assert.equal(annuelle.body.tarifExceptionnel, false);
 
-    await superApi.patch(`/api/plans-abonnement/${plan.id}`, { tarifsDuree: [] });
+    // Un PDG ne peut pas modifier les tarifs ; une durée libre hors catalogue n'existe plus en mode CATALOGUE.
+    assert.equal((await adminApi.patch(`/api/plans-abonnement/${plan.id}`, { prixAnnuel: 1 })).status, 403);
+    const horsCatalogue = await superApi.post(`/api/ateliers/${autreAtelier.id}/abonnement/activer`, { mode: "CATALOGUE", planId: plan.id, dureeMois: 2 });
+    assert.equal(horsCatalogue.status, 400);
+    await prisma.historiqueAbonnement.deleteMany({ where: { atelierId: autreAtelier.id } });
+    await prisma.abonnement.deleteMany({ where: { atelierId: autreAtelier.id } });
+  });
+
+  test("ACTIVATION EXCEPTIONNELLE : durée et montant saisis, motif obligatoire, figés et marqués ; aucun prix déduit", async () => {
+    const url = `/api/ateliers/${autreAtelier.id}/abonnement/activer`;
+    const base = { mode: "EXCEPTIONNEL", planId: plan.id, dureeMois: 2, prix: 20000, note: "Geste commercial convenu" };
+    // Refus : pas de motif, pas de prix, prix nul / négatif / décimal, ni durée ni date.
+    assert.equal((await superApi.post(url, { ...base, note: undefined })).status, 400);
+    assert.equal((await superApi.post(url, { ...base, note: "ab" })).status, 400);
+    assert.equal((await superApi.post(url, { ...base, prix: undefined })).status, 400);
+    for (const prix of [0, -5, 2500.5, "abc"]) assert.equal((await superApi.post(url, { ...base, prix })).status, 400, String(prix));
+    assert.equal((await superApi.post(url, { ...base, dureeMois: undefined })).status, 400);
+    assert.equal((await adminApi.post(url, base)).status, 403);
+
+    const res = await superApi.post(url, base);
+    assert.equal(res.status, 201);
+    assert.equal(Number(res.body.prix), 20000, "le montant saisi, pas mensuel × durée");
+    assert.equal(res.body.dureeMois, 2);
+    assert.equal(res.body.tarifExceptionnel, true);
+    const detail = await superApi.get(url.replace("/activer", ""));
+    assert.ok(detail.body.historique.some((h) => h.action === "ACTIVATION" && h.note === "Geste commercial convenu"));
+
+    // Modifier le catalogue ensuite ne change rien au contrat figé.
+    await superApi.patch(`/api/plans-abonnement/${plan.id}`, { prixMensuel: 99999 });
+    const apres = (await superApi.get(url.replace("/activer", ""))).body.abonnements.find((a) => a.id === res.body.id);
+    assert.equal(Number(apres.prix), 20000);
+    await superApi.patch(`/api/plans-abonnement/${plan.id}`, { prixMensuel: 15000 });
     await prisma.historiqueAbonnement.deleteMany({ where: { atelierId: autreAtelier.id } });
     await prisma.abonnement.deleteMany({ where: { atelierId: autreAtelier.id } });
   });
@@ -182,12 +203,20 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
     assert.equal(e.abonnement, null);
   });
 
-  test("validation : ni durée ni date d'expiration -> 400 ; plan inactif -> 404 ; dates incohérentes -> 400", async () => {
+  test("validation : mode requis ; plan inactif -> 404 ; période sans tarif -> 400 ; dates incohérentes -> 400", async () => {
     const url = `/api/ateliers/${atelier.id}/abonnement/activer`;
     assert.equal((await superApi.post(url, { planId: plan.id })).status, 400);
-    assert.equal((await superApi.post(url, { planId: planInactif.id, dureeMois: 1 })).status, 404);
+    assert.equal((await superApi.post(url, { planId: plan.id, dureeMois: 1 })).status, 400, "sans mode : refusé");
+    assert.equal((await superApi.post(url, { mode: "CATALOGUE", planId: planInactif.id, periodicite: "MENSUEL" })).status, 404);
+    const sansAnnuel = await prisma.planAbonnement.create({ data: { nom: `Mensuel seul ${process.pid}`, prixMensuel: 1000, actif: true } });
+    const refus = await superApi.post(url, { mode: "CATALOGUE", planId: sansAnnuel.id, periodicite: "ANNUEL" });
+    assert.equal(refus.status, 400, "pas de prix annuel : pas d'offre annuelle");
+    await prisma.planAbonnement.delete({ where: { id: sansAnnuel.id } });
     const incoherent = await superApi.post(url, {
+      mode: "EXCEPTIONNEL",
       planId: plan.id,
+      prix: 5000,
+      note: "Test dates",
       dateDebut: "2030-05-01",
       dateExpiration: "2030-04-01",
     });
@@ -197,9 +226,10 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
   test("activation planifiée (début futur) -> EN_ATTENTE côté PDG", async () => {
     const debut = new Date(Date.now() + 10 * JOUR).toISOString();
     const res = await superApi.post(`/api/ateliers/${atelier.id}/abonnement/activer`, {
+      mode: "CATALOGUE",
       planId: plan.id,
+      periodicite: "MENSUEL",
       dateDebut: debut,
-      dureeMois: 1,
     });
     assert.equal(res.status, 201);
     assert.equal(res.body.statutEffectif, "EN_ATTENTE");
@@ -211,8 +241,10 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
 
   test("activation immédiate -> ACTIF côté PDG avec plan, dates et prix figé ; historique écrit", async () => {
     const res = await superApi.post(`/api/ateliers/${atelier.id}/abonnement/activer`, {
+      mode: "EXCEPTIONNEL",
       planId: plan.id,
       dureeMois: 2,
+      prix: 30000,
       note: "Paiement reçu en espèces",
     });
     assert.equal(res.status, 201);
@@ -234,7 +266,7 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
   });
 
   test("le prix du plan modifié ensuite ne change pas l'abonnement déjà activé", async () => {
-    await superApi.patch(`/api/plans-abonnement/${plan.id}`, { prixMensuel: "99999" });
+    await superApi.patch(`/api/plans-abonnement/${plan.id}`, { prixMensuel: 99999 });
     const detail = await superApi.get(`/api/ateliers/${atelier.id}/abonnement`);
     const actif = detail.body.abonnements.find((a) => a.statutEffectif === "ACTIF");
     assert.equal(Number(actif.prix), 30000);
@@ -275,7 +307,7 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
     await verifierLectureSeule();
     assert.equal((await superApi.post(`/api/ateliers/${atelier.id}/abonnement/${actif.id}/expirer`, {})).status, 409);
 
-    const reactive = await superApi.post(`/api/ateliers/${atelier.id}/abonnement/activer`, { planId: plan.id, dureeMois: 1 });
+    const reactive = await superApi.post(`/api/ateliers/${atelier.id}/abonnement/activer`, { mode: "CATALOGUE", planId: plan.id, periodicite: "MENSUEL" });
     assert.equal((await adminApi.get("/api/clientes")).status, 200);
     const desactivation = await superApi.post(`/api/ateliers/${atelier.id}/abonnement/${reactive.body.id}/desactiver`, {});
     assert.equal(desactivation.status, 200);
@@ -290,8 +322,9 @@ describe("Abonnement manuel (SUPERADMIN) et état côté PDG", () => {
 
   test("RÉGRESSION : un abonnement d'un autre atelier n'est ni modifiable ni désactivable via ce chemin (404)", async () => {
     const chezAutre = await superApi.post(`/api/ateliers/${autreAtelier.id}/abonnement/activer`, {
+      mode: "CATALOGUE",
       planId: plan.id,
-      dureeMois: 1,
+      periodicite: "MENSUEL",
     });
     assert.equal(chezAutre.status, 201);
     const tentative = await superApi.post(`/api/ateliers/${atelier.id}/abonnement/${chezAutre.body.id}/desactiver`, {});
